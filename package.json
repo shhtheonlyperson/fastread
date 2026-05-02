@@ -3,8 +3,30 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "expo-router/entry",
   "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
+    "web": "expo start --web",
     "test": "node --test",
     "serve": "node server.js"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~55.0.10",
+    "expo": "~55.0.19",
+    "expo-constants": "~55.0.15",
+    "expo-image": "~55.0.9",
+    "expo-linking": "~55.0.14",
+    "expo-router": "~55.0.13",
+    "expo-status-bar": "~55.0.5",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "react-native": "0.85.2",
+    "react-native-gesture-handler": "~2.31.1",
+    "react-native-reanimated": "~4.3.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.24.0",
+    "react-native-web": "^0.21.2"
   }
 }
