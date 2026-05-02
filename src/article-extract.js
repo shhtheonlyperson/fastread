@@ -1,3 +1,5 @@
+import { countReadingUnits } from "./reader-core.js";
+
 const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 
 const ENTITY_MAP = {
@@ -44,7 +46,7 @@ export function extractArticle(html, sourceUrl = "") {
     title,
     url: sourceUrl,
     text: best?.text || "",
-    wordCount: best ? countWords(best.text) : 0,
+    wordCount: best ? countReadingUnits(best.text) : 0,
     source: best?.source || "none",
   };
 }
@@ -139,7 +141,7 @@ function extractJsonLdText(html) {
     const json = script.replace(/^<script\b[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
     try {
       const value = findArticleText(JSON.parse(json));
-      if (value && countWords(value) > 10) {
+      if (value && countReadingUnits(value) > 10) {
         return value;
       }
     } catch {
@@ -174,7 +176,7 @@ function findArticleText(value) {
     for (const key of ["@graph", "mainEntity", "mainEntityOfPage", "text", "description"]) {
       if (value[key]) {
         const text = typeof value[key] === "string" ? value[key] : findArticleText(value[key]);
-        if (text && countWords(text) > 10) {
+        if (text && countReadingUnits(text) > 10) {
           return text;
         }
       }
@@ -278,18 +280,14 @@ function matchAttribute(html, tagPattern, attribute) {
   return tag.match(attributeRe)?.[2] || "";
 }
 
-function countWords(value) {
-  return (String(value || "").match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) || []).length;
-}
-
 function scoreText(value) {
-  const words = countWords(value);
-  if (words < 20) {
+  const readingUnits = countReadingUnits(value);
+  if (readingUnits < 20) {
     return 0;
   }
 
-  const paragraphs = String(value || "").split(/\n{2,}/).filter((paragraph) => countWords(paragraph) > 8).length;
-  return words + paragraphs * 25;
+  const paragraphs = String(value || "").split(/\n{2,}/).filter((paragraph) => countReadingUnits(paragraph) > 8).length;
+  return readingUnits + paragraphs * 25;
 }
 
 function cloneRegex(pattern) {

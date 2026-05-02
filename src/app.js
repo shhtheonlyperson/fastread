@@ -5,6 +5,7 @@ import {
   estimateMinutes,
   getProgress,
   splitForFocus,
+  tokenSeparator,
   tokenize,
 } from "./reader-core.js";
 
@@ -39,6 +40,7 @@ const els = {
 let tokens = [];
 let index = 0;
 let isPlaying = false;
+let hasFinished = false;
 let timer = null;
 
 const icons = {
@@ -74,6 +76,7 @@ function refreshTokens(resetIndex = false) {
   tokens = tokenize(els.textInput.value);
   if (resetIndex) {
     index = 0;
+    hasFinished = false;
   }
   index = clamp(index, 0, Math.max(tokens.length - 1, 0));
   render();
@@ -192,8 +195,9 @@ async function toggleFocusMode() {
   render();
 }
 
-function stop() {
+function stop(completed = false) {
   isPlaying = false;
+  hasFinished = completed;
   clearTimeout(timer);
   timer = null;
   render();
@@ -209,10 +213,11 @@ function scheduleNext() {
   const delay = durationForToken(token, Number(els.wpm.value), els.punctuationPause.checked);
   timer = window.setTimeout(() => {
     if (index >= tokens.length - 1) {
-      stop();
+      stop(true);
       return;
     }
     index += 1;
+    hasFinished = false;
     render();
     scheduleNext();
   }, delay);
@@ -221,6 +226,11 @@ function scheduleNext() {
 function togglePlayback() {
   if (!tokens.length) {
     return;
+  }
+
+  if (!isPlaying && hasFinished) {
+    index = 0;
+    hasFinished = false;
   }
 
   isPlaying = !isPlaying;
@@ -240,11 +250,12 @@ function move(delta) {
 
 function getFocusHtml() {
   return tokens
-    .map((token) => {
+    .map((token, tokenIndex) => {
       const parts = splitForFocus(token);
-      return `<span class="fastread-word">${escapeHtml(parts.before)}<span class="fastread-focus">${escapeHtml(parts.focus)}</span>${escapeHtml(parts.after)}</span>`;
+      const separator = escapeHtml(tokenSeparator(token, tokens[tokenIndex + 1]));
+      return `<span class="fastread-word">${escapeHtml(parts.before)}<span class="fastread-focus">${escapeHtml(parts.focus)}</span>${escapeHtml(parts.after)}</span>${separator}`;
     })
-    .join(" ");
+    .join("");
 }
 
 function escapeHtml(value) {

@@ -1,4 +1,10 @@
 const FOCUS_RE = /[\p{L}\p{N}]/u;
+const HAN_RE = /\p{Script=Han}/u;
+const LEADING_PUNCT_RE = /[「『（《〈【“‘"([{]/u;
+const TRAILING_PUNCT_RE = /[，。、！？；：」』）》〉】”’"'.,!?;:)\]}…]/u;
+const PAUSE_PUNCT_RE = /[.!?;:)\]}"'，。、！？；：）」』》〉】”’…]+$/u;
+const CJK_JOIN_LEFT_RE = /[\p{Script=Han}，。、！？；：）」』》〉】”’…]$/u;
+const CJK_JOIN_RIGHT_RE = /^[\p{Script=Han}「『（《〈【“‘]/u;
 
 export const DEFAULT_TEXT = `Paste an article, memo, or transcript here. FastRead will turn it into one focused word at a time, with the red letter held at the same visual anchor so your eyes move less.`;
 
@@ -7,9 +13,85 @@ export function tokenize(input) {
     return [];
   }
 
-  return input
-    .replace(/\u00a0/g, " ")
-    .match(/\S+/gu) || [];
+  const tokens = [];
+  let word = "";
+  let pendingPrefix = "";
+
+  const flushWord = () => {
+    if (word) {
+      tokens.push(word);
+      word = "";
+    }
+  };
+
+  const flushPrefix = () => {
+    if (pendingPrefix) {
+      tokens.push(pendingPrefix);
+      pendingPrefix = "";
+    }
+  };
+
+  for (const char of input.replace(/\u00a0/g, " ")) {
+    if (/\s/u.test(char)) {
+      flushWord();
+      flushPrefix();
+      continue;
+    }
+
+    if (HAN_RE.test(char)) {
+      flushWord();
+      tokens.push(`${pendingPrefix}${char}`);
+      pendingPrefix = "";
+      continue;
+    }
+
+    if (!word && LEADING_PUNCT_RE.test(char)) {
+      pendingPrefix += char;
+      continue;
+    }
+
+    if (TRAILING_PUNCT_RE.test(char)) {
+      if (word) {
+        word += char;
+      } else if (tokens.length) {
+        tokens[tokens.length - 1] += char;
+      } else {
+        pendingPrefix += char;
+      }
+      continue;
+    }
+
+    if (pendingPrefix) {
+      word += pendingPrefix;
+      pendingPrefix = "";
+    }
+    word += char;
+  }
+
+  flushWord();
+  flushPrefix();
+
+  return tokens;
+}
+
+export function countReadingUnits(input) {
+  return tokenize(input).filter((token) => FOCUS_RE.test(token)).length;
+}
+
+export function containsCjk(input) {
+  return HAN_RE.test(String(input || ""));
+}
+
+export function tokenSeparator(leftToken, rightToken) {
+  if (!leftToken || !rightToken) {
+    return "";
+  }
+
+  return CJK_JOIN_LEFT_RE.test(leftToken) && CJK_JOIN_RIGHT_RE.test(rightToken) ? "" : " ";
+}
+
+export function joinTokensForDisplay(tokens) {
+  return tokens.reduce((text, token, index) => `${text}${index ? tokenSeparator(tokens[index - 1], token) : ""}${token}`, "");
 }
 
 export function getFocusIndex(token) {
@@ -67,7 +149,7 @@ export function durationForToken(token, wpm, punctuationPause = true) {
   const base = 60000 / safeWpm;
   const focusableCount = Array.from(token || "").filter((char) => FOCUS_RE.test(char)).length;
   const lengthMultiplier = focusableCount > 9 ? 1 + Math.min((focusableCount - 9) * 0.07, 0.6) : 1;
-  const pauseMultiplier = punctuationPause && /[.!?;:)]["')\]]*$/u.test(token || "") ? 1.65 : 1;
+  const pauseMultiplier = punctuationPause && PAUSE_PUNCT_RE.test(token || "") ? 1.65 : 1;
 
   return Math.round(base * lengthMultiplier * pauseMultiplier);
 }
