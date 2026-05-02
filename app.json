@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "fastread",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shhtheonlyperson.fastread"
