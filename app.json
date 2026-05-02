@@ -3,7 +3,7 @@
     "name": "FastRead",
     "slug": "fastread",
     "version": "0.1.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "scheme": "fastread",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -17,7 +17,8 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": false
