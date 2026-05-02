@@ -1,0 +1,228 @@
+import SwiftUI
+
+enum JRColor {
+    static let paper = Color(hex: 0xF5EFE2)
+    static let paperStrong = Color(hex: 0xFAF6EC)
+    static let paperDeep = Color(hex: 0xECE4D2)
+    static let ink = Color(hex: 0x1F1A17)
+    static let inkMid = Color(hex: 0x4A3F37)
+    static let inkQuiet = Color(hex: 0x8A7A6A)
+    static let rule = Color(hex: 0x1F1A17, opacity: 0.08)
+    static let ruleStrong = Color(hex: 0x1F1A17, opacity: 0.18)
+    static let terracotta = Color(hex: 0xC96442)
+    static let focusDark = Color(hex: 0x1C1714)
+}
+
+enum JRFont {
+    static func serif(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Fraunces", size: size).weight(weight)
+    }
+
+    static func sans(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Inter", size: size).weight(weight)
+    }
+
+    static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("JetBrains Mono", size: size).weight(weight)
+    }
+}
+
+extension Color {
+    init(hex: UInt32, opacity: Double = 1) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xff) / 255,
+            green: Double((hex >> 8) & 0xff) / 255,
+            blue: Double(hex & 0xff) / 255,
+            opacity: opacity
+        )
+    }
+}
+
+struct SectionLabel: View {
+    let text: String
+    var color: Color = JRColor.inkQuiet
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(JRFont.mono(11, weight: .medium))
+            .tracking(1.54)
+            .foregroundStyle(color)
+            .lineLimit(1)
+    }
+}
+
+struct JRCard<Content: View>: View {
+    var padding: CGFloat = 18
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .padding(padding)
+            .background(JRColor.paperStrong)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(JRColor.rule, lineWidth: 0.5)
+            )
+    }
+}
+
+struct JRProgressBar: View {
+    let progress: Double
+    var height: CGFloat = 2
+    var track: Color = JRColor.rule
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(track)
+                Capsule()
+                    .fill(JRColor.terracotta)
+                    .frame(width: max(0, min(1, progress)) * proxy.size.width)
+            }
+        }
+        .frame(height: height)
+    }
+}
+
+struct BrandMark: View {
+    var size: CGFloat = 56
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: 0xF3ECE1), Color(hex: 0xE9DCC5), Color(hex: 0xD9C8AA)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(spacing: 7) {
+                ForEach(0..<Int(size / 8 + 2), id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.black.opacity(0.025))
+                        .frame(height: 1)
+                    Spacer(minLength: 0)
+                }
+            }
+            .opacity(0.7)
+
+            HStack(alignment: .lastTextBaseline, spacing: -size * 0.10) {
+                Text("J")
+                    .font(JRFont.sans(size * 0.46, weight: .medium))
+                    .foregroundStyle(JRColor.ink.opacity(0.55))
+                Text("R")
+                    .font(JRFont.serif(size * 0.50, weight: .bold))
+                    .foregroundStyle(JRColor.terracotta)
+            }
+            .tracking(-size * 0.01)
+            .offset(x: size * 0.02, y: size * 0.02)
+
+            Circle()
+                .fill(JRColor.terracotta)
+                .frame(width: size * 0.11, height: size * 0.11)
+                .offset(x: size * 0.28, y: -size * 0.21)
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+}
+
+struct TabGlyph: View {
+    let tab: AppTab
+    let color: Color
+
+    var body: some View {
+        ZStack {
+            switch tab {
+            case .home:
+                HStack(spacing: 2) {
+                    RoundedRectangle(cornerRadius: 1)
+                        .stroke(color, lineWidth: 1.4)
+                        .frame(width: 7, height: 14)
+                    RoundedRectangle(cornerRadius: 1)
+                        .stroke(color, lineWidth: 1.4)
+                        .frame(width: 7, height: 14)
+                }
+            case .source:
+                Circle()
+                    .stroke(color, lineWidth: 1.4)
+                    .frame(width: 16, height: 16)
+                Rectangle()
+                    .fill(color)
+                    .frame(width: 8, height: 1.4)
+                Rectangle()
+                    .fill(color)
+                    .frame(width: 1.4, height: 8)
+            case .reader:
+                Rectangle()
+                    .stroke(color, lineWidth: 1.4)
+                    .frame(width: 12, height: 12)
+                Circle()
+                    .fill(color)
+                    .frame(width: 4, height: 4)
+            case .stats:
+                HStack(alignment: .bottom, spacing: 4) {
+                    Capsule().fill(color).frame(width: 1.4, height: 8)
+                    Capsule().fill(color).frame(width: 1.4, height: 13)
+                    Capsule().fill(color).frame(width: 1.4, height: 7)
+                    Capsule().fill(color).frame(width: 1.4, height: 10)
+                }
+            case .settings:
+                SettingsGlyph(color: color)
+            }
+        }
+        .frame(width: 22, height: 22)
+    }
+}
+
+private struct SettingsGlyph: View {
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            var path = Path()
+            path.addEllipse(in: CGRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6))
+            context.stroke(path, with: .color(color), lineWidth: 1.4)
+
+            let lines: [(CGPoint, CGPoint)] = [
+                (CGPoint(x: 11, y: 2), CGPoint(x: 11, y: 5)),
+                (CGPoint(x: 11, y: 17), CGPoint(x: 11, y: 20)),
+                (CGPoint(x: 2, y: 11), CGPoint(x: 5, y: 11)),
+                (CGPoint(x: 17, y: 11), CGPoint(x: 20, y: 11)),
+                (CGPoint(x: 4.5, y: 4.5), CGPoint(x: 6.6, y: 6.6)),
+                (CGPoint(x: 15.4, y: 15.4), CGPoint(x: 17.5, y: 17.5)),
+                (CGPoint(x: 4.5, y: 17.5), CGPoint(x: 6.6, y: 15.4)),
+                (CGPoint(x: 15.4, y: 6.6), CGPoint(x: 17.5, y: 4.5)),
+            ]
+
+            for line in lines {
+                var linePath = Path()
+                linePath.move(to: line.0)
+                linePath.addLine(to: line.1)
+                context.stroke(linePath, with: .color(color), lineWidth: 1.4)
+            }
+        }
+    }
+}
+
+struct Chevron: View {
+    var color: Color = JRColor.inkQuiet
+
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(color)
+    }
+}
+
+extension View {
+    func paperBackground() -> some View {
+        background(JRColor.paper.ignoresSafeArea())
+    }
+}
