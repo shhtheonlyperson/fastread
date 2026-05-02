@@ -1,5 +1,6 @@
 node_modules/
 .build/
+.expo/
 .DS_Store
 *.log
 coverage/
