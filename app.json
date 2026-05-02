@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "FastRead",
+    "slug": "fastread",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "fastread",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.shhtheonlyperson.fastread"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
