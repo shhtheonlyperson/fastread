@@ -40,6 +40,41 @@ test("extractArticle can use JSON-LD articleBody when available", () => {
   assert.equal(result.text, articleBody);
 });
 
+test("extractArticle scores Traditional Chinese text by readable units instead of spaces", () => {
+  const html = `
+    <html>
+      <head><title>中文閱讀測試</title></head>
+      <body>
+        <nav>首頁 登入 分享</nav>
+        <div class="entry-content">
+          <p>高效率閱讀不是把文字掃過去，而是把注意力放在最穩的位置。</p>
+          <p>當每個字被穩定呈現，眼睛不需要在段落裡來回尋找焦點。</p>
+        </div>
+      </body>
+    </html>`;
+
+  const result = extractArticle(html);
+
+  assert.equal(result.source, "entry-content");
+  assert.match(result.text, /高效率閱讀/);
+  assert.ok(result.wordCount > 20);
+});
+
+test("extractArticle accepts Simplified Chinese JSON-LD articleBody", () => {
+  const articleBody = "快速阅读不等于跳过理解。更好的方式是把信息拆成稳定的小单位，让眼睛少移动，让大脑持续跟上上下文。";
+  const html = `
+    <script type="application/ld+json">
+      {"@type":"Article","headline":"中文示例","articleBody":"${articleBody}"}
+    </script>
+    <body><main>短页面</main></body>`;
+
+  const result = extractArticle(html);
+
+  assert.equal(result.source, "json-ld");
+  assert.equal(result.text, articleBody);
+  assert.ok(result.wordCount > 20);
+});
+
 test("htmlToText decodes entities and inserts paragraph breaks", () => {
   assert.equal(htmlToText("<p>Fast&nbsp;readers</p><p>focus &amp; move.</p>"), "Fast readers\n\nfocus & move.");
 });

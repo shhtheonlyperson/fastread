@@ -1,10 +1,10 @@
 import { StatusBar } from "expo-status-bar";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { useFonts } from "expo-font";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
-  Modal,
   Pressable,
   ScrollView,
   Switch,
@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { extractArticle } from "../src/article-extract.js";
-import { clamp, durationForToken, estimateMinutes, splitForFocus, tokenize } from "../src/reader-core.js";
+import { clamp, containsCjk, durationForToken, estimateMinutes, joinTokensForDisplay, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
 const color = {
   paper: "#f5efe2",
@@ -32,6 +32,8 @@ const color = {
 };
 
 const currentText = `Researchers say a quiet shift in how we read is reshaping attention. For most of the past decade, the conversation around digital reading focused on what was being lost: depth, patience, the long arc of a paragraph. But a new wave of cognitive scientists, working with eye-tracking data and tools that present text one word at a time, argue that something else is happening too. Readers are not simply skimming more. They are renegotiating the basic contract between eye and page, learning to absorb prose in shorter visual jumps and longer mental ones. The implications, these researchers say, are still emerging, but the early evidence suggests that the brain is more elastic about how it takes in language than the long history of the printed book might lead us to believe.`;
+const traditionalText = `高效率閱讀不是把文字掃過去，而是把注意力放在最穩的位置。當每個字被穩定呈現，眼睛不需要在段落裡來回尋找焦點，大腦就能把更多力氣留給理解。這種節奏特別適合新聞、備忘錄和長篇訪談，因為讀者可以快速前進，卻仍然保留句子的呼吸。`;
+const simplifiedText = `快速阅读不等于跳过理解。更好的方式是把信息拆成稳定的小单位，让眼睛少移动，让大脑持续跟上上下文。对于没有空格的中文内容，阅读器需要按汉字和标点处理节奏，才能让速度和理解同时成立。`;
 
 const seedArticle = {
   id: "attention",
@@ -48,6 +50,30 @@ const seedArticle = {
 
 const initialLibrary = [
   seedArticle,
+  {
+    id: "traditional-chinese",
+    title: "高效率閱讀不是把文字掃過去",
+    source: "數位時代",
+    author: "FastRead Desk",
+    date: "May 2, 2026",
+    readTime: "2 min",
+    progress: 0,
+    lede: "真正的速度來自更穩定的注意力，而不是更用力地掃描頁面。",
+    tag: "Saved",
+    text: traditionalText,
+  },
+  {
+    id: "simplified-chinese",
+    title: "快速阅读不等于跳过理解",
+    source: "少数派",
+    author: "FastRead Desk",
+    date: "May 2, 2026",
+    readTime: "2 min",
+    progress: 0,
+    lede: "阅读器需要按汉字和标点处理节奏，才能让速度和理解同时成立。",
+    tag: "Saved",
+    text: simplifiedText,
+  },
   makeArticle("memo", "The Long-Memo Renaissance", "Stratechery", "11 min", 0, "Inside the quiet revival of the 3,000-word strategy memo at large technology companies.", "Saved"),
   makeArticle("fed", "Fed signals patience as inflation cools to 2.3%", "Reuters", "3 min", 1, "Policymakers indicated they are in no hurry to cut rates further despite the latest figures.", "Finished"),
   makeArticle("mars", "A surprisingly habitable patch of Mars, and what it means", "Quanta", "8 min", 0.62, "New radar data hints at briny aquifers within a kilometer of the surface.", "Reading now"),
@@ -92,6 +118,7 @@ export default function FastReadScreen() {
   const [articleId, setArticleId] = useState(seedArticle.id);
   const [wordIndex, setWordIndex] = useState(Math.floor(tokenize(seedArticle.text).length * seedArticle.progress));
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasFinished, setHasFinished] = useState(seedArticle.progress >= 1);
   const [focusMode, setFocusMode] = useState(false);
   const [wpm, setWpm] = useState(540);
   const [punctuationPause, setPunctuationPause] = useState(true);
@@ -102,7 +129,9 @@ export default function FastReadScreen() {
   const tokens = useMemo(() => tokenize(article.text), [article.text]);
   const token = tokens[wordIndex] || "";
   const progress = tokens.length ? (wordIndex + 1) / tokens.length : 0;
-  const isLandscape = width > height;
+  const physicalIsLandscape = width > height;
+  const appIsLandscape = false;
+  const focusIsLandscape = focusMode || physicalIsLandscape;
   const isWide = width >= 700;
 
   useEffect(() => {
@@ -116,6 +145,7 @@ export default function FastReadScreen() {
       setWordIndex((current) => {
         if (current >= tokens.length - 1) {
           setIsPlaying(false);
+          setHasFinished(true);
           return current;
         }
         return current + 1;
@@ -124,6 +154,65 @@ export default function FastReadScreen() {
 
     return () => clearTimeout(timeout);
   }, [isPlaying, punctuationPause, token, tokens.length, wpm]);
+
+  useEffect(() => {
+    if (focusMode) return undefined;
+
+    let shouldLock = true;
+
+    const lockPortrait = async () => {
+      try {
+        const supportsPortrait = await ScreenOrientation.supportsOrientationLockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        if (shouldLock && supportsPortrait) {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        }
+      } catch (error) {
+        console.warn("Unable to lock app to portrait.", error);
+      }
+    };
+
+    lockPortrait();
+
+    return () => {
+      shouldLock = false;
+    };
+  }, [focusMode]);
+
+  useEffect(() => {
+    if (!focusMode) return undefined;
+
+    let shouldLock = true;
+
+    const openInLandscape = async () => {
+      try {
+        const supportsLandscape = await ScreenOrientation.supportsOrientationLockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        if (shouldLock && supportsLandscape) {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        }
+      } catch (error) {
+        console.warn("Unable to lock focus mode to landscape.", error);
+      }
+    };
+
+    openInLandscape();
+
+    return () => {
+      shouldLock = false;
+
+      const restoreOrientation = async () => {
+        try {
+          const supportsPortrait = await ScreenOrientation.supportsOrientationLockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          if (supportsPortrait) {
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          }
+        } catch (error) {
+          console.warn("Unable to restore orientation after focus mode.", error);
+        }
+      };
+
+      restoreOrientation();
+    };
+  }, [focusMode]);
 
   useEffect(() => {
     if (!tokens.length) return;
@@ -143,6 +232,7 @@ export default function FastReadScreen() {
   const openArticle = useCallback((item, resume = item.progress > 0) => {
     const articleTokens = tokenize(item.text);
     setIsPlaying(false);
+    setHasFinished(resume && item.progress >= 1);
     setArticleId(item.id);
     setWordIndex(resume ? clamp(Math.floor(articleTokens.length * item.progress), 0, Math.max(articleTokens.length - 1, 0)) : 0);
     setActiveTab("reader");
@@ -152,22 +242,23 @@ export default function FastReadScreen() {
     (text, title = "Pasted text", source = "Clipboard") => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const words = tokenize(trimmed);
+      const readingUnits = tokenize(trimmed);
       const item = {
         id: `draft-${Date.now()}`,
         title,
         source,
         author: "You",
         date: "Today",
-        readTime: `${Math.max(1, Math.ceil(estimateMinutes(words.length, wpm)))} min`,
+        readTime: `${Math.max(1, Math.ceil(estimateMinutes(readingUnits.length, wpm)))} min`,
         progress: 0,
-        lede: words.slice(0, 18).join(" "),
+        lede: makeLede(trimmed, readingUnits),
         tag: "Reading now",
         text: trimmed,
       };
       setLibrary((items) => [item, ...items]);
       setArticleId(item.id);
       setWordIndex(0);
+      setHasFinished(false);
       setActiveTab("reader");
     },
     [wpm],
@@ -176,6 +267,7 @@ export default function FastReadScreen() {
   const move = useCallback(
     (delta) => {
       setIsPlaying(false);
+      setHasFinished(false);
       setWordIndex((current) => clamp(current + delta, 0, Math.max(tokens.length - 1, 0)));
     },
     [tokens.length],
@@ -184,10 +276,26 @@ export default function FastReadScreen() {
   const setProgress = useCallback(
     (value) => {
       setIsPlaying(false);
+      setHasFinished(false);
       setWordIndex(clamp(Math.floor(value * Math.max(tokens.length - 1, 0)), 0, Math.max(tokens.length - 1, 0)));
     },
     [tokens.length],
   );
+
+  const togglePlayback = useCallback(() => {
+    if (!tokens.length) return;
+
+    if (isPlaying) {
+      setIsPlaying(false);
+      return;
+    }
+
+    if (hasFinished) {
+      setWordIndex(0);
+      setHasFinished(false);
+    }
+    setIsPlaying(true);
+  }, [hasFinished, isPlaying, tokens.length]);
 
   if (!fontsLoaded) {
     return (
@@ -200,13 +308,13 @@ export default function FastReadScreen() {
   return (
     <View style={s.app}>
       <StatusBar style="dark" />
-      <View style={[s.contentFrame, isWide && s.contentFrameWide, isLandscape && s.contentFrameLandscape]}>
-        {activeTab === "home" ? <LibraryScreen insets={insets} isLandscape={isLandscape} library={library} onResume={() => openArticle(article, true)} onOpen={openArticle} /> : null}
-        {activeTab === "source" ? <SourceScreen insets={insets} isLandscape={isLandscape} onAddArticle={addArticle} /> : null}
+      <View style={[s.contentFrame, isWide && s.contentFrameWide, appIsLandscape && s.contentFrameLandscape]}>
+        {activeTab === "home" ? <LibraryScreen insets={insets} isLandscape={appIsLandscape} library={library} onResume={() => openArticle(article, true)} onOpen={openArticle} /> : null}
+        {activeTab === "source" ? <SourceScreen insets={insets} isLandscape={appIsLandscape} onAddArticle={addArticle} /> : null}
         {activeTab === "reader" ? (
           <ReaderScreen
             insets={insets}
-            isLandscape={isLandscape}
+            isLandscape={appIsLandscape}
             article={article}
             token={token}
             tokens={tokens}
@@ -220,15 +328,15 @@ export default function FastReadScreen() {
             onBack={() => setActiveTab("home")}
             onMove={move}
             onScrub={setProgress}
-            onPlayPause={() => tokens.length && setIsPlaying((value) => !value)}
+            onPlayPause={togglePlayback}
             onFocus={() => setFocusMode(true)}
           />
         ) : null}
-        {activeTab === "stats" ? <StatsScreen insets={insets} isLandscape={isLandscape} /> : null}
+        {activeTab === "stats" ? <StatsScreen insets={insets} isLandscape={appIsLandscape} /> : null}
         {activeTab === "settings" ? (
           <SettingsScreen
             insets={insets}
-            isLandscape={isLandscape}
+            isLandscape={appIsLandscape}
             wpm={wpm}
             setWpm={setWpm}
             punctuationPause={punctuationPause}
@@ -240,12 +348,12 @@ export default function FastReadScreen() {
           />
         ) : null}
 
-        <TabBar activeTab={activeTab} onChange={setActiveTab} bottomInset={Math.max(insets.bottom, isLandscape ? 16 : 28)} />
+        <TabBar activeTab={activeTab} onChange={setActiveTab} bottomInset={Math.max(insets.bottom, appIsLandscape ? 16 : 28)} />
       </View>
 
       <FocusMode
         visible={focusMode}
-        isLandscape={isLandscape}
+        isLandscape={focusIsLandscape}
         token={token}
         article={article}
         progress={progress}
@@ -257,7 +365,7 @@ export default function FastReadScreen() {
         wordFont={wordFont}
         onClose={() => setFocusMode(false)}
         onMove={move}
-        onPlayPause={() => tokens.length && setIsPlaying((value) => !value)}
+        onPlayPause={togglePlayback}
       />
     </View>
   );
@@ -503,7 +611,8 @@ function ReaderScreen({
                 <Text key={`${item}-${index}`} style={{ color: baseColor, fontWeight: index === wordIndex ? "600" : "400" }}>
                   {parts.before}
                   <Text style={{ color: color.terracotta, fontWeight: "700" }}>{parts.focus}</Text>
-                  {parts.after}{" "}
+                  {parts.after}
+                  {tokenSeparator(item, tokens[index + 1])}
                 </Text>
               );
             })}
@@ -517,38 +626,38 @@ function ReaderScreen({
 function FocusMode({ visible, isLandscape, token, article, progress, wordIndex, total, isPlaying, wpm, focusStyle, wordFont, onClose, onMove, onPlayPause }) {
   const insets = useSafeAreaInsets();
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <View style={[s.focusScreen, { paddingTop: Math.max(insets.top + 10, isLandscape ? 28 : 56), paddingBottom: Math.max(insets.bottom, isLandscape ? 18 : 40) }]}>
-        <StatusBar hidden />
-        <View style={s.focusTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.focusLabel}>Focus / {wpm} wpm</Text>
-            <Text numberOfLines={1} style={s.focusTitle}>
-              {article.title}
-            </Text>
-          </View>
-          <Pressable onPress={onClose} style={s.closeButton}>
-            <Text style={s.closeText}>x</Text>
-          </Pressable>
+    <View style={[s.focusScreen, s.focusOverlay, { paddingTop: Math.max(insets.top + 10, isLandscape ? 28 : 56), paddingBottom: Math.max(insets.bottom, isLandscape ? 18 : 40) }]}>
+      <StatusBar hidden />
+      <View style={s.focusTop}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.focusLabel}>Focus / {wpm} wpm</Text>
+          <Text numberOfLines={1} style={s.focusTitle}>
+            {article.title}
+          </Text>
         </View>
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <RSVPStage token={token} focusStyle={focusStyle} wordFont={wordFont} dark big compact={isLandscape} />
-        </View>
-        <View style={{ paddingHorizontal: 24, gap: 18 }}>
-          <View style={{ gap: 6 }}>
-            <ProgressBar progress={progress} track="rgba(245,239,226,0.15)" />
-            <View style={s.rowBetween}>
-              <Text style={s.focusProgress}>
-                {wordIndex + 1} / {total}
-              </Text>
-              <Text style={s.focusProgress}>{Math.round(progress * 100)}%</Text>
-            </View>
-          </View>
-          <Transport dark compact={isLandscape} isPlaying={isPlaying} onPlayPause={onPlayPause} onMove={onMove} />
-        </View>
+        <Pressable onPress={onClose} style={s.closeButton}>
+          <Text style={s.closeText}>x</Text>
+        </Pressable>
       </View>
-    </Modal>
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <RSVPStage token={token} focusStyle={focusStyle} wordFont={wordFont} dark big compact={isLandscape} />
+      </View>
+      <View style={{ paddingHorizontal: 24, gap: 18 }}>
+        <View style={{ gap: 6 }}>
+          <ProgressBar progress={progress} track="rgba(245,239,226,0.15)" />
+          <View style={s.rowBetween}>
+            <Text style={s.focusProgress}>
+              {wordIndex + 1} / {total}
+            </Text>
+            <Text style={s.focusProgress}>{Math.round(progress * 100)}%</Text>
+          </View>
+        </View>
+        <Transport dark compact={isLandscape} isPlaying={isPlaying} onPlayPause={onPlayPause} onMove={onMove} />
+      </View>
+    </View>
   );
 }
 
@@ -641,19 +750,20 @@ function RSVPStage({ token, focusStyle, wordFont, dark = false, big = false, com
   const parts = splitForFocus(token);
   const size = big ? (compact ? 58 : 76) : compact ? 44 : 54;
   const family = wordFont === "mono" ? "JetBrainsMono" : wordFont === "sans" ? "Inter" : "Fraunces";
+  const fontStyle = containsCjk(token) ? null : { fontFamily: family };
   const ink = dark ? color.paper : color.ink;
 
   return (
     <View style={[s.stage, { minHeight: big ? (compact ? 142 : 220) : compact ? 122 : 180 }]}>
       <FocusGuide type={focusStyle} dark={dark} />
       <View style={s.stageWord}>
-        <Text numberOfLines={1} adjustsFontSizeToFit style={[s.stageText, { color: ink, fontSize: size, fontFamily: family, textAlign: "right" }]}>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={[s.stageText, { color: ink, fontSize: size, textAlign: "right" }, fontStyle]}>
           {parts.before}
         </Text>
-        <Text numberOfLines={1} style={[s.stageFocus, { fontSize: size, fontFamily: family }]}>
+        <Text numberOfLines={1} style={[s.stageFocus, { fontSize: size }, fontStyle]}>
           {parts.focus}
         </Text>
-        <Text numberOfLines={1} adjustsFontSizeToFit style={[s.stageText, { color: ink, fontSize: size, fontFamily: family, textAlign: "left" }]}>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={[s.stageText, { color: ink, fontSize: size, textAlign: "left" }, fontStyle]}>
           {parts.after}
         </Text>
       </View>
@@ -745,38 +855,44 @@ function TabBar({ activeTab, onChange, bottomInset }) {
 
 function TabIcon({ id, active }) {
   const tint = active ? color.terracotta : color.inkQuiet;
+  let icon;
+
   if (id === "stats") {
-    return (
+    icon = (
       <View style={s.statsIcon}>
         {[8, 14, 10, 16].map((height, index) => (
           <View key={index} style={{ width: 2, height, borderRadius: 1, backgroundColor: tint }} />
         ))}
       </View>
     );
-  }
-  if (id === "source") {
-    return (
+  } else if (id === "source") {
+    icon = (
       <View style={[s.circleIcon, { borderColor: tint }]}>
         <Text style={[s.iconGlyph, { color: tint }]}>+</Text>
       </View>
     );
-  }
-  if (id === "reader") {
-    return (
+  } else if (id === "reader") {
+    icon = (
       <View style={[s.squareIcon, { borderColor: tint }]}>
         <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: tint }} />
       </View>
     );
+  } else if (id === "settings") {
+    icon = (
+      <View style={[s.settingsIcon, { borderColor: tint }]}>
+        <View style={[s.settingsIconDot, { backgroundColor: tint }]} />
+      </View>
+    );
+  } else {
+    icon = (
+      <View style={s.bookIcon}>
+        <View style={[s.bookPage, { borderColor: tint }]} />
+        <View style={[s.bookPage, { borderColor: tint }]} />
+      </View>
+    );
   }
-  if (id === "settings") {
-    return <Text style={[s.iconText, { color: tint }]}>⚙</Text>;
-  }
-  return (
-    <View style={s.bookIcon}>
-      <View style={[s.bookPage, { borderColor: tint }]} />
-      <View style={[s.bookPage, { borderColor: tint }]} />
-    </View>
-  );
+
+  return <View style={s.tabIconSlot}>{icon}</View>;
 }
 
 function BrandMark({ size = 56 }) {
@@ -903,6 +1019,11 @@ function makeArticle(id, title, source, readTime, progress, lede, tag) {
   };
 }
 
+function makeLede(text, tokens) {
+  const limit = containsCjk(text) ? 42 : 18;
+  return joinTokensForDisplay(tokens.slice(0, limit));
+}
+
 function dotStyle(progress) {
   if (progress >= 1) return { backgroundColor: color.inkQuiet, borderColor: color.inkQuiet };
   if (progress > 0) return { backgroundColor: color.terracotta, borderColor: color.terracotta };
@@ -1010,6 +1131,7 @@ const s = {
   tinyMono: { fontFamily: "JetBrainsMono", fontSize: 10, letterSpacing: 0.6, color: color.inkQuiet },
   fullText: { marginTop: 10, fontFamily: "Fraunces", fontSize: 15.5, lineHeight: 24, color: color.inkMid },
   focusScreen: { flex: 1, backgroundColor: color.focusDark },
+  focusOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
   focusTop: { flexDirection: "row", alignItems: "center", paddingHorizontal: 24, gap: 12 },
   focusLabel: { fontFamily: "JetBrainsMono", fontSize: 10, letterSpacing: 1.4, color: "rgba(245,239,226,0.5)", textTransform: "uppercase" },
   focusTitle: { marginTop: 4, fontFamily: "Fraunces", fontSize: 14, color: "rgba(245,239,226,0.85)" },
@@ -1040,15 +1162,17 @@ const s = {
   segment: { flex: 1, paddingVertical: 10, borderRadius: 3, alignItems: "center" },
   segmentText: { fontFamily: "Inter", fontSize: 13, color: color.inkMid, fontWeight: "600" },
   tabBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 12, flexDirection: "row", backgroundColor: color.paper },
-  tabButton: { flex: 1, alignItems: "center", gap: 3, paddingVertical: 6 },
+  tabButton: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 6 },
   tabLabel: { fontFamily: "JetBrainsMono", fontSize: 10, letterSpacing: 0.6, color: color.inkQuiet },
+  tabIconSlot: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   bookIcon: { width: 22, height: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
   bookPage: { width: 7, height: 14, borderWidth: 1.4, borderRadius: 1 },
   circleIcon: { width: 18, height: 18, borderWidth: 1.4, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   squareIcon: { width: 14, height: 14, borderWidth: 1.4, alignItems: "center", justifyContent: "center" },
   iconGlyph: { fontFamily: "Inter", fontSize: 14, lineHeight: 16, fontWeight: "600" },
   statsIcon: { width: 22, height: 22, flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 3 },
-  iconText: { fontSize: 18, lineHeight: 22 },
+  settingsIcon: { width: 18, height: 18, borderWidth: 1.4, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  settingsIconDot: { width: 5, height: 5, borderRadius: 2.5 },
   brandMark: { position: "relative", overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: "#eadcc5", borderWidth: 0.5, borderColor: "rgba(0,0,0,0.08)" },
   grain: { position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.02)" },
   brandLetters: { flexDirection: "row", alignItems: "baseline" },
