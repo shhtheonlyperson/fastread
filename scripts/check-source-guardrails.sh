@@ -38,6 +38,18 @@ reject_pattern "TextInput|smartInput|Paste or type" \
   "Expo Add screen must stay clipboard-only for the shipped TestFlight surface." \
   components/fast-read-screen.jsx
 
+require_pattern "nextArticleProgressState" \
+  "Expo reader progress sync must stay idempotent so playback timers are not starved by render loops." \
+  components/fast-read-screen.jsx src/reader-core.js
+
+require_pattern "return didChange \\? nextItems : items" \
+  "Expo reader progress sync must avoid library state writes when article progress is unchanged." \
+  components/fast-read-screen.jsx
+
+reject_pattern "\\[article, progress" \
+  "Expo reader effects must not depend on the full article object; use stable article ids instead." \
+  components/fast-read-screen.jsx
+
 reject_pattern "NSAttributedString[[:space:]]*\\(data:" \
   "Do not reintroduce synchronous NSAttributedString HTML parsing on paste/load paths." \
   FastReadApp

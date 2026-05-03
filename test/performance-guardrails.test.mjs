@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 
 import { htmlToText } from "../src/article-extract.js";
-import { contextWindow, durationForToken, tokenize } from "../src/reader-core.js";
+import { contextWindow, durationForToken, nextArticleProgressState, tokenize } from "../src/reader-core.js";
 
 function budget(baseMillis) {
   const multiplier = Number(process.env.FASTREAD_PERF_BUDGET_MULTIPLIER || "1");
@@ -73,6 +73,15 @@ test("reader core stress paths stay within practical budgets", () => {
       totalDuration += durationForToken(tokens[index % tokens.length], 540);
     }
     assert.ok(totalDuration > 0);
+  });
+
+  measure("skip 100k unchanged progress sync writes", 45, () => {
+    const article = { id: "perf", progress: 0.5, tagKey: "readingNow", finishedAt: null };
+    let unchanged = 0;
+    for (let index = 0; index < 100_000; index += 1) {
+      if (nextArticleProgressState(article, 0.5) === article) unchanged += 1;
+    }
+    assert.equal(unchanged, 100_000);
   });
 
   const text = measure("extract text from large HTML", 500, () => htmlToText(makeHtml(8_000)));

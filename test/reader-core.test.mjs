@@ -9,6 +9,7 @@ import {
   getFocusIndex,
   getProgress,
   joinTokensForDisplay,
+  nextArticleProgressState,
   shouldRestartPlayback,
   splitForFocus,
   tokenize,
@@ -93,4 +94,25 @@ test("playback restarts when saved reader state is already at the end", () => {
   assert.equal(shouldRestartPlayback(9, 10, false), true);
   assert.equal(shouldRestartPlayback(4, 10, true), true);
   assert.equal(shouldRestartPlayback(0, 0, true), false);
+});
+
+test("article progress sync is idempotent to avoid playback render loops", () => {
+  const reading = { id: "a", progress: 0.5, tagKey: "readingNow", finishedAt: null };
+  assert.equal(nextArticleProgressState(reading, 0.5, "2026-05-03T00:00:00.000Z"), reading);
+
+  assert.deepEqual(nextArticleProgressState(reading, 0.75, "2026-05-03T00:00:00.000Z"), {
+    id: "a",
+    progress: 0.75,
+    tagKey: "readingNow",
+    finishedAt: null,
+  });
+
+  const finished = nextArticleProgressState(reading, 1, "2026-05-03T00:00:00.000Z");
+  assert.deepEqual(finished, {
+    id: "a",
+    progress: 1,
+    tagKey: "finished",
+    finishedAt: "2026-05-03T00:00:00.000Z",
+  });
+  assert.equal(nextArticleProgressState(finished, 1, "2026-05-04T00:00:00.000Z"), finished);
 });
