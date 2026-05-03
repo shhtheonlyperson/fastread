@@ -10,6 +10,7 @@ import {
   getProgress,
   joinTokensForDisplay,
   nextArticleProgressState,
+  rangeValueFromLocation,
   shouldRestartPlayback,
   splitForFocus,
   tokenize,
@@ -94,6 +95,15 @@ test("playback restarts when saved reader state is already at the end", () => {
   assert.equal(shouldRestartPlayback(9, 10, false), true);
   assert.equal(shouldRestartPlayback(4, 10, true), true);
   assert.equal(shouldRestartPlayback(0, 0, true), false);
+});
+
+test("range input maps finger location continuously and clamps edges", () => {
+  assert.equal(rangeValueFromLocation(0, 200), 0);
+  assert.equal(rangeValueFromLocation(50, 200), 0.25);
+  assert.equal(rangeValueFromLocation(100, 200), 0.5);
+  assert.equal(rangeValueFromLocation(240, 200), 1);
+  assert.equal(rangeValueFromLocation(-20, 200), 0);
+  assert.equal(rangeValueFromLocation(50, 0), 1);
 });
 
 test("article progress sync is idempotent to avoid playback render loops", () => {

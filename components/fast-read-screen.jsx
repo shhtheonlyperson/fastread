@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  PanResponder,
   Pressable,
   ScrollView,
   Switch,
@@ -19,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { extractArticle } from "../src/article-extract.js";
-import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
+import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "0.2.0";
@@ -970,15 +971,58 @@ function PaceControl({ wpm, setWpm, compact = false }) {
 
 function Scrubber({ value, onChange }) {
   const [width, setWidth] = useState(1);
-  const apply = (event) => {
-    const next = clamp(event.nativeEvent.locationX / width, 0, 1);
-    onChange(next);
-  };
+  const widthRef = useRef(1);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const apply = useCallback(
+    (event) => {
+      onChangeRef.current(rangeValueFromLocation(event.nativeEvent.locationX, widthRef.current));
+    },
+    [],
+  );
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: apply,
+        onPanResponderMove: apply,
+        onPanResponderRelease: apply,
+        onPanResponderTerminate: apply,
+      }),
+    [apply],
+  );
+  const handleLayout = useCallback((event) => {
+    const nextWidth = Math.max(event.nativeEvent.layout.width, 1);
+    widthRef.current = nextWidth;
+    setWidth(nextWidth);
+  }, []);
+  const adjustBy = useCallback(
+    (delta) => {
+      onChange(clamp(value + delta, 0, 1));
+    },
+    [onChange, value],
+  );
   return (
-    <Pressable onPress={apply} onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={s.scrubber}>
+    <View
+      accessibilityActions={[
+        { name: "increment", label: "Increase" },
+        { name: "decrement", label: "Decrease" },
+      ]}
+      accessibilityRole="adjustable"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(clamp(value, 0, 1) * 100) }}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "increment") adjustBy(0.05);
+        if (event.nativeEvent.actionName === "decrement") adjustBy(-0.05);
+      }}
+      onLayout={handleLayout}
+      style={s.scrubber}
+      {...panResponder.panHandlers}
+    >
       <View style={[s.scrubberFill, { width: `${clamp(value, 0, 1) * 100}%` }]} />
       <View style={[s.scrubberThumb, { left: `${clamp(value, 0, 1) * 100}%` }]} />
-    </Pressable>
+    </View>
   );
 }
 
@@ -1421,9 +1465,9 @@ const s = {
   centerLine: { position: "absolute", top: 12, bottom: 12, left: "50%", width: 0.5 },
   centerCross: { position: "absolute", top: "50%", left: 24, right: 24, height: 0.5 },
   guideDot: { position: "absolute", left: "50%", width: 4, height: 4, marginLeft: -2, borderRadius: 2, backgroundColor: color.terracotta },
-  scrubber: { height: 22, justifyContent: "center" },
-  scrubberFill: { height: 2, borderRadius: 2, backgroundColor: color.terracotta },
-  scrubberThumb: { position: "absolute", width: 18, height: 18, marginLeft: -9, borderRadius: 9, backgroundColor: color.terracotta },
+  scrubber: { height: 34, justifyContent: "center" },
+  scrubberFill: { height: 3, borderRadius: 2, backgroundColor: color.terracotta },
+  scrubberThumb: { position: "absolute", width: 22, height: 22, marginLeft: -11, borderRadius: 11, backgroundColor: color.terracotta },
   transport: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 24, paddingTop: 18 },
   transportCompact: { gap: 10, paddingHorizontal: 0, paddingTop: 12 },
   playButton: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", backgroundColor: color.terracotta },
