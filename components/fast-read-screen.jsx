@@ -19,7 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { extractArticle } from "../src/article-extract.js";
-import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
+import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "0.2.0";
@@ -116,6 +116,8 @@ export default function FastReadScreen() {
   const appIsLandscape = physicalIsLandscape;
   const focusIsLandscape = focusMode || physicalIsLandscape;
   const isWide = width >= 700;
+  const activeArticleId = article?.id || null;
+  const activeArticleFinishedAt = article?.finishedAt || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -186,7 +188,7 @@ export default function FastReadScreen() {
   }, [wpm]);
 
   useEffect(() => {
-    if (!isPlaying || !tokens.length || !article) return undefined;
+    if (!isPlaying || !tokens.length || !activeArticleId) return undefined;
 
     const timeout = setTimeout(() => {
       setWordIndex((current) => {
@@ -201,7 +203,7 @@ export default function FastReadScreen() {
     }, durationForToken(token, wpm, punctuationPause));
 
     return () => clearTimeout(timeout);
-  }, [article, isPlaying, punctuationPause, recordWords, token, tokens.length, wpm]);
+  }, [activeArticleId, isPlaying, punctuationPause, recordWords, token, tokens.length, wpm]);
 
   useEffect(() => {
     ScreenOrientation.unlockAsync().catch((error) => {
@@ -210,24 +212,24 @@ export default function FastReadScreen() {
   }, []);
 
   useEffect(() => {
-    if (!article || !tokens.length) return;
-    const shouldRecordFinish = progress >= 1 && !article.finishedAt;
-    setLibrary((items) =>
-      items.map((item) =>
-        item.id === article.id
-          ? {
-              ...item,
-              progress,
-              tagKey: progress >= 1 ? "finished" : progress > 0 ? "readingNow" : item.tagKey,
-              finishedAt: progress >= 1 ? item.finishedAt || new Date().toISOString() : null,
-            }
-          : item,
-      ),
-    );
+    if (!activeArticleId || !tokens.length) return;
+
+    const shouldRecordFinish = progress >= 1 && !activeArticleFinishedAt;
+    const finishTimestamp = shouldRecordFinish ? new Date().toISOString() : undefined;
+    setLibrary((items) => {
+      let didChange = false;
+      const nextItems = items.map((item) => {
+        if (item.id !== activeArticleId) return item;
+        const nextItem = nextArticleProgressState(item, progress, finishTimestamp);
+        didChange ||= nextItem !== item;
+        return nextItem;
+      });
+      return didChange ? nextItems : items;
+    });
     if (shouldRecordFinish) {
       recordArticleFinished();
     }
-  }, [article, progress, recordArticleFinished, tokens.length]);
+  }, [activeArticleFinishedAt, activeArticleId, progress, recordArticleFinished, tokens.length]);
 
   const openArticle = useCallback((item, resume = item.progress > 0) => {
     if (!item) return;

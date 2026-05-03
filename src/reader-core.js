@@ -153,6 +153,29 @@ export function shouldRestartPlayback(currentIndex, tokenCount, hasFinished = fa
   return Boolean(hasFinished) || index >= count - 1;
 }
 
+export function nextArticleProgressState(article, progress, nowIso) {
+  if (!article || typeof article !== "object") return article;
+
+  const nextProgress = clamp(Number(progress) || 0, 0, 1);
+  const nextTagKey = nextProgress >= 1 ? "finished" : nextProgress > 0 ? "readingNow" : article.tagKey || "saved";
+  const nextFinishedAt = nextProgress >= 1 ? article.finishedAt || nowIso || new Date().toISOString() : null;
+
+  if (
+    article.progress === nextProgress &&
+    article.tagKey === nextTagKey &&
+    (article.finishedAt || null) === nextFinishedAt
+  ) {
+    return article;
+  }
+
+  return {
+    ...article,
+    progress: nextProgress,
+    tagKey: nextTagKey,
+    finishedAt: nextFinishedAt,
+  };
+}
+
 export function contextWindow(tokenCount, currentIndex, before = 18, after = 36) {
   if (!tokenCount || tokenCount < 0) {
     return {
