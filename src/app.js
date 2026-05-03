@@ -53,7 +53,7 @@ const icons = {
 function restoreState() {
   try {
     const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    els.textInput.value = state.text || DEFAULT_TEXT;
+    els.textInput.value = state.text ?? DEFAULT_TEXT;
     els.urlInput.value = state.url || "";
     els.wpm.value = state.wpm || 650;
     els.punctuationPause.checked = state.punctuationPause ?? true;

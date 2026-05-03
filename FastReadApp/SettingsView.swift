@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: ReadingStore
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -95,21 +96,34 @@ struct SettingsView: View {
             SettingsRow {
                 Text("Version")
                 Spacer()
-                Text("1.4.0")
+                Text(appVersion)
                     .font(JRFont.mono(13))
                     .foregroundStyle(JRColor.inkQuiet)
             }
             SettingsRow {
                 Text("Privacy policy")
                 Spacer()
-                Chevron()
+                Text("Local data only")
+                    .font(JRFont.mono(13))
+                    .foregroundStyle(JRColor.inkQuiet)
             }
             SettingsRow(isLast: true) {
                 Text("Send feedback")
                 Spacer()
-                Chevron()
+                Button {
+                    if let url = URL(string: "mailto:huge.huang@gmail.com?subject=JustRead%20feedback") {
+                        openURL(url)
+                    }
+                } label: {
+                    Chevron()
+                }
+                .buttonStyle(.plain)
             }
         }
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
     }
 }
 

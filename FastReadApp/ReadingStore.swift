@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class ReadingStore: ObservableObject {
     @Published var articles: [ReadingArticle]
-    @Published var selectedArticleID: String
+    @Published var selectedArticleID: String?
     @Published var stats: ReadingStats
     @Published var wpm: Double {
         didSet { persistSettings() }
@@ -24,16 +24,18 @@ final class ReadingStore: ObservableObject {
     private var playbackTask: Task<Void, Never>?
     private let defaults: UserDefaults
 
-    var currentArticle: ReadingArticle {
-        articles[selectedArticleIndex]
+    var currentArticle: ReadingArticle? {
+        guard let selectedArticleIndex else { return articles.first }
+        return articles[selectedArticleIndex]
     }
 
     var currentTokens: [String] {
-        currentArticle.tokens
+        currentArticle?.tokens ?? []
     }
 
     var currentIndex: Int {
-        RSVPEngine.clamp(currentArticle.wordIndex, min: 0, max: max(currentTokens.count - 1, 0))
+        guard let currentArticle else { return 0 }
+        return RSVPEngine.clamp(currentArticle.wordIndex, min: 0, max: max(currentTokens.count - 1, 0))
     }
 
     var currentToken: String {
@@ -50,8 +52,28 @@ final class ReadingStore: ObservableObject {
         RSVPEngine.estimateMinutes(wordCount: max(currentTokens.count - currentIndex, 0), wpm: wpm)
     }
 
-    var selectedArticleIndex: Int {
-        articles.firstIndex { $0.id == selectedArticleID } ?? 0
+    var selectedArticleIndex: Int? {
+        guard let selectedArticleID else { return articles.isEmpty ? nil : 0 }
+        return articles.firstIndex { $0.id == selectedArticleID } ?? (articles.isEmpty ? nil : 0)
+    }
+
+    var recentSources: [RecentSource] {
+        var seen = Set<String>()
+        return articles
+            .compactMap { article -> RecentSource? in
+                let label = article.source.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !label.isEmpty, label != "Clipboard" else { return nil }
+                let key = (article.sourceURL ?? label).lowercased()
+                guard !seen.contains(key) else { return nil }
+                seen.insert(key)
+                return RecentSource(
+                    label: label,
+                    date: Self.relativeDateLabel(for: article.createdAt ?? article.lastOpenedAt ?? Date()),
+                    url: article.sourceURL
+                )
+            }
+            .prefix(5)
+            .map { $0 }
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -59,16 +81,15 @@ final class ReadingStore: ObservableObject {
         let settings = Self.loadSettings(from: defaults)
 
         self.articles = Self.loadArticles(from: defaults)
-        self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle) ?? SampleData.currentArticle.id
+        self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle)
         self.stats = Self.loadStats(from: defaults)
         self.wpm = settings.wpm
         self.punctuationPause = settings.punctuationPause
         self.focusIndicator = settings.focusIndicator
         self.wordTypeface = settings.wordTypeface
 
-        if !articles.contains(where: { $0.id == selectedArticleID }) {
-            selectedArticleID = SampleData.currentArticle.id
-        }
+        ensureSelectedArticle()
+        rollStatsIfNeeded()
     }
 
     deinit {
@@ -79,10 +100,11 @@ final class ReadingStore: ObservableObject {
         pause()
         guard articles.contains(where: { $0.id == id }) else { return }
         selectedArticleID = id
-        defaults.set(id, forKey: StorageKey.selectedArticle)
+        persistSelectedArticleID()
 
         updateSelectedArticle { article in
             article.timesOpened += 1
+            article.lastOpenedAt = Date()
             if !resume {
                 article.wordIndex = 0
                 if !article.isFinished {
@@ -131,40 +153,47 @@ final class ReadingStore: ObservableObject {
         updateSelectedArticle { article in
             article.wordIndex = RSVPEngine.clamp(index, min: 0, max: max(RSVPEngine.tokenize(article.text).count - 1, 0))
             article.isFinished = false
-            article.tag = article.progress > 0 ? "Reading now" : article.tag
+            article.finishedAt = nil
+            article.tag = article.progress > 0 ? "Reading now" : "Saved"
         }
     }
 
     func markRead() {
+        guard let currentArticle else { return }
         let wasFinished = currentArticle.isFinished
         pause()
         updateSelectedArticle { article in
             article.wordIndex = max(RSVPEngine.tokenize(article.text).count - 1, 0)
             article.progress = 1
             article.isFinished = true
+            article.finishedAt = Date()
             article.tag = "Finished"
         }
 
         if !wasFinished {
-            stats.today.articles += 1
-            stats.totalArticles += 1
-            persistStats()
+            recordFinishedArticle()
         }
     }
 
-    func addDraftArticle(text: String, title: String = "Pasted text", source: String = "Clipboard") {
+    func addDraftArticle(text: String, title: String = "Pasted text", source: String = "Clipboard", sourceURL: String? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         pause()
+        let tokens = RSVPEngine.tokenize(trimmed)
+        let now = Date()
         let article = ReadingArticle(
             id: "draft-\(UUID().uuidString)",
             title: title,
             source: source,
+            sourceURL: sourceURL,
             author: "You",
-            date: "Today",
-            readTime: "\(max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: RSVPEngine.tokenize(trimmed).count, wpm: wpm))))) min",
-            lede: RSVPEngine.tokenize(trimmed).prefix(18).joined(separator: " "),
+            date: Self.displayDate(for: now),
+            createdAt: now,
+            lastOpenedAt: now,
+            finishedAt: nil,
+            readTime: "\(max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: tokens.count, wpm: wpm))))) min",
+            lede: Self.makeLede(from: trimmed, tokens: tokens),
             tag: "Reading now",
             text: trimmed,
             progress: 0,
@@ -174,12 +203,12 @@ final class ReadingStore: ObservableObject {
         )
         articles.insert(article, at: 0)
         selectedArticleID = article.id
-        defaults.set(article.id, forKey: StorageKey.selectedArticle)
+        persistSelectedArticleID()
         persistArticles()
     }
 
-    func addFetchedArticle(title: String, source: String, text: String) {
-        addDraftArticle(text: text, title: title, source: source)
+    func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
+        addDraftArticle(text: text, title: title, source: source, sourceURL: url)
     }
 
     private func scheduleNext() {
@@ -209,16 +238,12 @@ final class ReadingStore: ObservableObject {
         updateSelectedArticle { article in
             article.wordIndex += 1
         }
-        stats.today.words += 1
-        if let lastIndex = stats.week.indices.last {
-            stats.week[lastIndex].words += 1
-        }
-        persistStats()
+        recordReadWords(1)
         scheduleNext()
     }
 
     private func updateSelectedArticle(_ mutate: (inout ReadingArticle) -> Void) {
-        guard articles.indices.contains(selectedArticleIndex) else { return }
+        guard let selectedArticleIndex, articles.indices.contains(selectedArticleIndex) else { return }
         var article = articles[selectedArticleIndex]
         mutate(&article)
 
@@ -227,8 +252,81 @@ final class ReadingStore: ObservableObject {
         if count > 0 {
             article.progress = article.isFinished ? 1 : Double(article.wordIndex + 1) / Double(count)
         }
+        article.tag = article.isFinished ? "Finished" : article.progress > 0 ? "Reading now" : "Saved"
         articles[selectedArticleIndex] = article
         persistArticles()
+    }
+
+    private func ensureSelectedArticle() {
+        if let selectedArticleID, articles.contains(where: { $0.id == selectedArticleID }) {
+            return
+        }
+
+        selectedArticleID = articles.first?.id
+        persistSelectedArticleID()
+    }
+
+    private func persistSelectedArticleID() {
+        if let selectedArticleID {
+            defaults.set(selectedArticleID, forKey: StorageKey.selectedArticle)
+        } else {
+            defaults.removeObject(forKey: StorageKey.selectedArticle)
+        }
+    }
+
+    private func recordReadWords(_ count: Int) {
+        guard count > 0 else { return }
+        startActivityIfNeeded()
+        stats.today.words += count
+        stats.today.minutes = Self.estimatedMinutes(for: stats.today.words, wpm: wpm)
+        if let todayIndex = stats.week.firstIndex(where: { $0.date == Self.dayKey(for: Date()) }) {
+            stats.week[todayIndex].words += count
+        }
+        stats.avgWPM = Int(wpm.rounded())
+        stats.bestWPM = max(stats.bestWPM, Int(wpm.rounded()))
+        persistStats()
+    }
+
+    private func recordFinishedArticle() {
+        startActivityIfNeeded()
+        stats.today.articles += 1
+        stats.today.minutes = Self.estimatedMinutes(for: stats.today.words, wpm: wpm)
+        stats.totalArticles += 1
+        stats.avgWPM = Int(wpm.rounded())
+        stats.bestWPM = max(stats.bestWPM, Int(wpm.rounded()))
+        persistStats()
+    }
+
+    private func startActivityIfNeeded(now: Date = Date()) {
+        rollStatsIfNeeded(now: now)
+        let todayKey = Self.dayKey(for: now)
+        let alreadyActiveToday = stats.lastActiveDay == todayKey && (stats.today.words > 0 || stats.today.articles > 0)
+        guard !alreadyActiveToday else { return }
+
+        if let lastActiveDay = stats.lastActiveDay,
+           let lastActiveDate = Self.date(fromDayKey: lastActiveDay),
+           Calendar.current.isDate(lastActiveDate, inSameDayAs: Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now) {
+            stats.streak += 1
+        } else {
+            stats.streak = 1
+        }
+        stats.lastActiveDay = todayKey
+    }
+
+    private func rollStatsIfNeeded(now: Date = Date()) {
+        let todayKey = Self.dayKey(for: now)
+        let datedWeek = stats.week.filter { $0.date != nil }
+        let wordsByDay = Dictionary(uniqueKeysWithValues: datedWeek.map { ($0.date ?? $0.day, $0.words) })
+        stats.week = Self.weekTemplate(endingAt: now).map { day in
+            DayWords(date: day.date, day: day.day, words: wordsByDay[day.date ?? day.day] ?? 0)
+        }
+
+        if stats.lastActiveDay != todayKey {
+            stats.today = TodayStats(words: wordsByDay[todayKey] ?? 0, minutes: 0, articles: 0)
+        } else if let todayWords = stats.week.first(where: { $0.date == todayKey })?.words {
+            stats.today.words = todayWords
+        }
+        stats.today.minutes = Self.estimatedMinutes(for: stats.today.words, wpm: wpm)
     }
 
     private func persistSettings() {
@@ -272,10 +370,9 @@ final class ReadingStore: ObservableObject {
     private static func loadArticles(from defaults: UserDefaults) -> [ReadingArticle] {
         guard
             let data = defaults.data(forKey: StorageKey.articles),
-            let articles = try? JSONDecoder().decode([ReadingArticle].self, from: data),
-            !articles.isEmpty
+            let articles = try? JSONDecoder().decode([ReadingArticle].self, from: data)
         else {
-            return SampleData.articles
+            return []
         }
         return articles
     }
@@ -285,10 +382,97 @@ final class ReadingStore: ObservableObject {
             let data = defaults.data(forKey: StorageKey.stats),
             let stats = try? JSONDecoder().decode(ReadingStats.self, from: data)
         else {
-            return SampleData.stats
+            return emptyStats()
+        }
+
+        guard stats.week.allSatisfy({ $0.date != nil }) else {
+            return emptyStats()
         }
         return stats
     }
+
+    private static func emptyStats(for date: Date = Date()) -> ReadingStats {
+        ReadingStats(
+            today: TodayStats(words: 0, minutes: 0, articles: 0),
+            week: weekTemplate(endingAt: date),
+            streak: 0,
+            avgWPM: 0,
+            bestWPM: 0,
+            totalArticles: 0,
+            lastActiveDay: nil
+        )
+    }
+
+    private static func weekTemplate(endingAt date: Date) -> [DayWords] {
+        let calendar = Calendar.current
+        return (0..<7).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset - 6, to: date) else { return nil }
+            return DayWords(date: dayKey(for: day), day: weekdayLabel(for: day), words: 0)
+        }
+    }
+
+    private static func dayKey(for date: Date) -> String {
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+    }
+
+    private static func date(fromDayKey key: String) -> Date? {
+        let parts = key.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        return Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+    }
+
+    private static func weekdayLabel(for date: Date) -> String {
+        let weekday = Calendar.current.component(.weekday, from: date)
+        let symbols = Calendar.current.shortWeekdaySymbols
+        return symbols.indices.contains(weekday - 1) ? symbols[weekday - 1] : ""
+    }
+
+    private static func displayDate(for date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().year())
+    }
+
+    private static func relativeDateLabel(for date: Date) -> String {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: date)
+        let today = calendar.startOfDay(for: Date())
+        let days = calendar.dateComponents([.day], from: start, to: today).day ?? 0
+        switch days {
+        case ...0: return "Today"
+        case 1: return "Yesterday"
+        case 2...6: return "\(days)d ago"
+        default: return date.formatted(.dateTime.month(.abbreviated).day())
+        }
+    }
+
+    private static func estimatedMinutes(for words: Int, wpm: Double) -> Int {
+        guard words > 0 else { return 0 }
+        return max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: words, wpm: wpm))))
+    }
+
+    private static func makeLede(from text: String, tokens: [String]) -> String {
+        let limit = containsCJK(text) ? 42 : 18
+        let selected = tokens.prefix(limit)
+        return containsCJK(text) ? selected.joined() : selected.joined(separator: " ")
+    }
+
+    private static func containsCJK(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            (0x3040...0x30ff).contains(scalar.value) ||
+            (0x3400...0x4dbf).contains(scalar.value) ||
+            (0x4e00...0x9fff).contains(scalar.value) ||
+            (0xf900...0xfaff).contains(scalar.value) ||
+            (0xac00...0xd7af).contains(scalar.value)
+        }
+    }
+}
+
+struct RecentSource: Identifiable, Equatable {
+    var label: String
+    var date: String
+    var url: String?
+
+    var id: String { (url ?? label).lowercased() }
 }
 
 private struct SettingsPayload: Codable {
@@ -309,6 +493,8 @@ enum ArticleFetchError: LocalizedError {
     case invalidURL
     case unsupportedScheme
     case badStatus(Int)
+    case unsupportedContentType(String)
+    case tooLarge
     case unreadable
 
     var errorDescription: String? {
@@ -319,6 +505,10 @@ enum ArticleFetchError: LocalizedError {
             "Only http and https URLs are supported."
         case let .badStatus(status):
             "Fetch failed with HTTP \(status)."
+        case let .unsupportedContentType(type):
+            "Unsupported content type: \(type.isEmpty ? "unknown" : type)."
+        case .tooLarge:
+            "Page is too large to extract."
         case .unreadable:
             "Could not find enough readable text on that page."
         }
@@ -328,23 +518,44 @@ enum ArticleFetchError: LocalizedError {
 struct ArticleFetchResult {
     var title: String
     var source: String
+    var url: String
     var text: String
     var wordCount: Int
 }
 
 enum ArticleLoader {
+    private static let maxHTMLBytes = 6 * 1024 * 1024
+
     static func fetch(urlString: String) async throws -> ArticleFetchResult {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed), let scheme = url.scheme else {
+        let normalized = trimmed.range(of: #"^[a-z][a-z0-9+.-]*://"#, options: [.regularExpression, .caseInsensitive]) == nil
+            ? "https://\(trimmed)"
+            : trimmed
+        guard let url = URL(string: normalized), let scheme = url.scheme else {
             throw ArticleFetchError.invalidURL
         }
         guard ["http", "https"].contains(scheme.lowercased()) else {
             throw ArticleFetchError.unsupportedScheme
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2", forHTTPHeaderField: "Accept")
+        request.setValue("Mozilla/5.0 JustRead iOS reader", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw ArticleFetchError.unreadable
+        }
+        if !(200..<300).contains(http.statusCode) {
             throw ArticleFetchError.badStatus(http.statusCode)
+        }
+        if data.count > maxHTMLBytes {
+            throw ArticleFetchError.tooLarge
+        }
+        let contentType = http.value(forHTTPHeaderField: "Content-Type") ?? ""
+        if !contentType.isEmpty,
+           contentType.range(of: #"text/html|application/xhtml\+xml|text/plain"#, options: [.regularExpression, .caseInsensitive]) == nil {
+            throw ArticleFetchError.unsupportedContentType(contentType)
         }
 
         let html = String(data: data, encoding: .utf8)
@@ -369,6 +580,7 @@ enum ArticleLoader {
         return ArticleFetchResult(
             title: title,
             source: url.host(percentEncoded: false) ?? "Web",
+            url: http.url?.absoluteString ?? url.absoluteString,
             text: text,
             wordCount: words.count
         )

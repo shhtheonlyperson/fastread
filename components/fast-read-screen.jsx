@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useFonts } from "expo-font";
@@ -18,6 +20,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { extractArticle } from "../src/article-extract.js";
 import { clamp, containsCjk, durationForToken, estimateMinutes, joinTokensForDisplay, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
+const STORAGE_KEY = "justread.expo.state.v2";
+const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "0.2.0";
+const MAX_HTML_BYTES = 6 * 1024 * 1024;
+
 const color = {
   paper: "#f5efe2",
   paperStrong: "#faf6ec",
@@ -35,7 +41,6 @@ const localeData = {
   en: {
     label: "English",
     ui: {
-      volume: "Vol. 47 · Fri",
       todayPrefix: "Today you've read",
       todaySuffix: "words.",
       todayMeta: ({ minutes, articles, streak }) => `${minutes} minutes across ${articles} articles. Streak: ${streak} days.`,
@@ -48,26 +53,10 @@ const localeData = {
       saved: "Saved",
       finished: "Finished",
     },
-    current: {
-      title: "Researchers say a quiet shift in how we read is reshaping attention",
-      source: "The Atlantic",
-      author: "Maya Lindgren",
-      date: "May 2, 2026",
-      readTime: "6 min",
-      text: `Researchers say a quiet shift in how we read is reshaping attention. For most of the past decade, the conversation around digital reading focused on what was being lost: depth, patience, the long arc of a paragraph. But a new wave of cognitive scientists, working with eye-tracking data and tools that present text one word at a time, argue that something else is happening too. Readers are not simply skimming more. They are renegotiating the basic contract between eye and page, learning to absorb prose in shorter visual jumps and longer mental ones. The implications, these researchers say, are still emerging, but the early evidence suggests that the brain is more elastic about how it takes in language than the long history of the printed book might lead us to believe.`,
-    },
-    library: [
-      { id: "attention", title: "Researchers say a quiet shift in how we read is reshaping attention", source: "The Atlantic", readTime: "6 min", progress: 0.34, tagKey: "readingNow" },
-      { id: "memo", title: "The Long-Memo Renaissance", source: "Stratechery", readTime: "11 min", progress: 0, tagKey: "saved" },
-      { id: "fed", title: "Fed signals patience as inflation cools to 2.3%", source: "Reuters", readTime: "3 min", progress: 1, tagKey: "finished" },
-      { id: "mars", title: "A surprisingly habitable patch of Mars, and what it means", source: "Quanta", readTime: "8 min", progress: 0.62, tagKey: "readingNow" },
-      { id: "kitchen", title: "How restaurants quietly redesigned the home kitchen", source: "Eater", readTime: "5 min", progress: 0, tagKey: "saved" },
-    ],
   },
   "zh-Hant": {
     label: "繁體中文",
     ui: {
-      volume: "第 47 期 · 週五",
       todayPrefix: "今天你已閱讀",
       todaySuffix: "個字",
       todayMeta: ({ minutes, articles, streak }) => `${minutes} 分鐘,共 ${articles} 篇文章。連續 ${streak} 天。`,
@@ -80,39 +69,7 @@ const localeData = {
       saved: "已儲存",
       finished: "已讀完",
     },
-    current: {
-      title: "研究人員指出,我們閱讀方式的悄然轉變正在重塑注意力",
-      source: "大西洋月刊",
-      author: "林格倫",
-      date: "2026 年 5 月 2 日",
-      readTime: "6 分鐘",
-      text: `研究人員指出,我們閱讀方式的悄然轉變正在重塑注意力。過去十年來,關於數位閱讀的討論大多聚焦於我們失去了什麼:深度、耐心,以及一個段落綿長的弧線。然而,一批新的認知科學家,藉由眼動追蹤資料以及一次只呈現一個詞的工具,主張另一件事也正在發生。讀者並不只是略讀得更多。他們正在重新協商眼睛與頁面之間最基本的契約,學會以更短的視覺跳躍與更長的心智延展來吸收散文。這些研究人員表示,影響仍在浮現,但初步證據顯示,大腦對語言吸收方式的彈性,比印刷書漫長的歷史所暗示的還要大。`,
-    },
-    library: [
-      { id: "attention", title: "研究人員指出,我們閱讀方式的悄然轉變正在重塑注意力", source: "大西洋月刊", readTime: "6 分鐘", progress: 0.34, tagKey: "readingNow" },
-      { id: "memo", title: "長備忘錄的復興", source: "Stratechery", readTime: "11 分鐘", progress: 0, tagKey: "saved" },
-      { id: "fed", title: "通膨降至 2.3%,聯準會表示將保持耐心", source: "路透社", readTime: "3 分鐘", progress: 1, tagKey: "finished" },
-      { id: "mars", title: "火星上一處意外宜居的地帶,以及它的意義", source: "Quanta", readTime: "8 分鐘", progress: 0.62, tagKey: "readingNow" },
-      { id: "kitchen", title: "餐廳如何悄悄地重新設計了家庭廚房", source: "Eater", readTime: "5 分鐘", progress: 0, tagKey: "saved" },
-    ],
   },
-};
-
-const stats = {
-  today: { words: 4280, minutes: 11, articles: 2 },
-  week: [
-    { day: "Mon", words: 3200 },
-    { day: "Tue", words: 5100 },
-    { day: "Wed", words: 2400 },
-    { day: "Thu", words: 6800 },
-    { day: "Fri", words: 3900 },
-    { day: "Sat", words: 1100 },
-    { day: "Sun", words: 4280 },
-  ],
-  streak: 12,
-  avgWpm: 540,
-  bestWpm: 720,
-  totalArticles: 47,
 };
 
 const tabs = [
@@ -131,14 +88,14 @@ export default function FastReadScreen() {
     JetBrainsMono: require("../FastReadApp/Resources/Fonts/JetBrainsMono.ttf"),
   });
   const insets = useSafeAreaInsets();
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [locale, setLocale] = useState("en");
   const localePack = localeData[locale] || localeData.en;
   const ui = localePack.ui;
-  const seededLibrary = useMemo(() => buildLibrary(locale), [locale]);
   const [activeTab, setActiveTab] = useState("home");
-  const [library, setLibrary] = useState(() => buildLibrary("en"));
-  const [articleId, setArticleId] = useState("attention");
-  const [wordIndex, setWordIndex] = useState(() => Math.floor(tokenize(buildLibrary("en")[0].text).length * buildLibrary("en")[0].progress));
+  const [library, setLibrary] = useState([]);
+  const [articleId, setArticleId] = useState(null);
+  const [wordIndex, setWordIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasFinished, setHasFinished] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -146,32 +103,89 @@ export default function FastReadScreen() {
   const [punctuationPause, setPunctuationPause] = useState(true);
   const [focusStyle, setFocusStyle] = useState("dot");
   const [wordFont, setWordFont] = useState("serif");
+  const [readingStats, setReadingStats] = useState(() => createEmptyStats());
 
-  const article = useMemo(() => library.find((item) => item.id === articleId) || library[0], [articleId, library]);
-  const tokens = useMemo(() => tokenize(article.text), [article.text]);
+  const article = useMemo(() => library.find((item) => item.id === articleId) || library[0] || null, [articleId, library]);
+  const tokens = useMemo(() => tokenize(article?.text || ""), [article?.text]);
   const token = tokens[wordIndex] || "";
   const progress = tokens.length ? (wordIndex + 1) / tokens.length : 0;
+  const stats = useMemo(() => normalizeStatsForToday(readingStats, wpm), [readingStats, wpm]);
+  const recentSources = useMemo(() => getRecentSources(library), [library]);
   const physicalIsLandscape = width > height;
   const appIsLandscape = physicalIsLandscape;
   const focusIsLandscape = focusMode || physicalIsLandscape;
   const isWide = width >= 700;
 
   useEffect(() => {
-    const nextArticle = seededLibrary[0];
-    const nextTokens = tokenize(nextArticle.text);
-    setIsPlaying(false);
-    setLibrary(seededLibrary);
-    setArticleId(nextArticle.id);
-    setWordIndex(Math.floor(nextTokens.length * nextArticle.progress));
-    setHasFinished(nextArticle.progress >= 1);
-  }, [seededLibrary]);
+    let cancelled = false;
+
+    async function hydrate() {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!raw || cancelled) {
+          return;
+        }
+
+        const saved = JSON.parse(raw);
+        const savedLibrary = Array.isArray(saved.library) ? saved.library.filter((item) => item?.text) : [];
+        setLibrary(savedLibrary);
+        setArticleId(savedLibrary.some((item) => item.id === saved.articleId) ? saved.articleId : savedLibrary[0]?.id || null);
+        setWordIndex(Number.isFinite(saved.wordIndex) ? saved.wordIndex : 0);
+        setLocale(localeData[saved.locale] ? saved.locale : "en");
+        setWpm(clamp(Number(saved.wpm) || 540, 150, 1000));
+        setPunctuationPause(saved.punctuationPause ?? true);
+        setFocusStyle(["dot", "line", "crosshair"].includes(saved.focusStyle) ? saved.focusStyle : "dot");
+        setWordFont(["serif", "sans", "mono"].includes(saved.wordFont) ? saved.wordFont : "serif");
+        setReadingStats(normalizeStatsForToday(saved.stats || createEmptyStats(), Number(saved.wpm) || 540));
+      } catch (error) {
+        console.warn("Unable to restore JustRead state.", error);
+      } finally {
+        if (!cancelled) setHasHydrated(true);
+      }
+    }
+
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    const payload = {
+      locale,
+      library,
+      articleId: article?.id || null,
+      wordIndex,
+      wpm,
+      punctuationPause,
+      focusStyle,
+      wordFont,
+      stats,
+    };
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch((error) => {
+      console.warn("Unable to persist JustRead state.", error);
+    });
+  }, [article?.id, focusStyle, hasHydrated, library, locale, punctuationPause, stats, wordFont, wordIndex, wpm]);
 
   useEffect(() => {
     setWordIndex((current) => clamp(current, 0, Math.max(tokens.length - 1, 0)));
   }, [tokens.length]);
 
+  const recordWords = useCallback(
+    (count) => {
+      setReadingStats((current) => recordReadWords(current, count, wpm));
+    },
+    [wpm],
+  );
+
+  const recordArticleFinished = useCallback(() => {
+    setReadingStats((current) => recordFinishedArticle(current, wpm));
+  }, [wpm]);
+
   useEffect(() => {
-    if (!isPlaying || !tokens.length) return undefined;
+    if (!isPlaying || !tokens.length || !article) return undefined;
 
     const timeout = setTimeout(() => {
       setWordIndex((current) => {
@@ -180,12 +194,13 @@ export default function FastReadScreen() {
           setHasFinished(true);
           return current;
         }
+        recordWords(1);
         return current + 1;
       });
     }, durationForToken(token, wpm, punctuationPause));
 
     return () => clearTimeout(timeout);
-  }, [isPlaying, punctuationPause, token, tokens.length, wpm]);
+  }, [article, isPlaying, punctuationPause, recordWords, token, tokens.length, wpm]);
 
   useEffect(() => {
     ScreenOrientation.unlockAsync().catch((error) => {
@@ -194,7 +209,8 @@ export default function FastReadScreen() {
   }, []);
 
   useEffect(() => {
-    if (!tokens.length) return;
+    if (!article || !tokens.length) return;
+    const shouldRecordFinish = progress >= 1 && !article.finishedAt;
     setLibrary((items) =>
       items.map((item) =>
         item.id === article.id
@@ -202,37 +218,59 @@ export default function FastReadScreen() {
               ...item,
               progress,
               tagKey: progress >= 1 ? "finished" : progress > 0 ? "readingNow" : item.tagKey,
+              finishedAt: progress >= 1 ? item.finishedAt || new Date().toISOString() : null,
             }
           : item,
       ),
     );
-  }, [article.id, progress, tokens.length]);
+    if (shouldRecordFinish) {
+      recordArticleFinished();
+    }
+  }, [article, progress, recordArticleFinished, tokens.length]);
 
   const openArticle = useCallback((item, resume = item.progress > 0) => {
+    if (!item) return;
     const articleTokens = tokenize(item.text);
     setIsPlaying(false);
     setHasFinished(resume && item.progress >= 1);
     setArticleId(item.id);
     setWordIndex(resume ? clamp(Math.floor(articleTokens.length * item.progress), 0, Math.max(articleTokens.length - 1, 0)) : 0);
+    setLibrary((items) =>
+      items.map((articleItem) =>
+        articleItem.id === item.id
+          ? {
+              ...articleItem,
+              lastOpenedAt: new Date().toISOString(),
+              timesOpened: (articleItem.timesOpened || 0) + 1,
+            }
+          : articleItem,
+      ),
+    );
     setActiveTab("reader");
   }, []);
 
   const addArticle = useCallback(
-    (text, title = "Pasted text", source = "Clipboard") => {
+    (text, title = "Pasted text", source = "Clipboard", sourceURL = null) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       const readingUnits = tokenize(trimmed);
+      const now = new Date().toISOString();
       const item = {
-        id: `draft-${Date.now()}`,
+        id: `article-${Date.now()}`,
         title,
         source,
+        sourceURL,
         author: "You",
-        date: "Today",
+        date: formatDisplayDate(now),
+        createdAt: now,
+        lastOpenedAt: now,
+        finishedAt: null,
         readTime: `${Math.max(1, Math.ceil(estimateMinutes(readingUnits.length, wpm)))} min`,
         progress: 0,
         lede: makeLede(trimmed, readingUnits),
         tagKey: "readingNow",
         text: trimmed,
+        timesOpened: 1,
       };
       setLibrary((items) => [item, ...items]);
       setArticleId(item.id);
@@ -262,7 +300,7 @@ export default function FastReadScreen() {
   );
 
   const togglePlayback = useCallback(() => {
-    if (!tokens.length) return;
+    if (!article || !tokens.length) return;
 
     if (isPlaying) {
       setIsPlaying(false);
@@ -274,9 +312,9 @@ export default function FastReadScreen() {
       setHasFinished(false);
     }
     setIsPlaying(true);
-  }, [hasFinished, isPlaying, tokens.length]);
+  }, [article, hasFinished, isPlaying, tokens.length]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !hasHydrated) {
     return (
       <View style={[s.app, { alignItems: "center", justifyContent: "center" }]}>
         <ActivityIndicator color={color.terracotta} />
@@ -288,9 +326,19 @@ export default function FastReadScreen() {
     <View style={s.app}>
       <StatusBar style="dark" />
       <View style={[s.contentFrame, isWide && s.contentFrameWide, appIsLandscape && s.contentFrameLandscape]}>
-        {activeTab === "home" ? <LibraryScreen insets={insets} isLandscape={appIsLandscape} ui={ui} library={library} onResume={() => openArticle(article, true)} onOpen={openArticle} /> : null}
-        {activeTab === "source" ? <SourceScreen insets={insets} isLandscape={appIsLandscape} onAddArticle={addArticle} /> : null}
-        {activeTab === "reader" ? (
+        {activeTab === "home" ? (
+          <LibraryScreen
+            insets={insets}
+            isLandscape={appIsLandscape}
+            ui={ui}
+            stats={stats}
+            library={library}
+            onResume={() => (article ? openArticle(article, true) : setActiveTab("source"))}
+            onOpen={openArticle}
+          />
+        ) : null}
+        {activeTab === "source" ? <SourceScreen insets={insets} isLandscape={appIsLandscape} recentSources={recentSources} onAddArticle={addArticle} /> : null}
+        {activeTab === "reader" && article ? (
           <ReaderScreen
             insets={insets}
             isLandscape={appIsLandscape}
@@ -311,7 +359,8 @@ export default function FastReadScreen() {
             onFocus={() => setFocusMode(true)}
           />
         ) : null}
-        {activeTab === "stats" ? <StatsScreen insets={insets} isLandscape={appIsLandscape} library={library} ui={ui} /> : null}
+        {activeTab === "reader" && !article ? <ReaderEmptyScreen insets={insets} isLandscape={appIsLandscape} onAdd={() => setActiveTab("source")} /> : null}
+        {activeTab === "stats" ? <StatsScreen insets={insets} isLandscape={appIsLandscape} library={library} stats={stats} ui={ui} /> : null}
         {activeTab === "settings" ? (
           <SettingsScreen
             insets={insets}
@@ -333,7 +382,7 @@ export default function FastReadScreen() {
       </View>
 
       <FocusMode
-        visible={focusMode}
+        visible={focusMode && !!article}
         isLandscape={focusIsLandscape}
         token={token}
         article={article}
@@ -352,9 +401,9 @@ export default function FastReadScreen() {
   );
 }
 
-function LibraryScreen({ insets, isLandscape, ui, library, onResume, onOpen }) {
-  const current = library.find((item) => item.id === "attention") || library[0];
-  const currentCount = tokenize(current.text).length;
+function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOpen }) {
+  const current = library.find((item) => item.progress > 0 && item.progress < 1) || library[0] || null;
+  const currentCount = current ? tokenize(current.text).length : 0;
   const topPad = topPadding(insets, isLandscape);
   const bottomPad = bottomPadding(isLandscape);
 
@@ -366,7 +415,7 @@ function LibraryScreen({ insets, isLandscape, ui, library, onResume, onOpen }) {
             <BrandMark size={28} />
             <Text style={s.wordmark}>JustRead</Text>
           </View>
-          <SectionLabel>{ui.volume}</SectionLabel>
+          <SectionLabel>{formatShortDate(new Date())}</SectionLabel>
         </View>
         <Text style={[s.heroLine, isLandscape && s.heroLineLandscape]}>{ui.todayPrefix}</Text>
         <Text style={[s.heroLine, isLandscape && s.heroLineLandscape]}>
@@ -377,25 +426,33 @@ function LibraryScreen({ insets, isLandscape, ui, library, onResume, onOpen }) {
 
       <View style={[s.libraryBody, isLandscape && s.libraryBodyLandscape]}>
         <Pressable onPress={onResume} style={[s.continueWrap, isLandscape && s.continueWrapLandscape]}>
-          <Card>
-            <View style={s.rowBetween}>
-              <SectionLabel>{ui.continueReading}</SectionLabel>
-              <SectionLabel tone="accent">{ui.ofWords({ read: Math.round(currentCount * current.progress), total: currentCount })}</SectionLabel>
-            </View>
-            <Text style={s.continueTitle}>{current.title}</Text>
-            <View style={s.progressRow}>
-              <ProgressBar progress={current.progress} />
-              <Text style={s.percent}>{Math.round(current.progress * 100)}%</Text>
-            </View>
-            <View style={s.rowBetween}>
-              <Text style={s.metaText}>
-                {current.source} / {current.readTime}
-              </Text>
-              <View style={s.resumePill}>
-                <Text style={s.resumeText}>{ui.resume}</Text>
+          {current ? (
+            <Card>
+              <View style={s.rowBetween}>
+                <SectionLabel>{ui.continueReading}</SectionLabel>
+                <SectionLabel tone="accent">{ui.ofWords({ read: Math.round(currentCount * current.progress), total: currentCount })}</SectionLabel>
               </View>
-            </View>
-          </Card>
+              <Text style={s.continueTitle}>{current.title}</Text>
+              <View style={s.progressRow}>
+                <ProgressBar progress={current.progress} />
+                <Text style={s.percent}>{Math.round(current.progress * 100)}%</Text>
+              </View>
+              <View style={s.rowBetween}>
+                <Text style={s.metaText}>
+                  {current.source} / {current.readTime}
+                </Text>
+                <View style={s.resumePill}>
+                  <Text style={s.resumeText}>{ui.resume}</Text>
+                </View>
+              </View>
+            </Card>
+          ) : (
+            <Card>
+              <SectionLabel>Start reading</SectionLabel>
+              <Text style={s.continueTitle}>Add your first article.</Text>
+              <Text style={s.metaText}>Paste text or fetch a URL to build a real library. Nothing is preloaded.</Text>
+            </Card>
+          )}
         </Pressable>
 
         <View style={[s.libraryListWrap, isLandscape && s.libraryListWrapLandscape]}>
@@ -404,21 +461,28 @@ function LibraryScreen({ insets, isLandscape, ui, library, onResume, onOpen }) {
             <SectionLabel faded>{ui.items(library.length)}</SectionLabel>
           </View>
           <View style={s.listCard}>
-            {library.map((item, index) => (
-              <Pressable key={item.id} onPress={() => onOpen(item)} style={[s.articleRow, index > 0 && s.topRule]}>
-                <View style={s.articleRowMain}>
-                  <View style={s.articleTitleBlock}>
-                    <Text numberOfLines={1} style={s.articleTitle}>
-                      {item.title}
-                    </Text>
-                    <Text style={s.articleSubline}>
-                      {item.source} · {item.readTime}
-                    </Text>
+            {library.length ? (
+              library.map((item, index) => (
+                <Pressable key={item.id} onPress={() => onOpen(item)} style={[s.articleRow, index > 0 && s.topRule]}>
+                  <View style={s.articleRowMain}>
+                    <View style={s.articleTitleBlock}>
+                      <Text numberOfLines={1} style={s.articleTitle}>
+                        {item.title}
+                      </Text>
+                      <Text style={s.articleSubline}>
+                        {item.source} · {item.readTime}
+                      </Text>
+                    </View>
+                    <TagPill item={item} ui={ui} />
                   </View>
-                  <TagPill item={item} ui={ui} />
-                </View>
-              </Pressable>
-            ))}
+                </Pressable>
+              ))
+            ) : (
+              <View style={s.articleRow}>
+                <Text style={s.articleTitle}>No saved articles yet.</Text>
+                <Text style={s.articleSubline}>Use Add to paste text or fetch a webpage.</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -426,7 +490,7 @@ function LibraryScreen({ insets, isLandscape, ui, library, onResume, onOpen }) {
   );
 }
 
-function SourceScreen({ insets, isLandscape, onAddArticle }) {
+function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
@@ -454,18 +518,31 @@ function SourceScreen({ insets, isLandscape, onAddArticle }) {
 
     setLoading(true);
     setStatus("Loading...");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
       if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only http and https URLs are supported.");
-      const response = await fetch(parsed.toString(), { headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2" } });
+      const response = await fetch(parsed.toString(), {
+        headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2" },
+        signal: controller.signal,
+      });
       if (!response.ok) throw new Error(`Fetch failed with HTTP ${response.status}.`);
+      const length = Number(response.headers.get("content-length") || 0);
+      if (length > MAX_HTML_BYTES) throw new Error("Page is too large to extract.");
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType && !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
+        throw new Error(`Unsupported content type: ${contentType}.`);
+      }
       const html = await response.text();
+      if (html.length > MAX_HTML_BYTES) throw new Error("Page is too large to extract.");
       const article = extractArticle(html, response.url || parsed.toString());
       if (!article.text || article.wordCount < 20) throw new Error("Could not find enough readable text on that page.");
-      onAddArticle(article.text, article.title || parsed.host, parsed.host);
+      onAddArticle(article.text, article.title || parsed.host, parsed.host, response.url || parsed.toString());
     } catch (error) {
-      setStatus(error.message || "Could not load that URL.");
+      setStatus(error.name === "AbortError" ? "Fetch timed out." : error.message || "Could not load that URL.");
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   }, [hasInput, input, isUrl, loading, onAddArticle, trimmed]);
@@ -509,16 +586,19 @@ function SourceScreen({ insets, isLandscape, onAddArticle }) {
 
         <View>
           <SectionLabel>Recent sources</SectionLabel>
-          {[
-            ["stratechery.com", "2h ago"],
-            ["theatlantic.com", "yesterday"],
-            ["reuters.com", "3 days ago"],
-          ].map(([label, date], index) => (
-            <Pressable key={label} onPress={() => setInput(label)} style={[s.recentRow, index === 0 && { marginTop: 12 }]}>
-              <Text style={s.recentLabel}>{label}</Text>
-              <Text style={s.recentDate}>{date}</Text>
-            </Pressable>
-          ))}
+          {recentSources.length ? (
+            recentSources.map((item, index) => (
+              <Pressable key={item.id} onPress={() => setInput(item.url || item.label)} style={[s.recentRow, index === 0 && { marginTop: 12 }]}>
+                <Text style={s.recentLabel}>{item.label}</Text>
+                <Text style={s.recentDate}>{item.date}</Text>
+              </Pressable>
+            ))
+          ) : (
+            <View style={[s.recentRow, { marginTop: 12 }]}>
+              <Text style={s.recentLabel}>No web sources yet</Text>
+              <Text style={s.recentDate}>Fetch a URL</Text>
+            </View>
+          )}
         </View>
       </View>
     </ScrollView>
@@ -604,6 +684,20 @@ function ReaderScreen({
   );
 }
 
+function ReaderEmptyScreen({ insets, isLandscape, onAdd }) {
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPadding(isLandscape) }} showsVerticalScrollIndicator={false}>
+      <PageTitle insets={insets} isLandscape={isLandscape} label="Reader" title={"Nothing\nqueued."} sub={"Add text or fetch a URL first. JustRead will preserve your real library and progress locally."} />
+      <View style={{ paddingHorizontal: 24 }}>
+        <Pressable onPress={onAdd} style={s.primaryButton}>
+          <Text style={s.primaryButtonText}>Add something to read</Text>
+          <Text style={s.primaryArrow}>{"->"}</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
+  );
+}
+
 function FocusMode({ visible, isLandscape, token, article, progress, wordIndex, total, isPlaying, wpm, focusStyle, wordFont, onClose, onMove, onPlayPause }) {
   const insets = useSafeAreaInsets();
 
@@ -642,20 +736,21 @@ function FocusMode({ visible, isLandscape, token, article, progress, wordIndex, 
   );
 }
 
-function StatsScreen({ insets, isLandscape, library, ui }) {
-  const maxWords = Math.max(...stats.week.map((item) => item.words));
+function StatsScreen({ insets, isLandscape, library, stats, ui }) {
+  const maxWords = Math.max(1, ...stats.week.map((item) => item.words));
   const weekTotal = stats.week.reduce((sum, item) => sum + item.words, 0);
   const finishedArticles = library.filter((item) => item.progress >= 1);
   const bottomPad = bottomPadding(isLandscape);
+  const pace = stats.avgWpm || 0;
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-      <PageTitle insets={insets} isLandscape={isLandscape} label="Stats" title={`${weekTotal.toLocaleString()} words`} sub={`That's roughly ${(weekTotal / 60000).toFixed(2)} novellas at ${stats.avgWpm} wpm.`} />
+      <PageTitle insets={insets} isLandscape={isLandscape} label="Stats" title={`${weekTotal.toLocaleString()} words`} sub={weekTotal ? `That's roughly ${(weekTotal / 60000).toFixed(2)} novellas at ${pace || 540} wpm.` : "Start reading to build a real weekly trend."} />
       <View style={{ paddingHorizontal: 16, gap: 8 }}>
         <View style={s.statCards}>
           <SmallStat label="Streak" value={stats.streak} unit="days" />
-          <SmallStat label="Avg pace" value={stats.avgWpm} unit="wpm" />
-          <SmallStat label="Best pace" value={stats.bestWpm} unit="wpm" />
+          <SmallStat label="Avg pace" value={stats.avgWpm || "-"} unit="wpm" />
+          <SmallStat label="Best pace" value={stats.bestWpm || "-"} unit="wpm" />
           <SmallStat label="Articles read" value={stats.totalArticles} unit="total" />
         </View>
         <Card>
@@ -675,26 +770,33 @@ function StatsScreen({ insets, isLandscape, library, ui }) {
         <View style={{ paddingTop: 16 }}>
           <SectionLabel>Recently finished</SectionLabel>
           <View style={[s.listCard, { marginTop: 12 }]}>
-            {finishedArticles.map((item, index) => (
-              <View key={item.id} style={[s.articleRow, index > 0 && s.topRule]}>
-                <View style={s.articleRowMain}>
-                  <View style={s.articleTitleBlock}>
-                    <Text numberOfLines={1} style={s.articleTitle}>
-                      {item.title}
-                    </Text>
-                    <Text style={s.articleSubline}>
-                      {item.source} · {item.readTime}
-                    </Text>
+            {finishedArticles.length ? (
+              finishedArticles.map((item, index) => (
+                <View key={item.id} style={[s.articleRow, index > 0 && s.topRule]}>
+                  <View style={s.articleRowMain}>
+                    <View style={s.articleTitleBlock}>
+                      <Text numberOfLines={1} style={s.articleTitle}>
+                        {item.title}
+                      </Text>
+                      <Text style={s.articleSubline}>
+                        {item.source} · {item.readTime}
+                      </Text>
+                    </View>
+                    <TagPill item={item} ui={ui} />
                   </View>
-                  <TagPill item={item} ui={ui} />
                 </View>
+              ))
+            ) : (
+              <View style={s.articleRow}>
+                <Text style={s.articleTitle}>No completed articles yet.</Text>
+                <Text style={s.articleSubline}>Finished articles will appear here after real reading sessions.</Text>
               </View>
-            ))}
+            )}
           </View>
         </View>
         <View style={s.noteCard}>
           <SectionLabel>This week's note</SectionLabel>
-          <Text style={s.noteText}>You're reading 18% faster than last week, but pausing more often on punctuation. That's usually a sign you're picking denser writing - keep going.</Text>
+          <Text style={s.noteText}>{buildWeeklyNote(stats)}</Text>
         </View>
       </View>
     </ScrollView>
@@ -736,9 +838,9 @@ function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, se
           <Segmented value={locale} onChange={setLocale} options={[["en", "English"], ["zh-Hant", "繁體"]]} />
         </SettingsGroup>
         <SettingsGroup label="About">
-          <SettingsRow label="Version" value="1.4.0" />
-          <SettingsRow label="Privacy policy" value=">" />
-          <SettingsRow label="Send feedback" value=">" last />
+          <SettingsRow label="Version" value={APP_VERSION} />
+          <SettingsRow label="Privacy" value="Local only" />
+          <SettingsRow label="Send feedback" value="huge.huang@gmail.com" last />
         </SettingsGroup>
       </View>
     </ScrollView>
@@ -993,32 +1095,168 @@ function SmallStat({ label, value, unit }) {
   );
 }
 
-function buildLibrary(locale) {
-  const pack = localeData[locale] || localeData.en;
-  return pack.library.map((item) => {
-    const isCurrent = item.id === "attention";
-    const text = isCurrent ? pack.current.text : sampleArticleText(item, locale);
-    const tokens = tokenize(text);
-    return {
-      id: item.id,
-      title: item.title,
-      source: item.source,
-      author: isCurrent ? pack.current.author : "JustRead Desk",
-      date: isCurrent ? pack.current.date : "May 2, 2026",
-      readTime: item.readTime,
-      progress: item.progress,
-      tagKey: item.tagKey,
-      lede: makeLede(text, tokens),
-      text,
-    };
+function createEmptyStats(referenceDate = new Date()) {
+  return {
+    today: { words: 0, minutes: 0, articles: 0 },
+    week: buildWeek(referenceDate),
+    streak: 0,
+    avgWpm: 0,
+    bestWpm: 0,
+    totalArticles: 0,
+    lastActiveDay: null,
+  };
+}
+
+function normalizeStatsForToday(input, wpm) {
+  const base = input && typeof input === "object" ? input : createEmptyStats();
+  const todayKey = dayKey(new Date());
+  const datedWeek = Array.isArray(base.week) ? base.week.filter((item) => item?.date) : [];
+
+  if (!datedWeek.length && Array.isArray(base.week) && base.week.some((item) => item?.words > 0)) {
+    return createEmptyStats();
+  }
+
+  const wordsByDay = new Map(datedWeek.map((item) => [item.date, Number(item.words) || 0]));
+  const week = buildWeek(new Date()).map((item) => ({ ...item, words: wordsByDay.get(item.date) || 0 }));
+  const todayWords = week.find((item) => item.date === todayKey)?.words || 0;
+  const sameActiveDay = base.lastActiveDay === todayKey;
+  const today = {
+    words: sameActiveDay ? todayWords : 0,
+    minutes: sameActiveDay ? estimateStatMinutes(todayWords, wpm) : 0,
+    articles: sameActiveDay ? Number(base.today?.articles) || 0 : 0,
+  };
+
+  return {
+    today,
+    week,
+    streak: Number(base.streak) || 0,
+    avgWpm: Number(base.avgWpm) || 0,
+    bestWpm: Number(base.bestWpm) || 0,
+    totalArticles: Number(base.totalArticles) || 0,
+    lastActiveDay: base.lastActiveDay || null,
+  };
+}
+
+function recordReadWords(current, count, wpm) {
+  if (!count) return normalizeStatsForToday(current, wpm);
+  const stats = startActivity(normalizeStatsForToday(current, wpm), wpm);
+  const today = dayKey(new Date());
+  const week = stats.week.map((item) => (item.date === today ? { ...item, words: item.words + count } : item));
+  const words = stats.today.words + count;
+  return {
+    ...stats,
+    week,
+    today: { ...stats.today, words, minutes: estimateStatMinutes(words, wpm) },
+    avgWpm: Math.round(wpm),
+    bestWpm: Math.max(stats.bestWpm || 0, Math.round(wpm)),
+  };
+}
+
+function recordFinishedArticle(current, wpm) {
+  const stats = startActivity(normalizeStatsForToday(current, wpm), wpm);
+  return {
+    ...stats,
+    today: { ...stats.today, articles: stats.today.articles + 1, minutes: estimateStatMinutes(stats.today.words, wpm) },
+    totalArticles: stats.totalArticles + 1,
+    avgWpm: Math.round(wpm),
+    bestWpm: Math.max(stats.bestWpm || 0, Math.round(wpm)),
+  };
+}
+
+function startActivity(stats) {
+  const today = dayKey(new Date());
+  const alreadyActive = stats.lastActiveDay === today && (stats.today.words > 0 || stats.today.articles > 0);
+  if (alreadyActive) return stats;
+
+  const yesterday = dayKey(addDays(new Date(), -1));
+  return {
+    ...stats,
+    streak: stats.lastActiveDay === yesterday ? (stats.streak || 0) + 1 : 1,
+    lastActiveDay: today,
+  };
+}
+
+function buildWeek(referenceDate) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(referenceDate, index - 6);
+    return { date: dayKey(date), day: weekdayLabel(date), words: 0 };
   });
 }
 
-function sampleArticleText(item, locale) {
-  if (locale === "zh-Hant") {
-    return `${item.title}。這篇儲存文章作為樣本內容,用來演練同一套 RSVP 引擎與固定焦點字錨點。打開它,你可以確認中文會以兩字為單位前進,並在標點處保留更自然的停頓。`;
+function getRecentSources(library) {
+  const seen = new Set();
+  return library
+    .filter((item) => item.source && item.source !== "Clipboard")
+    .map((item) => ({
+      id: String(item.sourceURL || item.source).toLowerCase(),
+      label: item.source,
+      date: relativeDateLabel(item.createdAt || item.lastOpenedAt),
+      url: item.sourceURL || null,
+    }))
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .slice(0, 5);
+}
+
+function buildWeeklyNote(stats) {
+  const weekTotal = stats.week.reduce((sum, item) => sum + item.words, 0);
+  if (!weekTotal) {
+    return "No reading activity yet this week. Paste an article or fetch a URL and JustRead will fill this with real pace, streak, and completion data.";
   }
-  return `${item.title}. This saved piece is included as sample library material for the speed reader prototype. Open it to rehearse the one-word reading flow with the same RSVP engine and focus-letter anchor.`;
+
+  const activeDays = stats.week.filter((item) => item.words > 0).length;
+  const bestDay = [...stats.week].sort((a, b) => b.words - a.words)[0];
+  return `You read on ${activeDays} day${activeDays === 1 ? "" : "s"} this week. Your strongest day was ${bestDay.day} with ${bestDay.words.toLocaleString()} words.`;
+}
+
+function dayKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function weekdayLabel(date) {
+  return date.toLocaleDateString(undefined, { weekday: "short" });
+}
+
+function formatShortDate(date) {
+  return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function formatDisplayDate(value) {
+  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function relativeDateLabel(value) {
+  if (!value) return "Recent";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recent";
+  const today = startOfLocalDay(new Date());
+  const then = startOfLocalDay(date);
+  const days = Math.round((today - then) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function startOfLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function estimateStatMinutes(words, wpm) {
+  if (!words) return 0;
+  return Math.max(1, Math.ceil(estimateMinutes(words, wpm || 540)));
 }
 
 function tagLabel(item, ui) {

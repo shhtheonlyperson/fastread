@@ -14,8 +14,12 @@ struct ContentView: View {
                 case .home:
                     LibraryView(
                         onResume: {
-                            store.openArticle(SampleData.currentArticle.id, resume: true)
-                            selectedTab = .reader
+                            if let article = store.currentArticle {
+                                store.openArticle(article.id, resume: true)
+                                selectedTab = .reader
+                            } else {
+                                selectedTab = .source
+                            }
                         },
                         onOpenArticle: { article in
                             store.openArticle(article.id, resume: article.progress > 0)

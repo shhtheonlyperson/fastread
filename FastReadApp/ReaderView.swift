@@ -6,20 +6,26 @@ struct ReaderView: View {
     let onFocus: () -> Void
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                header
-                stageCard
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                transport
-                    .padding(.top, 18)
-                paceControl
-                    .padding(.top, 22)
-                fullText
-                    .padding(.top, 24)
+        Group {
+            if store.currentArticle == nil {
+                emptyReader
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        header
+                        stageCard
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                        transport
+                            .padding(.top, 18)
+                        paceControl
+                            .padding(.top, 22)
+                        fullText
+                            .padding(.top, 24)
+                    }
+                    .padding(.bottom, 112)
+                }
             }
-            .padding(.bottom, 112)
         }
         .background(JRColor.paper)
         .onDisappear {
@@ -27,6 +33,34 @@ struct ReaderView: View {
                 store.pause()
             }
         }
+    }
+
+    private var emptyReader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionLabel(text: "Reader")
+            Text("Nothing queued.")
+                .font(JRFont.serif(36, weight: .medium))
+                .tracking(-0.9)
+                .foregroundStyle(JRColor.ink)
+            Text("Add text or fetch a URL first. The reader will open with your saved article and preserve progress locally.")
+                .font(JRFont.sans(14))
+                .lineSpacing(4)
+                .foregroundStyle(JRColor.inkMid)
+            Button(action: onBack) {
+                Text("Back to library")
+                    .font(JRFont.sans(14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(JRColor.ink)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.top, 60)
+        .padding(.horizontal, 24)
     }
 
     private var header: some View {
@@ -40,14 +74,14 @@ struct ReaderView: View {
             }
             .buttonStyle(.plain)
 
-            Text(store.currentArticle.title)
+            Text(store.currentArticle?.title ?? "Untitled")
                 .font(JRFont.serif(22, weight: .medium))
                 .tracking(-0.4)
                 .lineSpacing(1)
                 .foregroundStyle(JRColor.ink)
                 .padding(.top, 12)
 
-            Text("\(store.currentArticle.source) · \(store.currentArticle.author) · \(store.currentArticle.date)")
+            Text(articleMeta)
                 .font(JRFont.sans(12))
                 .foregroundStyle(JRColor.inkQuiet)
                 .lineLimit(1)
@@ -233,6 +267,11 @@ struct ReaderView: View {
         let minutes = store.minutesRemaining
         return minutes < 1 ? "\(Int(ceil(minutes * 60)))s left" : "\(String(format: "%.1f", minutes))m left"
     }
+
+    private var articleMeta: String {
+        guard let article = store.currentArticle else { return "" }
+        return "\(article.source) · \(article.author) · \(article.date)"
+    }
 }
 
 struct FocusModeView: View {
@@ -250,7 +289,7 @@ struct FocusModeView: View {
                             .font(JRFont.mono(10, weight: .medium))
                             .tracking(1.4)
                             .foregroundStyle(JRColor.paper.opacity(0.5))
-                        Text(store.currentArticle.title)
+                        Text(store.currentArticle?.title ?? "No article")
                             .font(JRFont.serif(14))
                             .foregroundStyle(JRColor.paper.opacity(0.85))
                             .lineLimit(1)

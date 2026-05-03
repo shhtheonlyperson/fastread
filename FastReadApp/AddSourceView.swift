@@ -195,32 +195,47 @@ struct AddSourceView: View {
             SectionLabel(text: "Recent sources")
                 .padding(.bottom, 12)
 
-            ForEach(Array(recent.enumerated()), id: \.offset) { index, item in
-                HStack {
-                    Text(item.label)
-                        .font(JRFont.mono(13))
-                        .foregroundStyle(JRColor.ink)
-                    Spacer()
-                    Text(item.date)
-                        .font(JRFont.sans(12))
-                        .foregroundStyle(JRColor.inkQuiet)
-                }
-                .padding(.vertical, 12)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(JRColor.rule)
-                        .frame(height: index == 0 ? 0.5 : 0.5)
+            if store.recentSources.isEmpty {
+                Text("Sources appear here after you fetch articles from the web.")
+                    .font(JRFont.sans(13))
+                    .lineSpacing(3)
+                    .foregroundStyle(JRColor.inkQuiet)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
+                    .overlay(alignment: .top) {
+                        Rectangle()
+                            .fill(JRColor.rule)
+                            .frame(height: 0.5)
+                    }
+            } else {
+                ForEach(Array(store.recentSources.enumerated()), id: \.element.id) { index, item in
+                    Button {
+                        if let itemURL = item.url {
+                            url = itemURL
+                            status = "URL ready."
+                        }
+                    } label: {
+                        HStack {
+                            Text(item.label)
+                                .font(JRFont.mono(13))
+                                .foregroundStyle(JRColor.ink)
+                            Spacer()
+                            Text(item.date)
+                                .font(JRFont.sans(12))
+                                .foregroundStyle(JRColor.inkQuiet)
+                        }
+                        .padding(.vertical, 12)
+                        .overlay(alignment: .top) {
+                            Rectangle()
+                                .fill(JRColor.rule)
+                                .frame(height: index == 0 ? 0.5 : 0.5)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(item.url == nil)
                 }
             }
         }
-    }
-
-    private var recent: [(label: String, date: String)] {
-        [
-            ("stratechery.com", "2h ago"),
-            ("theatlantic.com", "yesterday"),
-            ("reuters.com", "3 days ago"),
-        ]
     }
 
     private func fetchURL() async {
@@ -234,7 +249,7 @@ struct AddSourceView: View {
 
         do {
             let result = try await ArticleLoader.fetch(urlString: url)
-            store.addFetchedArticle(title: result.title, source: result.source, text: result.text)
+            store.addFetchedArticle(title: result.title, source: result.source, text: result.text, url: result.url)
             status = "Loaded · \(result.wordCount) words"
             onLoaded()
         } catch {

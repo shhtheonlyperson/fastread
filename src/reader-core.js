@@ -4,7 +4,7 @@ const CJK_PUNCT_RE = /[\u3000-\u303f\uff00-\uffef]/u;
 const CJK_JOIN_LEFT_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u3000-\u303f\uff00-\uffef]$/u;
 const CJK_JOIN_RIGHT_RE = /^[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u3000-\u303f\uff00-\uffef]/u;
 
-export const DEFAULT_TEXT = `Paste an article, memo, or transcript here. JustRead will turn it into one focused word at a time, with the red letter held at the same visual anchor so your eyes move less.`;
+export const DEFAULT_TEXT = "";
 
 export function tokenize(input) {
   if (typeof input !== "string") return [];
