@@ -153,6 +153,11 @@ export function shouldRestartPlayback(currentIndex, tokenCount, hasFinished = fa
   return Boolean(hasFinished) || index >= count - 1;
 }
 
+export function rangeValueFromLocation(locationX, width) {
+  const safeWidth = Math.max(Number(width) || 0, 1);
+  return clamp((Number(locationX) || 0) / safeWidth, 0, 1);
+}
+
 export function nextArticleProgressState(article, progress, nowIso) {
   if (!article || typeof article !== "object") return article;
 

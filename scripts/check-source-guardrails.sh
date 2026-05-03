@@ -38,6 +38,14 @@ reject_pattern "TextInput|smartInput|Paste or type" \
   "Expo Add screen must stay clipboard-only for the shipped TestFlight surface." \
   components/fast-read-screen.jsx
 
+require_pattern "PanResponder\\.create" \
+  "Expo range controls must track finger movement continuously instead of only applying on press release." \
+  components/fast-read-screen.jsx
+
+require_pattern "rangeValueFromLocation" \
+  "Range input coordinate mapping must stay covered by shared reader-core tests." \
+  components/fast-read-screen.jsx src/reader-core.js test/reader-core.test.mjs
+
 require_pattern "nextArticleProgressState" \
   "Expo reader progress sync must stay idempotent so playback timers are not starved by render loops." \
   components/fast-read-screen.jsx src/reader-core.js

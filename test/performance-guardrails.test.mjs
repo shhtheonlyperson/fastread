@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 
 import { htmlToText } from "../src/article-extract.js";
-import { contextWindow, durationForToken, nextArticleProgressState, tokenize } from "../src/reader-core.js";
+import { contextWindow, durationForToken, nextArticleProgressState, rangeValueFromLocation, tokenize } from "../src/reader-core.js";
 
 function budget(baseMillis) {
   const multiplier = Number(process.env.FASTREAD_PERF_BUDGET_MULTIPLIER || "1");
@@ -82,6 +82,14 @@ test("reader core stress paths stay within practical budgets", () => {
       if (nextArticleProgressState(article, 0.5) === article) unchanged += 1;
     }
     assert.equal(unchanged, 100_000);
+  });
+
+  measure("apply 100k continuous range updates", 20, () => {
+    let value = 0;
+    for (let index = 0; index < 100_000; index += 1) {
+      value += rangeValueFromLocation(index % 321, 320);
+    }
+    assert.ok(value > 0);
   });
 
   const text = measure("extract text from large HTML", 500, () => htmlToText(makeHtml(8_000)));
