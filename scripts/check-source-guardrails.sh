@@ -42,6 +42,14 @@ require_pattern "PanResponder\\.create" \
   "Expo range controls must track finger movement continuously instead of only applying on press release." \
   components/fast-read-screen.jsx
 
+require_pattern "clipboardBeamActive" \
+  "Expo paste button must keep a visibly stronger active beam while reading/fetching clipboard content." \
+  components/fast-read-screen.jsx
+
+require_pattern "duration: isBeamActive \\? 850 : 2500" \
+  "Expo paste beam must speed up during active paste/fetch work." \
+  components/fast-read-screen.jsx
+
 require_pattern "rangeValueFromLocation" \
   "Range input coordinate mapping must stay covered by shared reader-core tests." \
   components/fast-read-screen.jsx src/reader-core.js test/reader-core.test.mjs
