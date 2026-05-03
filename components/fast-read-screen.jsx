@@ -497,26 +497,24 @@ function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOp
 function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isPasteActive, setIsPasteActive] = useState(false);
   const beamValue = useRef(new Animated.Value(0)).current;
   const bottomPad = bottomPadding(isLandscape);
+  const isBeamActive = loading || isPasteActive;
 
   useEffect(() => {
-    if (loading) {
-      beamValue.setValue(0);
-      return undefined;
-    }
-
+    beamValue.setValue(0);
     const animation = Animated.loop(
       Animated.timing(beamValue, {
         toValue: 1,
-        duration: 2500,
+        duration: isBeamActive ? 850 : 2500,
         easing: Easing.linear,
         useNativeDriver: false,
       }),
     );
     animation.start();
     return () => animation.stop();
-  }, [beamValue, loading]);
+  }, [beamValue, isBeamActive]);
 
   const fetchURL = useCallback(async (value) => {
     const trimmed = value.trim();
@@ -573,22 +571,32 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
   }, [fetchURL, onAddArticle]);
 
   const handlePaste = useCallback(async () => {
-    if (loading) return;
+    if (isBeamActive) return;
+    setIsPasteActive(true);
+    setStatus("Reading clipboard.");
     try {
       const value = await Clipboard.getStringAsync();
       await openClipboardValue(value || "");
     } catch (error) {
       setStatus(error?.message || "Clipboard is unavailable.");
+    } finally {
+      setIsPasteActive(false);
     }
-  }, [loading, openClipboardValue]);
+  }, [isBeamActive, openClipboardValue]);
 
   const beamColor = beamValue.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: ["rgba(201,100,66,0.22)", "rgba(223,161,93,0.95)", "rgba(201,100,66,0.22)"],
+    outputRange: isBeamActive
+      ? ["rgba(201,100,66,0.78)", "rgba(255,204,112,1)", "rgba(201,100,66,0.78)"]
+      : ["rgba(201,100,66,0.22)", "rgba(223,161,93,0.95)", "rgba(201,100,66,0.22)"],
   });
   const beamShadow = beamValue.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [0.08, 0.22, 0.08],
+    outputRange: isBeamActive ? [0.22, 0.5, 0.22] : [0.08, 0.22, 0.08],
+  });
+  const beamScale = beamValue.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: isBeamActive ? [1, 1.012, 1] : [1, 1.002, 1],
   });
 
   return (
@@ -597,16 +605,26 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
       <View style={{ paddingHorizontal: 24, gap: 28 }}>
         <View>
           <SectionLabel>Clipboard</SectionLabel>
-          <Animated.View style={[s.clipboardBeam, { borderColor: beamColor, shadowOpacity: loading ? 0 : beamShadow }]}>
-            <Pressable accessibilityRole="button" accessibilityLabel={loading ? "Fetching clipboard content" : "Paste from clipboard"} disabled={loading} onPress={handlePaste} style={[s.clipboardButton, loading && s.clipboardButtonDisabled]}>
-              <View style={s.clipboardIcon}>
-                <Text style={s.clipboardIconText}>{loading ? "↻" : "⌘"}</Text>
+          <Animated.View
+            style={[
+              s.clipboardBeam,
+              isBeamActive && s.clipboardBeamActive,
+              {
+                borderColor: beamColor,
+                shadowOpacity: beamShadow,
+                transform: [{ scale: beamScale }],
+              },
+            ]}
+          >
+            <Pressable accessibilityRole="button" accessibilityLabel={loading ? "Fetching clipboard content" : "Paste from clipboard"} disabled={isBeamActive} onPress={handlePaste} style={[s.clipboardButton, isBeamActive && s.clipboardButtonActive]}>
+              <View style={[s.clipboardIcon, isBeamActive && s.clipboardIconActive]}>
+                <Text style={[s.clipboardIconText, isBeamActive && s.clipboardIconTextActive]}>{isBeamActive ? "↻" : "⌘"}</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.clipboardTitle}>{loading ? "Fetching" : "Paste from clipboard"}</Text>
-                <Text style={s.clipboardSub}>{loading ? "Preparing readable text" : "URL or text"}</Text>
+                <Text style={s.clipboardTitle}>{isBeamActive ? "Working" : "Paste from clipboard"}</Text>
+                <Text style={s.clipboardSub}>{loading ? "Fetching readable text" : isPasteActive ? "Reading clipboard" : "URL or text"}</Text>
               </View>
-              {loading ? <ActivityIndicator color={color.terracotta} size="small" /> : <Text style={s.clipboardArrow}>{"->"}</Text>}
+              {isBeamActive ? <ActivityIndicator color={color.terracotta} size="small" /> : <Text style={s.clipboardArrow}>{"->"}</Text>}
             </Pressable>
           </Animated.View>
         </View>
@@ -1434,10 +1452,13 @@ const s = {
   pageHeadingLandscape: { fontSize: 30, lineHeight: 32 },
   pageSub: { fontFamily: "Inter", fontSize: 14, lineHeight: 21, color: color.inkMid },
   clipboardBeam: { marginTop: 10, borderRadius: 6, borderWidth: 1.2, backgroundColor: color.paperStrong, shadowColor: color.terracotta, shadowOffset: { width: 0, height: 8 }, shadowRadius: 18 },
+  clipboardBeamActive: { borderWidth: 2.4, backgroundColor: "#fff8eb", shadowRadius: 30 },
   clipboardButton: { minHeight: 92, flexDirection: "row", alignItems: "center", gap: 16, padding: 18, borderRadius: 6 },
-  clipboardButtonDisabled: { opacity: 0.72 },
+  clipboardButtonActive: { backgroundColor: "rgba(201,100,66,0.055)" },
   clipboardIcon: { width: 48, height: 48, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(201,100,66,0.11)" },
+  clipboardIconActive: { backgroundColor: "rgba(201,100,66,0.18)" },
   clipboardIconText: { color: color.terracotta, fontFamily: "Inter", fontSize: 20, fontWeight: "800" },
+  clipboardIconTextActive: { color: "#a9482f" },
   clipboardTitle: { fontFamily: "Fraunces", fontSize: 22, lineHeight: 26, fontWeight: "600", letterSpacing: -0.3, color: color.ink },
   clipboardSub: { marginTop: 4, fontFamily: "JetBrainsMono", fontSize: 11, fontWeight: "500", letterSpacing: 0.66, color: color.inkQuiet, textTransform: "uppercase" },
   clipboardArrow: { color: color.inkQuiet, fontFamily: "JetBrainsMono", fontSize: 13, fontWeight: "700" },
