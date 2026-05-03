@@ -36,7 +36,7 @@ struct StatsView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.75)
 
-            Text("That's roughly \(String(format: "%.2f", Double(store.stats.weekTotal) / 60_000)) novellas at \(store.stats.avgWPM) wpm.")
+            Text(summaryLine)
                 .font(JRFont.sans(14))
                 .lineSpacing(4)
                 .foregroundStyle(JRColor.inkMid)
@@ -87,8 +87,8 @@ struct StatsView: View {
     private var statGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
             StatCard(label: "Streak", value: "\(store.stats.streak)", unit: "days")
-            StatCard(label: "Avg pace", value: "\(store.stats.avgWPM)", unit: "wpm")
-            StatCard(label: "Best pace", value: "\(store.stats.bestWPM)", unit: "wpm")
+            StatCard(label: "Avg pace", value: store.stats.avgWPM > 0 ? "\(store.stats.avgWPM)" : "—", unit: "wpm")
+            StatCard(label: "Best pace", value: store.stats.bestWPM > 0 ? "\(store.stats.bestWPM)" : "—", unit: "wpm")
             StatCard(label: "Articles read", value: "\(store.stats.totalArticles)", unit: "total")
         }
     }
@@ -96,7 +96,7 @@ struct StatsView: View {
     private var weeklyNote: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "This week's note")
-            Text("You're reading 18% faster than last week, but pausing more often on punctuation. That's usually a sign you're picking denser writing — keep going.")
+            Text(weeklyNoteText)
                 .font(JRFont.serif(16))
                 .lineSpacing(5)
                 .foregroundStyle(JRColor.ink)
@@ -116,6 +116,27 @@ struct StatsView: View {
                 .frame(width: 3)
         }
         .padding(.top, 16)
+    }
+
+    private var summaryLine: String {
+        guard store.stats.weekTotal > 0 else {
+            return "Start reading to build a real weekly trend."
+        }
+        let pace = store.stats.avgWPM > 0 ? store.stats.avgWPM : Int(store.wpm)
+        return "That's roughly \(String(format: "%.2f", Double(store.stats.weekTotal) / 60_000)) novellas at \(pace) wpm."
+    }
+
+    private var weeklyNoteText: String {
+        guard store.stats.weekTotal > 0 else {
+            return "No reading activity yet this week. Paste an article or fetch a URL and your real pace, streak, and article counts will appear here."
+        }
+
+        let activeDays = store.stats.week.filter { $0.words > 0 }.count
+        let bestDay = store.stats.week.max { $0.words < $1.words }
+        if let bestDay, bestDay.words > 0 {
+            return "You read on \(activeDays) day\(activeDays == 1 ? "" : "s") this week. Your strongest day was \(bestDay.day) with \(bestDay.words.formatted()) words."
+        }
+        return "Your weekly trend is based only on words you actually read in JustRead."
     }
 }
 

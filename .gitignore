@@ -5,3 +5,7 @@ node_modules/
 *.log
 coverage/
 dist/
+google-service-account*.json
+play-store-service-account*.json
+*.jks
+*.keystore

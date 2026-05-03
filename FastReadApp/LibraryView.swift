@@ -5,16 +5,21 @@ struct LibraryView: View {
     let onResume: () -> Void
     let onOpenArticle: (ReadingArticle) -> Void
 
-    private var current: ReadingArticle {
-        store.articles.first { $0.id == SampleData.currentArticle.id } ?? store.currentArticle
+    private var current: ReadingArticle? {
+        store.currentArticle ?? store.articles.first { !$0.isFinished } ?? store.articles.first
     }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 masthead
-                continueCard
-                    .padding(.horizontal, 16)
+                if let current {
+                    continueCard(current)
+                        .padding(.horizontal, 16)
+                } else {
+                    emptyContinueCard
+                        .padding(.horizontal, 16)
+                }
                 libraryList
                     .padding(.top, 28)
                     .padding(.horizontal, 16)
@@ -37,7 +42,7 @@ struct LibraryView: View {
 
                 Spacer()
 
-                SectionLabel(text: "Vol. 47 · Fri")
+                SectionLabel(text: Date().formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
             }
             .padding(.bottom, 18)
 
@@ -68,7 +73,7 @@ struct LibraryView: View {
         .padding(.bottom, 18)
     }
 
-    private var continueCard: some View {
+    private func continueCard(_ current: ReadingArticle) -> some View {
         Button(action: onResume) {
             JRCard {
                 VStack(alignment: .leading, spacing: 12) {
@@ -120,6 +125,22 @@ struct LibraryView: View {
         .buttonStyle(.plain)
     }
 
+    private var emptyContinueCard: some View {
+        JRCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionLabel(text: "Start reading")
+                Text("Add your first article.")
+                    .font(JRFont.serif(22, weight: .medium))
+                    .tracking(-0.3)
+                    .foregroundStyle(JRColor.ink)
+                Text("Paste text or fetch a web page to build a real reading library.")
+                    .font(JRFont.sans(13))
+                    .lineSpacing(3)
+                    .foregroundStyle(JRColor.inkMid)
+            }
+        }
+    }
+
     private var libraryList: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
@@ -130,31 +151,52 @@ struct LibraryView: View {
             .padding(.horizontal, 8)
             .padding(.bottom, 12)
 
-            VStack(spacing: 0) {
-                ForEach(Array(store.articles.enumerated()), id: \.element.id) { index, article in
-                    Button {
-                        onOpenArticle(article)
-                    } label: {
-                        ArticleRow(article: article)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .overlay(alignment: .top) {
-                                if index != 0 {
-                                    Rectangle()
-                                        .fill(JRColor.rule)
-                                        .frame(height: 0.5)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
+            if store.articles.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("No saved articles yet.")
+                        .font(JRFont.serif(17, weight: .medium))
+                        .foregroundStyle(JRColor.ink)
+                    Text("Use the Add tab to paste text or fetch a URL. The library only shows your saved reading material.")
+                        .font(JRFont.sans(13))
+                        .lineSpacing(3)
+                        .foregroundStyle(JRColor.inkQuiet)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 18)
+                .background(JRColor.paperStrong)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .stroke(JRColor.rule, lineWidth: 0.5)
+                )
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(store.articles.enumerated()), id: \.element.id) { index, article in
+                        Button {
+                            onOpenArticle(article)
+                        } label: {
+                            ArticleRow(article: article)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .overlay(alignment: .top) {
+                                    if index != 0 {
+                                        Rectangle()
+                                            .fill(JRColor.rule)
+                                            .frame(height: 0.5)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(JRColor.paperStrong)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .stroke(JRColor.rule, lineWidth: 0.5)
+                )
             }
-            .background(JRColor.paperStrong)
-            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .stroke(JRColor.rule, lineWidth: 0.5)
-            )
         }
     }
 }

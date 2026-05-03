@@ -15,6 +15,16 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "android": {
+      "package": "com.shhtheonlyperson.fastread",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/JustReadIcon.png",
+        "backgroundColor": "#F7F0E6"
+      },
+      "permissions": [
+        "android.permission.INTERNET"
+      ]
+    },
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"

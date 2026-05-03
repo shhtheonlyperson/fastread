@@ -12,7 +12,10 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {
@@ -21,6 +24,11 @@
         "appleId": "shh@theonlyperson.com",
         "ascAppId": "ASC_APP_ID_PLACEHOLDER",
         "appleTeamId": "QLJ9ZM278S"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.fastread.json",
+        "track": "internal",
+        "releaseStatus": "completed"
       }
     }
   }
