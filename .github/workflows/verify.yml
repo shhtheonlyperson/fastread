@@ -25,5 +25,20 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Run native, web, stress, and Release build checks
-        run: npm run verify:ios-performance
+      - name: Check source guardrails
+        run: npm run guard:source
+
+      - name: Run Swift unit tests
+        run: swift test
+
+      - name: Run Swift core verifier
+        run: swift run FastReadCoreVerifier
+
+      - name: Run Swift performance stress tests
+        run: swift run FastReadPerformanceVerifier
+
+      - name: Run JS unit and stress tests
+        run: npm test
+
+      - name: Build Release iOS app
+        run: xcodebuild -project FastRead.xcodeproj -scheme FastRead -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build

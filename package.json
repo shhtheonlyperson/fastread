@@ -10,6 +10,7 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "test": "node --test",
+    "guard:source": "scripts/check-source-guardrails.sh",
     "test:swift": "swift test",
     "perf:web": "node --test test/performance-guardrails.test.mjs",
     "perf:ios": "swift run FastReadPerformanceVerifier",
