@@ -62,6 +62,14 @@ require_pattern "rangeValueFromLocation" \
   "Range input coordinate mapping must stay covered by shared reader-core tests." \
   components/fast-read-screen.jsx src/reader-core.js test/reader-core.test.mjs
 
+require_pattern "rangeValueFromPageX" \
+  "Range inputs must use absolute page coordinates so nested thumb/fill touches do not snap values." \
+  components/fast-read-screen.jsx src/reader-core.js test/reader-core.test.mjs
+
+require_pattern "measureInWindow" \
+  "Range inputs must measure the track bounds before mapping absolute touch coordinates." \
+  components/fast-read-screen.jsx
+
 require_pattern "nextArticleProgressState" \
   "Expo reader progress sync must stay idempotent so playback timers are not starved by render loops." \
   components/fast-read-screen.jsx src/reader-core.js

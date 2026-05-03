@@ -10,6 +10,7 @@ import {
   getProgress,
   joinTokensForDisplay,
   nextArticleProgressState,
+  rangeValueFromPageX,
   rangeValueFromLocation,
   shouldRestartPlayback,
   splitForFocus,
@@ -104,6 +105,15 @@ test("range input maps finger location continuously and clamps edges", () => {
   assert.equal(rangeValueFromLocation(240, 200), 1);
   assert.equal(rangeValueFromLocation(-20, 200), 0);
   assert.equal(rangeValueFromLocation(50, 0), 1);
+});
+
+test("range input maps absolute page location from track bounds", () => {
+  assert.equal(rangeValueFromPageX(180, 100, 200), 0.4);
+  assert.equal(rangeValueFromPageX(80, 100, 200), 0);
+  assert.equal(rangeValueFromPageX(360, 100, 200), 1);
+
+  const wpm425Value = (425 - 150) / 850;
+  assert.ok(Math.abs(rangeValueFromPageX(100 + wpm425Value * 320, 100, 320) - wpm425Value) < 0.000001);
 });
 
 test("article progress sync is idempotent to avoid playback render loops", () => {

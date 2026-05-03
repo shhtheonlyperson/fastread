@@ -158,6 +158,10 @@ export function rangeValueFromLocation(locationX, width) {
   return clamp((Number(locationX) || 0) / safeWidth, 0, 1);
 }
 
+export function rangeValueFromPageX(pageX, trackPageX, width) {
+  return rangeValueFromLocation((Number(pageX) || 0) - (Number(trackPageX) || 0), width);
+}
+
 export function nextArticleProgressState(article, progress, nowIso) {
   if (!article || typeof article !== "object") return article;
 
