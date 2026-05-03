@@ -25,8 +25,8 @@ test("tokenize splits Simplified Chinese into two-character chunks", () => {
 });
 
 test("joinTokensForDisplay preserves Chinese spacing while keeping mixed-language gaps", () => {
-  assert.equal(joinTokensForDisplay(tokenize("FastRead 支援中文。")), "FastRead 支援中文。");
-  assert.equal(joinTokensForDisplay(tokenize("FastRead，真的可以。")), "FastRead，真的可以。");
+  assert.equal(joinTokensForDisplay(tokenize("JustRead 支援中文。")), "JustRead 支援中文。");
+  assert.equal(joinTokensForDisplay(tokenize("JustRead，真的可以。")), "JustRead，真的可以。");
 });
 
 test("getFocusIndex places the focus letter near the optimal recognition point", () => {
