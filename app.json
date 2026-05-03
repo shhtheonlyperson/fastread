@@ -22,7 +22,8 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-screen-orientation"
+      "expo-screen-orientation",
+      "./plugins/with-ios-app-icons.cjs"
     ],
     "experiments": {
       "typedRoutes": false
