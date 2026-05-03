@@ -146,6 +146,13 @@ export function estimateMinutes(wordCount, wpm) {
   return wordCount / safeWpm;
 }
 
+export function shouldRestartPlayback(currentIndex, tokenCount, hasFinished = false) {
+  const count = Math.max(Number(tokenCount) || 0, 0);
+  if (!count) return false;
+  const index = clamp(Number(currentIndex) || 0, 0, count - 1);
+  return Boolean(hasFinished) || index >= count - 1;
+}
+
 export function contextWindow(tokenCount, currentIndex, before = 18, after = 36) {
   if (!tokenCount || tokenCount < 0) {
     return {

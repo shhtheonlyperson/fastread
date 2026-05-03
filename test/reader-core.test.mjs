@@ -9,6 +9,7 @@ import {
   getFocusIndex,
   getProgress,
   joinTokensForDisplay,
+  shouldRestartPlayback,
   splitForFocus,
   tokenize,
 } from "../src/reader-core.js";
@@ -85,4 +86,11 @@ test("contextWindow keeps reader previews bounded", () => {
   });
 
   assert.equal(contextWindow(50_000, 25_000).count, 55);
+});
+
+test("playback restarts when saved reader state is already at the end", () => {
+  assert.equal(shouldRestartPlayback(0, 10, false), false);
+  assert.equal(shouldRestartPlayback(9, 10, false), true);
+  assert.equal(shouldRestartPlayback(4, 10, true), true);
+  assert.equal(shouldRestartPlayback(0, 0, true), false);
 });

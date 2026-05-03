@@ -30,9 +30,13 @@ require_pattern "RSVPEngine\\.contextWindow" \
   "ReaderView must use RSVPEngine.contextWindow so READ context stays bounded." \
   FastReadApp/ReaderView.swift
 
-reject_pattern "FullTextPreview|The full text|step:" \
+reject_pattern "FullTextPreview|The full text|fullText|step:" \
   "Found a known perf-regression pattern in reader/settings UI." \
-  FastReadApp/ReaderView.swift FastReadApp/SettingsView.swift
+  FastReadApp/ReaderView.swift FastReadApp/SettingsView.swift components/fast-read-screen.jsx
+
+reject_pattern "TextInput|smartInput|Paste or type" \
+  "Expo Add screen must stay clipboard-only for the shipped TestFlight surface." \
+  components/fast-read-screen.jsx
 
 reject_pattern "NSAttributedString[[:space:]]*\\(data:" \
   "Do not reintroduce synchronous NSAttributedString HTML parsing on paste/load paths." \
