@@ -16,7 +16,7 @@ expect(
     "tokenize should split Traditional Chinese into two-character chunks with punctuation attached"
 )
 expect(
-    RSVPEngine.tokenize("FastRead 支援中文。") == ["FastRead", "支援", "中文。"],
+    RSVPEngine.tokenize("JustRead 支援中文。") == ["JustRead", "支援", "中文。"],
     "tokenize should preserve mixed Latin and CJK runs"
 )
 

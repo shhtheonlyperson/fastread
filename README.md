@@ -1,4 +1,4 @@
-# FastRead
+# JustRead
 
 Local RSVP speed reader inspired by the red-focus-letter format in the referenced UltraLinx tweet.
 
