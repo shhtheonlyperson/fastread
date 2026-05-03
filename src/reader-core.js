@@ -1,92 +1,83 @@
 const FOCUS_RE = /[\p{L}\p{N}]/u;
-const HAN_RE = /\p{Script=Han}/u;
-const LEADING_PUNCT_RE = /[「『（《〈【“‘"([{]/u;
-const TRAILING_PUNCT_RE = /[，。、！？；：」』）》〉】”’"'.,!?;:)\]}…]/u;
-const PAUSE_PUNCT_RE = /[.!?;:)\]}"'，。、！？；：）」』》〉】”’…]+$/u;
-const CJK_JOIN_LEFT_RE = /[\p{Script=Han}，。、！？；：）」』》〉】”’…]$/u;
-const CJK_JOIN_RIGHT_RE = /^[\p{Script=Han}「『（《〈【“‘]/u;
+const CJK_CHAR_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/u;
+const CJK_PUNCT_RE = /[\u3000-\u303f\uff00-\uffef]/u;
+const CJK_JOIN_LEFT_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u3000-\u303f\uff00-\uffef]$/u;
+const CJK_JOIN_RIGHT_RE = /^[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u3000-\u303f\uff00-\uffef]/u;
 
 export const DEFAULT_TEXT = `Paste an article, memo, or transcript here. FastRead will turn it into one focused word at a time, with the red letter held at the same visual anchor so your eyes move less.`;
 
 export function tokenize(input) {
-  if (typeof input !== "string") {
-    return [];
-  }
+  if (typeof input !== "string") return [];
+  const normalized = input.replace(/\u00a0/g, " ");
+  if (containsCjk(normalized)) return tokenizeCjk(normalized);
+  return normalized.match(/\S+/gu) || [];
+}
 
+function tokenizeCjk(input) {
   const tokens = [];
-  let word = "";
-  let pendingPrefix = "";
+  let buffer = "";
+  const chars = Array.from(input);
 
-  const flushWord = () => {
-    if (word) {
-      tokens.push(word);
-      word = "";
+  const flush = () => {
+    if (buffer) {
+      tokens.push(buffer);
+      buffer = "";
     }
   };
 
-  const flushPrefix = () => {
-    if (pendingPrefix) {
-      tokens.push(pendingPrefix);
-      pendingPrefix = "";
-    }
-  };
-
-  for (const char of input.replace(/\u00a0/g, " ")) {
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
     if (/\s/u.test(char)) {
-      flushWord();
-      flushPrefix();
+      flush();
       continue;
     }
 
-    if (HAN_RE.test(char)) {
-      flushWord();
-      tokens.push(`${pendingPrefix}${char}`);
-      pendingPrefix = "";
-      continue;
-    }
-
-    if (!word && LEADING_PUNCT_RE.test(char)) {
-      pendingPrefix += char;
-      continue;
-    }
-
-    if (TRAILING_PUNCT_RE.test(char)) {
-      if (word) {
-        word += char;
+    if (CJK_PUNCT_RE.test(char) || /[.,!?;:]/u.test(char)) {
+      if (buffer) {
+        buffer += char;
+        flush();
       } else if (tokens.length) {
         tokens[tokens.length - 1] += char;
-      } else {
-        pendingPrefix += char;
       }
       continue;
     }
 
-    if (pendingPrefix) {
-      word += pendingPrefix;
-      pendingPrefix = "";
+    if (CJK_CHAR_RE.test(char)) {
+      buffer += char;
+      if (Array.from(buffer).filter((item) => CJK_CHAR_RE.test(item)).length >= 2) {
+        flush();
+      }
+      continue;
     }
-    word += char;
+
+    flush();
+    let word = char;
+    while (
+      index + 1 < chars.length &&
+      !/\s/u.test(chars[index + 1]) &&
+      !CJK_CHAR_RE.test(chars[index + 1]) &&
+      !CJK_PUNCT_RE.test(chars[index + 1])
+    ) {
+      index += 1;
+      word += chars[index];
+    }
+    tokens.push(word);
   }
 
-  flushWord();
-  flushPrefix();
-
+  flush();
   return tokens;
 }
 
 export function countReadingUnits(input) {
-  return tokenize(input).filter((token) => FOCUS_RE.test(token)).length;
+  return tokenize(input).filter((token) => Array.from(token).some((char) => FOCUS_RE.test(char) || CJK_CHAR_RE.test(char))).length;
 }
 
 export function containsCjk(input) {
-  return HAN_RE.test(String(input || ""));
+  return CJK_CHAR_RE.test(String(input || ""));
 }
 
 export function tokenSeparator(leftToken, rightToken) {
-  if (!leftToken || !rightToken) {
-    return "";
-  }
-
+  if (!leftToken || !rightToken) return "";
   return CJK_JOIN_LEFT_RE.test(leftToken) && CJK_JOIN_RIGHT_RE.test(rightToken) ? "" : " ";
 }
 
@@ -96,47 +87,31 @@ export function joinTokensForDisplay(tokens) {
 
 export function getFocusIndex(token) {
   const chars = Array.from(token || "");
-  if (chars.length === 0) {
-    return 0;
-  }
+  if (chars.length === 0) return 0;
 
   const focusable = [];
   chars.forEach((char, index) => {
-    if (FOCUS_RE.test(char)) {
-      focusable.push(index);
-    }
+    if (FOCUS_RE.test(char)) focusable.push(index);
   });
 
-  if (focusable.length === 0) {
-    return Math.floor(chars.length / 2);
-  }
+  if (focusable.length === 0) return Math.floor(chars.length / 2);
 
   const letterCount = focusable.length;
   let target = 0;
-
-  if (letterCount <= 1) {
-    target = 0;
-  } else if (letterCount <= 5) {
-    target = 1;
-  } else if (letterCount <= 9) {
-    target = 2;
-  } else if (letterCount <= 13) {
-    target = 3;
-  } else {
-    target = 4;
-  }
+  if (letterCount <= 1) target = 0;
+  else if (letterCount <= 5) target = 1;
+  else if (letterCount <= 9) target = 2;
+  else if (letterCount <= 13) target = 3;
+  else target = 4;
 
   return focusable[Math.min(target, focusable.length - 1)];
 }
 
 export function splitForFocus(token) {
   const chars = Array.from(token || "");
-  if (chars.length === 0) {
-    return { before: "", focus: "", after: "" };
-  }
+  if (chars.length === 0) return { before: "", focus: "", after: "" };
 
   const focusIndex = getFocusIndex(token);
-
   return {
     before: chars.slice(0, focusIndex).join(""),
     focus: chars[focusIndex] || "",
@@ -147,11 +122,14 @@ export function splitForFocus(token) {
 export function durationForToken(token, wpm, punctuationPause = true) {
   const safeWpm = clamp(Number(wpm) || 450, 100, 1200);
   const base = 60000 / safeWpm;
-  const focusableCount = Array.from(token || "").filter((char) => FOCUS_RE.test(char)).length;
+  const isCjk = containsCjk(token);
+  const focusableCount = Array.from(token || "").filter((char) => FOCUS_RE.test(char) || CJK_CHAR_RE.test(char)).length;
+  const cjkMultiplier = isCjk ? 1.5 : 1;
   const lengthMultiplier = focusableCount > 9 ? 1 + Math.min((focusableCount - 9) * 0.07, 0.6) : 1;
-  const pauseMultiplier = punctuationPause && PAUSE_PUNCT_RE.test(token || "") ? 1.65 : 1;
+  const punctuation = isCjk ? /[\u3000-\u303f\uff00-\uffef.,!?;:]$/u : /[.!?;:)]["')\]]*$/u;
+  const pauseMultiplier = punctuationPause && punctuation.test(token || "") ? 1.65 : 1;
 
-  return Math.round(base * lengthMultiplier * pauseMultiplier);
+  return Math.round(base * cjkMultiplier * lengthMultiplier * pauseMultiplier);
 }
 
 export function clamp(value, min, max) {
@@ -159,10 +137,7 @@ export function clamp(value, min, max) {
 }
 
 export function getProgress(index, total) {
-  if (!total) {
-    return 0;
-  }
-
+  if (!total) return 0;
   return Math.round(((index + 1) / total) * 100);
 }
 

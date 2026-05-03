@@ -16,12 +16,12 @@ test("tokenize normalizes whitespace and preserves word punctuation", () => {
   assert.deepEqual(tokenize("  Read\tfast.\nNow  "), ["Read", "fast.", "Now"]);
 });
 
-test("tokenize splits Traditional Chinese into readable character units", () => {
-  assert.deepEqual(tokenize("快速閱讀，眼睛更輕鬆。"), ["快", "速", "閱", "讀，", "眼", "睛", "更", "輕", "鬆。"]);
+test("tokenize splits Traditional Chinese into two-character chunks", () => {
+  assert.deepEqual(tokenize("快速閱讀，眼睛更輕鬆。"), ["快速", "閱讀，", "眼睛", "更輕", "鬆。"]);
 });
 
-test("tokenize splits Simplified Chinese without spaces", () => {
-  assert.deepEqual(tokenize("快速阅读让注意力更稳定。"), ["快", "速", "阅", "读", "让", "注", "意", "力", "更", "稳", "定。"]);
+test("tokenize splits Simplified Chinese into two-character chunks", () => {
+  assert.deepEqual(tokenize("快速阅读让注意力更稳定。"), ["快速", "阅读", "让注", "意力", "更稳", "定。"]);
 });
 
 test("joinTokensForDisplay preserves Chinese spacing while keeping mixed-language gaps", () => {
@@ -46,7 +46,8 @@ test("durationForToken respects WPM, punctuation pauses, and long words", () => 
   const base = durationForToken("read", 600, false);
   assert.equal(base, 100);
   assert.ok(durationForToken("read.", 600, true) > base);
-  assert.ok(durationForToken("讀。", 600, true) > base);
+  assert.equal(durationForToken("閱讀", 600, false), 150);
+  assert.ok(durationForToken("讀。", 600, true) > durationForToken("閱讀", 600, false));
   assert.ok(durationForToken("internationalization", 600, false) > base);
 });
 
@@ -54,5 +55,5 @@ test("progress and ETA helpers handle empty and non-empty input", () => {
   assert.equal(getProgress(0, 0), 0);
   assert.equal(getProgress(4, 10), 50);
   assert.equal(estimateMinutes(900, 900), 1);
-  assert.equal(countReadingUnits("快速閱讀"), 4);
+  assert.equal(countReadingUnits("快速閱讀"), 2);
 });
