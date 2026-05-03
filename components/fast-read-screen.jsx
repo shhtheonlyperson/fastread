@@ -31,54 +31,72 @@ const color = {
   focusDark: "#1c1714",
 };
 
-const currentText = `Researchers say a quiet shift in how we read is reshaping attention. For most of the past decade, the conversation around digital reading focused on what was being lost: depth, patience, the long arc of a paragraph. But a new wave of cognitive scientists, working with eye-tracking data and tools that present text one word at a time, argue that something else is happening too. Readers are not simply skimming more. They are renegotiating the basic contract between eye and page, learning to absorb prose in shorter visual jumps and longer mental ones. The implications, these researchers say, are still emerging, but the early evidence suggests that the brain is more elastic about how it takes in language than the long history of the printed book might lead us to believe.`;
-const traditionalText = `高效率閱讀不是把文字掃過去，而是把注意力放在最穩的位置。當每個字被穩定呈現，眼睛不需要在段落裡來回尋找焦點，大腦就能把更多力氣留給理解。這種節奏特別適合新聞、備忘錄和長篇訪談，因為讀者可以快速前進，卻仍然保留句子的呼吸。`;
-const simplifiedText = `快速阅读不等于跳过理解。更好的方式是把信息拆成稳定的小单位，让眼睛少移动，让大脑持续跟上上下文。对于没有空格的中文内容，阅读器需要按汉字和标点处理节奏，才能让速度和理解同时成立。`;
-
-const seedArticle = {
-  id: "attention",
-  title: "Researchers say a quiet shift in how we read is reshaping attention",
-  source: "The Atlantic",
-  author: "Maya Lindgren",
-  date: "May 2, 2026",
-  readTime: "6 min",
-  progress: 0.34,
-  lede: "For most of the past decade, the conversation around digital reading focused on what was being lost.",
-  tag: "Reading now",
-  text: currentText,
+const localeData = {
+  en: {
+    label: "English",
+    ui: {
+      volume: "Vol. 47 · Fri",
+      todayPrefix: "Today you've read",
+      todaySuffix: "words.",
+      todayMeta: ({ minutes, articles, streak }) => `${minutes} minutes across ${articles} articles. Streak: ${streak} days.`,
+      continueReading: "Continue reading",
+      ofWords: ({ read, total }) => `${read} of ${total}`,
+      resume: "Resume",
+      library: "Library",
+      items: (count) => `${count} items`,
+      readingNow: "Reading now",
+      saved: "Saved",
+      finished: "Finished",
+    },
+    current: {
+      title: "Researchers say a quiet shift in how we read is reshaping attention",
+      source: "The Atlantic",
+      author: "Maya Lindgren",
+      date: "May 2, 2026",
+      readTime: "6 min",
+      text: `Researchers say a quiet shift in how we read is reshaping attention. For most of the past decade, the conversation around digital reading focused on what was being lost: depth, patience, the long arc of a paragraph. But a new wave of cognitive scientists, working with eye-tracking data and tools that present text one word at a time, argue that something else is happening too. Readers are not simply skimming more. They are renegotiating the basic contract between eye and page, learning to absorb prose in shorter visual jumps and longer mental ones. The implications, these researchers say, are still emerging, but the early evidence suggests that the brain is more elastic about how it takes in language than the long history of the printed book might lead us to believe.`,
+    },
+    library: [
+      { id: "attention", title: "Researchers say a quiet shift in how we read is reshaping attention", source: "The Atlantic", readTime: "6 min", progress: 0.34, tagKey: "readingNow" },
+      { id: "memo", title: "The Long-Memo Renaissance", source: "Stratechery", readTime: "11 min", progress: 0, tagKey: "saved" },
+      { id: "fed", title: "Fed signals patience as inflation cools to 2.3%", source: "Reuters", readTime: "3 min", progress: 1, tagKey: "finished" },
+      { id: "mars", title: "A surprisingly habitable patch of Mars, and what it means", source: "Quanta", readTime: "8 min", progress: 0.62, tagKey: "readingNow" },
+      { id: "kitchen", title: "How restaurants quietly redesigned the home kitchen", source: "Eater", readTime: "5 min", progress: 0, tagKey: "saved" },
+    ],
+  },
+  "zh-Hant": {
+    label: "繁體中文",
+    ui: {
+      volume: "第 47 期 · 週五",
+      todayPrefix: "今天你已閱讀",
+      todaySuffix: "個字",
+      todayMeta: ({ minutes, articles, streak }) => `${minutes} 分鐘,共 ${articles} 篇文章。連續 ${streak} 天。`,
+      continueReading: "繼續閱讀",
+      ofWords: ({ read, total }) => `${read} / ${total}`,
+      resume: "繼續",
+      library: "書架",
+      items: (count) => `${count} 項`,
+      readingNow: "閱讀中",
+      saved: "已儲存",
+      finished: "已讀完",
+    },
+    current: {
+      title: "研究人員指出,我們閱讀方式的悄然轉變正在重塑注意力",
+      source: "大西洋月刊",
+      author: "林格倫",
+      date: "2026 年 5 月 2 日",
+      readTime: "6 分鐘",
+      text: `研究人員指出,我們閱讀方式的悄然轉變正在重塑注意力。過去十年來,關於數位閱讀的討論大多聚焦於我們失去了什麼:深度、耐心,以及一個段落綿長的弧線。然而,一批新的認知科學家,藉由眼動追蹤資料以及一次只呈現一個詞的工具,主張另一件事也正在發生。讀者並不只是略讀得更多。他們正在重新協商眼睛與頁面之間最基本的契約,學會以更短的視覺跳躍與更長的心智延展來吸收散文。這些研究人員表示,影響仍在浮現,但初步證據顯示,大腦對語言吸收方式的彈性,比印刷書漫長的歷史所暗示的還要大。`,
+    },
+    library: [
+      { id: "attention", title: "研究人員指出,我們閱讀方式的悄然轉變正在重塑注意力", source: "大西洋月刊", readTime: "6 分鐘", progress: 0.34, tagKey: "readingNow" },
+      { id: "memo", title: "長備忘錄的復興", source: "Stratechery", readTime: "11 分鐘", progress: 0, tagKey: "saved" },
+      { id: "fed", title: "通膨降至 2.3%,聯準會表示將保持耐心", source: "路透社", readTime: "3 分鐘", progress: 1, tagKey: "finished" },
+      { id: "mars", title: "火星上一處意外宜居的地帶,以及它的意義", source: "Quanta", readTime: "8 分鐘", progress: 0.62, tagKey: "readingNow" },
+      { id: "kitchen", title: "餐廳如何悄悄地重新設計了家庭廚房", source: "Eater", readTime: "5 分鐘", progress: 0, tagKey: "saved" },
+    ],
+  },
 };
-
-const initialLibrary = [
-  seedArticle,
-  {
-    id: "traditional-chinese",
-    title: "高效率閱讀不是把文字掃過去",
-    source: "數位時代",
-    author: "FastRead Desk",
-    date: "May 2, 2026",
-    readTime: "2 min",
-    progress: 0,
-    lede: "真正的速度來自更穩定的注意力，而不是更用力地掃描頁面。",
-    tag: "Saved",
-    text: traditionalText,
-  },
-  {
-    id: "simplified-chinese",
-    title: "快速阅读不等于跳过理解",
-    source: "少数派",
-    author: "FastRead Desk",
-    date: "May 2, 2026",
-    readTime: "2 min",
-    progress: 0,
-    lede: "阅读器需要按汉字和标点处理节奏，才能让速度和理解同时成立。",
-    tag: "Saved",
-    text: simplifiedText,
-  },
-  makeArticle("memo", "The Long-Memo Renaissance", "Stratechery", "11 min", 0, "Inside the quiet revival of the 3,000-word strategy memo at large technology companies.", "Saved"),
-  makeArticle("fed", "Fed signals patience as inflation cools to 2.3%", "Reuters", "3 min", 1, "Policymakers indicated they are in no hurry to cut rates further despite the latest figures.", "Finished"),
-  makeArticle("mars", "A surprisingly habitable patch of Mars, and what it means", "Quanta", "8 min", 0.62, "New radar data hints at briny aquifers within a kilometer of the surface.", "Reading now"),
-  makeArticle("kitchen", "How restaurants quietly redesigned the home kitchen", "Eater", "5 min", 0, "The professional sheet-pan, the under-counter ice maker, the rise of the second sink.", "Saved"),
-];
 
 const stats = {
   today: { words: 4280, minutes: 11, articles: 2 },
@@ -113,12 +131,16 @@ export default function FastReadScreen() {
     JetBrainsMono: require("../FastReadApp/Resources/Fonts/JetBrainsMono.ttf"),
   });
   const insets = useSafeAreaInsets();
+  const [locale, setLocale] = useState("en");
+  const localePack = localeData[locale] || localeData.en;
+  const ui = localePack.ui;
+  const seededLibrary = useMemo(() => buildLibrary(locale), [locale]);
   const [activeTab, setActiveTab] = useState("home");
-  const [library, setLibrary] = useState(initialLibrary);
-  const [articleId, setArticleId] = useState(seedArticle.id);
-  const [wordIndex, setWordIndex] = useState(Math.floor(tokenize(seedArticle.text).length * seedArticle.progress));
+  const [library, setLibrary] = useState(() => buildLibrary("en"));
+  const [articleId, setArticleId] = useState("attention");
+  const [wordIndex, setWordIndex] = useState(() => Math.floor(tokenize(buildLibrary("en")[0].text).length * buildLibrary("en")[0].progress));
   const [isPlaying, setIsPlaying] = useState(false);
-  const [hasFinished, setHasFinished] = useState(seedArticle.progress >= 1);
+  const [hasFinished, setHasFinished] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [wpm, setWpm] = useState(540);
   const [punctuationPause, setPunctuationPause] = useState(true);
@@ -130,9 +152,19 @@ export default function FastReadScreen() {
   const token = tokens[wordIndex] || "";
   const progress = tokens.length ? (wordIndex + 1) / tokens.length : 0;
   const physicalIsLandscape = width > height;
-  const appIsLandscape = false;
+  const appIsLandscape = physicalIsLandscape;
   const focusIsLandscape = focusMode || physicalIsLandscape;
   const isWide = width >= 700;
+
+  useEffect(() => {
+    const nextArticle = seededLibrary[0];
+    const nextTokens = tokenize(nextArticle.text);
+    setIsPlaying(false);
+    setLibrary(seededLibrary);
+    setArticleId(nextArticle.id);
+    setWordIndex(Math.floor(nextTokens.length * nextArticle.progress));
+    setHasFinished(nextArticle.progress >= 1);
+  }, [seededLibrary]);
 
   useEffect(() => {
     setWordIndex((current) => clamp(current, 0, Math.max(tokens.length - 1, 0)));
@@ -156,63 +188,10 @@ export default function FastReadScreen() {
   }, [isPlaying, punctuationPause, token, tokens.length, wpm]);
 
   useEffect(() => {
-    if (focusMode) return undefined;
-
-    let shouldLock = true;
-
-    const lockPortrait = async () => {
-      try {
-        const supportsPortrait = await ScreenOrientation.supportsOrientationLockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-        if (shouldLock && supportsPortrait) {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-        }
-      } catch (error) {
-        console.warn("Unable to lock app to portrait.", error);
-      }
-    };
-
-    lockPortrait();
-
-    return () => {
-      shouldLock = false;
-    };
-  }, [focusMode]);
-
-  useEffect(() => {
-    if (!focusMode) return undefined;
-
-    let shouldLock = true;
-
-    const openInLandscape = async () => {
-      try {
-        const supportsLandscape = await ScreenOrientation.supportsOrientationLockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        if (shouldLock && supportsLandscape) {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        }
-      } catch (error) {
-        console.warn("Unable to lock focus mode to landscape.", error);
-      }
-    };
-
-    openInLandscape();
-
-    return () => {
-      shouldLock = false;
-
-      const restoreOrientation = async () => {
-        try {
-          const supportsPortrait = await ScreenOrientation.supportsOrientationLockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          if (supportsPortrait) {
-            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          }
-        } catch (error) {
-          console.warn("Unable to restore orientation after focus mode.", error);
-        }
-      };
-
-      restoreOrientation();
-    };
-  }, [focusMode]);
+    ScreenOrientation.unlockAsync().catch((error) => {
+      console.warn("Unable to unlock screen orientation.", error);
+    });
+  }, []);
 
   useEffect(() => {
     if (!tokens.length) return;
@@ -222,7 +201,7 @@ export default function FastReadScreen() {
           ? {
               ...item,
               progress,
-              tag: progress >= 1 ? "Finished" : progress > 0 ? "Reading now" : item.tag,
+              tagKey: progress >= 1 ? "finished" : progress > 0 ? "readingNow" : item.tagKey,
             }
           : item,
       ),
@@ -252,7 +231,7 @@ export default function FastReadScreen() {
         readTime: `${Math.max(1, Math.ceil(estimateMinutes(readingUnits.length, wpm)))} min`,
         progress: 0,
         lede: makeLede(trimmed, readingUnits),
-        tag: "Reading now",
+        tagKey: "readingNow",
         text: trimmed,
       };
       setLibrary((items) => [item, ...items]);
@@ -309,7 +288,7 @@ export default function FastReadScreen() {
     <View style={s.app}>
       <StatusBar style="dark" />
       <View style={[s.contentFrame, isWide && s.contentFrameWide, appIsLandscape && s.contentFrameLandscape]}>
-        {activeTab === "home" ? <LibraryScreen insets={insets} isLandscape={appIsLandscape} library={library} onResume={() => openArticle(article, true)} onOpen={openArticle} /> : null}
+        {activeTab === "home" ? <LibraryScreen insets={insets} isLandscape={appIsLandscape} ui={ui} library={library} onResume={() => openArticle(article, true)} onOpen={openArticle} /> : null}
         {activeTab === "source" ? <SourceScreen insets={insets} isLandscape={appIsLandscape} onAddArticle={addArticle} /> : null}
         {activeTab === "reader" ? (
           <ReaderScreen
@@ -332,7 +311,7 @@ export default function FastReadScreen() {
             onFocus={() => setFocusMode(true)}
           />
         ) : null}
-        {activeTab === "stats" ? <StatsScreen insets={insets} isLandscape={appIsLandscape} /> : null}
+        {activeTab === "stats" ? <StatsScreen insets={insets} isLandscape={appIsLandscape} library={library} ui={ui} /> : null}
         {activeTab === "settings" ? (
           <SettingsScreen
             insets={insets}
@@ -345,6 +324,8 @@ export default function FastReadScreen() {
             setFocusStyle={setFocusStyle}
             wordFont={wordFont}
             setWordFont={setWordFont}
+            locale={locale}
+            setLocale={setLocale}
           />
         ) : null}
 
@@ -371,8 +352,8 @@ export default function FastReadScreen() {
   );
 }
 
-function LibraryScreen({ insets, isLandscape, library, onResume, onOpen }) {
-  const current = library.find((item) => item.id === seedArticle.id) || library[0];
+function LibraryScreen({ insets, isLandscape, ui, library, onResume, onOpen }) {
+  const current = library.find((item) => item.id === "attention") || library[0];
   const currentCount = tokenize(current.text).length;
   const topPad = topPadding(insets, isLandscape);
   const bottomPad = bottomPadding(isLandscape);
@@ -385,25 +366,21 @@ function LibraryScreen({ insets, isLandscape, library, onResume, onOpen }) {
             <BrandMark size={28} />
             <Text style={s.wordmark}>JustRead</Text>
           </View>
-          <SectionLabel>Vol. 47 / Fri</SectionLabel>
+          <SectionLabel>{ui.volume}</SectionLabel>
         </View>
-        <Text style={[s.heroLine, isLandscape && s.heroLineLandscape]}>Today you've read</Text>
+        <Text style={[s.heroLine, isLandscape && s.heroLineLandscape]}>{ui.todayPrefix}</Text>
         <Text style={[s.heroLine, isLandscape && s.heroLineLandscape]}>
-          <Text style={{ color: color.terracotta }}>{stats.today.words.toLocaleString()}</Text> words.
+          <Text style={{ color: color.terracotta }}>{stats.today.words.toLocaleString()}</Text> {ui.todaySuffix}
         </Text>
-        <Text style={s.heroMeta}>
-          {stats.today.minutes} minutes across {stats.today.articles} articles. Streak: {stats.streak} days.
-        </Text>
+        <Text style={s.heroMeta}>{ui.todayMeta({ minutes: stats.today.minutes, articles: stats.today.articles, streak: stats.streak })}</Text>
       </View>
 
       <View style={[s.libraryBody, isLandscape && s.libraryBodyLandscape]}>
         <Pressable onPress={onResume} style={[s.continueWrap, isLandscape && s.continueWrapLandscape]}>
           <Card>
             <View style={s.rowBetween}>
-              <SectionLabel>Continue reading</SectionLabel>
-              <SectionLabel tone="accent">
-                {Math.round(currentCount * current.progress)} of {currentCount}
-              </SectionLabel>
+              <SectionLabel>{ui.continueReading}</SectionLabel>
+              <SectionLabel tone="accent">{ui.ofWords({ read: Math.round(currentCount * current.progress), total: currentCount })}</SectionLabel>
             </View>
             <Text style={s.continueTitle}>{current.title}</Text>
             <View style={s.progressRow}>
@@ -415,7 +392,7 @@ function LibraryScreen({ insets, isLandscape, library, onResume, onOpen }) {
                 {current.source} / {current.readTime}
               </Text>
               <View style={s.resumePill}>
-                <Text style={s.resumeText}>Resume</Text>
+                <Text style={s.resumeText}>{ui.resume}</Text>
               </View>
             </View>
           </Card>
@@ -423,19 +400,23 @@ function LibraryScreen({ insets, isLandscape, library, onResume, onOpen }) {
 
         <View style={[s.libraryListWrap, isLandscape && s.libraryListWrapLandscape]}>
           <View style={[s.rowBetween, { paddingHorizontal: 8, paddingBottom: 12 }]}>
-            <SectionLabel>Library</SectionLabel>
-            <SectionLabel faded>{library.length} items</SectionLabel>
+            <SectionLabel>{ui.library}</SectionLabel>
+            <SectionLabel faded>{ui.items(library.length)}</SectionLabel>
           </View>
           <View style={s.listCard}>
             {library.map((item, index) => (
               <Pressable key={item.id} onPress={() => onOpen(item)} style={[s.articleRow, index > 0 && s.topRule]}>
-                <View style={s.articleMetaRow}>
-                  <View style={[s.dot, dotStyle(item.progress)]} />
-                  <SectionLabel>{item.tag}</SectionLabel>
-                  <Text style={s.readTime}>{item.readTime}</Text>
+                <View style={s.articleRowMain}>
+                  <View style={s.articleTitleBlock}>
+                    <Text numberOfLines={1} style={s.articleTitle}>
+                      {item.title}
+                    </Text>
+                    <Text style={s.articleSubline}>
+                      {item.source} · {item.readTime}
+                    </Text>
+                  </View>
+                  <TagPill item={item} ui={ui} />
                 </View>
-                <Text style={s.articleTitle}>{item.title}</Text>
-                <Text style={s.articleLede}>{item.lede}</Text>
               </Pressable>
             ))}
           </View>
@@ -446,28 +427,40 @@ function LibraryScreen({ insets, isLandscape, library, onResume, onOpen }) {
 }
 
 function SourceScreen({ insets, isLandscape, onAddArticle }) {
-  const [url, setUrl] = useState("");
-  const [text, setText] = useState("");
+  const [input, setInput] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomPad = bottomPadding(isLandscape);
+  const trimmed = input.trim();
+  const isUrl = looksLikeUrl(trimmed);
+  const hasInput = trimmed.length > 0;
+  const wordCount = hasInput && !isUrl ? tokenize(trimmed).length : 0;
+  const actionLabel = loading
+    ? "Fetching article..."
+    : isUrl
+      ? "Fetch & open in reader"
+      : hasInput
+        ? `Open ${wordCount.toLocaleString()} words in reader`
+        : "Paste or type to begin";
 
-  const loadUrl = useCallback(async () => {
+  const handleAction = useCallback(async () => {
     Keyboard.dismiss();
-    const trimmed = url.trim();
-    if (!trimmed) {
-      setStatus("Enter a URL first.");
+    if (!hasInput || loading) return;
+
+    if (!isUrl) {
+      onAddArticle(trimmed);
       return;
     }
+
     setLoading(true);
     setStatus("Loading...");
     try {
-      const parsed = new URL(trimmed);
+      const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
       if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only http and https URLs are supported.");
-      const response = await fetch(trimmed, { headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2" } });
+      const response = await fetch(parsed.toString(), { headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2" } });
       if (!response.ok) throw new Error(`Fetch failed with HTTP ${response.status}.`);
       const html = await response.text();
-      const article = extractArticle(html, response.url || trimmed);
+      const article = extractArticle(html, response.url || parsed.toString());
       if (!article.text || article.wordCount < 20) throw new Error("Could not find enough readable text on that page.");
       onAddArticle(article.text, article.title || parsed.host, parsed.host);
     } catch (error) {
@@ -475,56 +468,44 @@ function SourceScreen({ insets, isLandscape, onAddArticle }) {
     } finally {
       setLoading(false);
     }
-  }, [onAddArticle, url]);
+  }, [hasInput, input, isUrl, loading, onAddArticle, trimmed]);
 
   return (
     <ScrollView style={s.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-      <PageTitle insets={insets} isLandscape={isLandscape} label="New reading" title={"Add something\nto read."} />
+      <PageTitle insets={insets} isLandscape={isLandscape} label="New reading" title={"Add something\nto read."} sub={"Paste a link or any text. We'll figure out which it is."} />
       <View style={{ paddingHorizontal: 24, gap: 28 }}>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <SourceTarget title="Paste" detail="Clipboard" />
-          <SourceTarget title="URL" detail="Fetch web" />
-        </View>
-
-        <View style={{ gap: 8 }}>
-          <SectionLabel>From the web</SectionLabel>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <TextInput
-              value={url}
-              onChangeText={setUrl}
-              placeholder="https://"
-              placeholderTextColor={color.inkQuiet}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onSubmitEditing={loadUrl}
-              style={[s.input, { flex: 1, fontFamily: "JetBrainsMono" }]}
-            />
-            <Pressable onPress={loadUrl} disabled={loading} style={s.fetchButton}>
-              <Text style={s.fetchText}>{loading ? "..." : "Fetch"}</Text>
-            </Pressable>
-          </View>
-          {status ? <Text style={[s.status, status.startsWith("Loaded") && { color: color.terracotta }]}>{status.toUpperCase()}</Text> : null}
-        </View>
-
-        <View style={{ gap: 8 }}>
-          <SectionLabel>Or paste text</SectionLabel>
+        <View style={s.smartInputWrap}>
           <TextInput
-            value={text}
-            onChangeText={setText}
-            multiline
+            value={input}
+            onChangeText={(value) => {
+              setInput(value);
+              setStatus("");
+            }}
+            multiline={!isUrl}
+            numberOfLines={isUrl ? 1 : 6}
             textAlignVertical="top"
-            placeholder="Paste an article, memo, or transcript here..."
+            placeholder="https://example.com/article  -  or paste an article, memo, or transcript..."
             placeholderTextColor="rgba(138,122,106,0.68)"
-            style={s.textArea}
+            autoCapitalize="none"
+            autoCorrect={!isUrl}
+            keyboardType={isUrl ? "url" : "default"}
+            onSubmitEditing={isUrl ? handleAction : undefined}
+            style={[s.smartInput, isUrl && s.smartInputUrl]}
           />
+          {hasInput ? (
+            <View style={[s.modeBadge, { backgroundColor: isUrl ? color.terracotta : color.ink }]}>
+              <Text style={s.modeBadgeText}>{isUrl ? "Link" : "Text"}</Text>
+            </View>
+          ) : null}
         </View>
 
-        {text.trim() ? (
-          <Pressable onPress={() => onAddArticle(text)} style={s.primaryButton}>
-            <Text style={s.primaryButtonText}>Open in reader</Text>
-          </Pressable>
-        ) : null}
+        {status ? <Text style={[s.status, { color: color.terracotta }]}>{status.toUpperCase()}</Text> : null}
+
+        <Pressable onPress={handleAction} disabled={!hasInput || loading} style={[s.primaryButton, (!hasInput || loading) && s.primaryButtonDisabled]}>
+          {loading ? <ActivityIndicator color="#fff" size="small" /> : null}
+          <Text style={[s.primaryButtonText, !hasInput && { color: color.inkQuiet }]}>{actionLabel}</Text>
+          {!loading && hasInput ? <Text style={s.primaryArrow}>{"->"}</Text> : null}
+        </Pressable>
 
         <View>
           <SectionLabel>Recent sources</SectionLabel>
@@ -533,10 +514,10 @@ function SourceScreen({ insets, isLandscape, onAddArticle }) {
             ["theatlantic.com", "yesterday"],
             ["reuters.com", "3 days ago"],
           ].map(([label, date], index) => (
-            <View key={label} style={[s.recentRow, index === 0 && { marginTop: 12 }]}>
+            <Pressable key={label} onPress={() => setInput(label)} style={[s.recentRow, index === 0 && { marginTop: 12 }]}>
               <Text style={s.recentLabel}>{label}</Text>
               <Text style={s.recentDate}>{date}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       </View>
@@ -661,23 +642,24 @@ function FocusMode({ visible, isLandscape, token, article, progress, wordIndex, 
   );
 }
 
-function StatsScreen({ insets, isLandscape }) {
+function StatsScreen({ insets, isLandscape, library, ui }) {
   const maxWords = Math.max(...stats.week.map((item) => item.words));
   const weekTotal = stats.week.reduce((sum, item) => sum + item.words, 0);
+  const finishedArticles = library.filter((item) => item.progress >= 1);
   const bottomPad = bottomPadding(isLandscape);
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-      <PageTitle insets={insets} isLandscape={isLandscape} label="This week" title={`${weekTotal.toLocaleString()} words`} sub={`That's roughly ${(weekTotal / 60000).toFixed(2)} novellas at ${stats.avgWpm} wpm.`} />
+      <PageTitle insets={insets} isLandscape={isLandscape} label="Stats" title={`${weekTotal.toLocaleString()} words`} sub={`That's roughly ${(weekTotal / 60000).toFixed(2)} novellas at ${stats.avgWpm} wpm.`} />
       <View style={{ paddingHorizontal: 16, gap: 8 }}>
+        <View style={s.statCards}>
+          <SmallStat label="Streak" value={stats.streak} unit="days" />
+          <SmallStat label="Avg pace" value={stats.avgWpm} unit="wpm" />
+          <SmallStat label="Best pace" value={stats.bestWpm} unit="wpm" />
+          <SmallStat label="Articles read" value={stats.totalArticles} unit="total" />
+        </View>
         <Card>
-          <View style={s.todayGrid}>
-            <StatMetric value={stats.today.words.toLocaleString()} label="words" />
-            <StatMetric value={stats.today.minutes} label="minutes" />
-            <StatMetric value={stats.today.articles} label="articles" />
-          </View>
-        </Card>
-        <Card>
+          <SectionLabel>This week</SectionLabel>
           <View style={s.chart}>
             {stats.week.map((item, index) => {
               const today = index === stats.week.length - 1;
@@ -690,11 +672,25 @@ function StatsScreen({ insets, isLandscape }) {
             })}
           </View>
         </Card>
-        <View style={s.statCards}>
-          <SmallStat label="Streak" value={stats.streak} unit="days" />
-          <SmallStat label="Avg pace" value={stats.avgWpm} unit="wpm" />
-          <SmallStat label="Best pace" value={stats.bestWpm} unit="wpm" />
-          <SmallStat label="Articles read" value={stats.totalArticles} unit="total" />
+        <View style={{ paddingTop: 16 }}>
+          <SectionLabel>Recently finished</SectionLabel>
+          <View style={[s.listCard, { marginTop: 12 }]}>
+            {finishedArticles.map((item, index) => (
+              <View key={item.id} style={[s.articleRow, index > 0 && s.topRule]}>
+                <View style={s.articleRowMain}>
+                  <View style={s.articleTitleBlock}>
+                    <Text numberOfLines={1} style={s.articleTitle}>
+                      {item.title}
+                    </Text>
+                    <Text style={s.articleSubline}>
+                      {item.source} · {item.readTime}
+                    </Text>
+                  </View>
+                  <TagPill item={item} ui={ui} />
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
         <View style={s.noteCard}>
           <SectionLabel>This week's note</SectionLabel>
@@ -705,7 +701,7 @@ function StatsScreen({ insets, isLandscape }) {
   );
 }
 
-function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, setPunctuationPause, focusStyle, setFocusStyle, wordFont, setWordFont }) {
+function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, setPunctuationPause, focusStyle, setFocusStyle, wordFont, setWordFont, locale, setLocale }) {
   const bottomPad = bottomPadding(isLandscape);
 
   return (
@@ -735,6 +731,9 @@ function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, se
         </SettingsGroup>
         <SettingsGroup label="Word typeface">
           <Segmented value={wordFont} onChange={setWordFont} options={[["serif", "Serif"], ["sans", "Sans"], ["mono", "Mono"]]} />
+        </SettingsGroup>
+        <SettingsGroup label="Language">
+          <Segmented value={locale} onChange={setLocale} options={[["en", "English"], ["zh-Hant", "繁體"]]} />
         </SettingsGroup>
         <SettingsGroup label="About">
           <SettingsRow label="Version" value="1.4.0" />
@@ -942,16 +941,6 @@ function RoundButton({ label, onPress, small = false, dark = false, compact = fa
   );
 }
 
-function SourceTarget({ title, detail }) {
-  return (
-    <View style={s.sourceTarget}>
-      <Text style={s.sourceIcon}>{title === "Paste" ? "□" : "∞"}</Text>
-      <Text style={s.sourceTitle}>{title}</Text>
-      <Text style={s.sourceDetail}>{detail.toUpperCase()}</Text>
-    </View>
-  );
-}
-
 function SettingsGroup({ label, children }) {
   return (
     <View style={{ gap: 8 }}>
@@ -1004,19 +993,46 @@ function SmallStat({ label, value, unit }) {
   );
 }
 
-function makeArticle(id, title, source, readTime, progress, lede, tag) {
-  return {
-    id,
-    title,
-    source,
-    author: "JustRead Desk",
-    date: "May 2, 2026",
-    readTime,
-    progress,
-    lede,
-    tag,
-    text: `${title}. ${lede} This saved piece is included as sample library material for the speed reader prototype. Open it to rehearse the one-word reading flow with the same RSVP engine and focus-letter anchor.`,
-  };
+function buildLibrary(locale) {
+  const pack = localeData[locale] || localeData.en;
+  return pack.library.map((item) => {
+    const isCurrent = item.id === "attention";
+    const text = isCurrent ? pack.current.text : sampleArticleText(item, locale);
+    const tokens = tokenize(text);
+    return {
+      id: item.id,
+      title: item.title,
+      source: item.source,
+      author: isCurrent ? pack.current.author : "JustRead Desk",
+      date: isCurrent ? pack.current.date : "May 2, 2026",
+      readTime: item.readTime,
+      progress: item.progress,
+      tagKey: item.tagKey,
+      lede: makeLede(text, tokens),
+      text,
+    };
+  });
+}
+
+function sampleArticleText(item, locale) {
+  if (locale === "zh-Hant") {
+    return `${item.title}。這篇儲存文章作為樣本內容,用來演練同一套 RSVP 引擎與固定焦點字錨點。打開它,你可以確認中文會以兩字為單位前進,並在標點處保留更自然的停頓。`;
+  }
+  return `${item.title}. This saved piece is included as sample library material for the speed reader prototype. Open it to rehearse the one-word reading flow with the same RSVP engine and focus-letter anchor.`;
+}
+
+function tagLabel(item, ui) {
+  return ui[item.tagKey] || item.tagKey;
+}
+
+function TagPill({ item, ui }) {
+  const finished = item.tagKey === "finished";
+  const text = `${finished ? "✓ " : ""}${tagLabel(item, ui)}`;
+  return (
+    <View style={[s.tagPill, item.tagKey === "readingNow" && s.tagPillReading, item.tagKey === "saved" && s.tagPillSaved, finished && s.tagPillFinished]}>
+      <Text style={[s.tagText, item.tagKey === "readingNow" && s.tagTextReading, item.tagKey === "saved" && s.tagTextSaved, finished && s.tagTextFinished]}>{text}</Text>
+    </View>
+  );
 }
 
 function makeLede(text, tokens) {
@@ -1024,10 +1040,12 @@ function makeLede(text, tokens) {
   return joinTokensForDisplay(tokens.slice(0, limit));
 }
 
-function dotStyle(progress) {
-  if (progress >= 1) return { backgroundColor: color.inkQuiet, borderColor: color.inkQuiet };
-  if (progress > 0) return { backgroundColor: color.terracotta, borderColor: color.terracotta };
-  return { backgroundColor: "transparent", borderColor: color.inkQuiet };
+const URL_RE = /^(https?:\/\/\S+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?)$/i;
+
+function looksLikeUrl(text) {
+  const value = (text || "").trim();
+  if (!value || /\s/.test(value)) return false;
+  return URL_RE.test(value);
 }
 
 function topPadding(insets, isLandscape) {
@@ -1070,29 +1088,35 @@ const s = {
   listCard: { backgroundColor: color.paperStrong, borderRadius: 4, borderWidth: 0.5, borderColor: color.rule, overflow: "hidden" },
   libraryListWrap: { paddingHorizontal: 16 },
   libraryListWrapLandscape: { flex: 0.58, paddingHorizontal: 0 },
-  articleRow: { paddingHorizontal: 16, paddingVertical: 14, gap: 6 },
+  articleRow: { paddingHorizontal: 16, paddingVertical: 14 },
   topRule: { borderTopWidth: 0.5, borderTopColor: color.rule },
-  articleMetaRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  dot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1 },
-  readTime: { marginLeft: "auto", fontFamily: "JetBrainsMono", fontSize: 11, letterSpacing: 0.66, color: color.inkQuiet },
+  articleRowMain: { flexDirection: "row", alignItems: "center", gap: 12 },
+  articleTitleBlock: { flex: 1, minWidth: 0, gap: 4 },
   articleTitle: { fontFamily: "Fraunces", fontSize: 16, lineHeight: 20, fontWeight: "500", color: color.ink, letterSpacing: -0.2 },
-  articleLede: { fontFamily: "Inter", fontSize: 13, lineHeight: 18, color: color.inkMid },
+  articleSubline: { fontFamily: "Inter", fontSize: 12, lineHeight: 17, color: color.inkQuiet },
+  tagPill: { alignSelf: "center", borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+  tagPillReading: { backgroundColor: "rgba(201,100,66,0.10)" },
+  tagPillSaved: { backgroundColor: "rgba(31,26,23,0.05)" },
+  tagPillFinished: { backgroundColor: "transparent", paddingHorizontal: 0 },
+  tagText: { fontFamily: "Inter", fontSize: 10, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase" },
+  tagTextReading: { color: color.terracotta },
+  tagTextSaved: { color: color.inkMid },
+  tagTextFinished: { color: color.inkQuiet },
   pageTitle: { paddingHorizontal: 24, paddingBottom: 18, gap: 8 },
   pageTitleLandscape: { paddingBottom: 12 },
   pageHeading: { fontFamily: "Fraunces", fontSize: 36, lineHeight: 38, fontWeight: "500", letterSpacing: -0.9, color: color.ink },
   pageHeadingLandscape: { fontSize: 30, lineHeight: 32 },
   pageSub: { fontFamily: "Inter", fontSize: 14, lineHeight: 21, color: color.inkMid },
-  sourceTarget: { flex: 1, padding: 16, gap: 4, borderRadius: 4, backgroundColor: color.paperStrong, borderWidth: 0.5, borderColor: color.rule },
-  sourceIcon: { fontFamily: "Inter", color: color.terracotta, fontSize: 20, fontWeight: "700", marginBottom: 6 },
-  sourceTitle: { fontFamily: "Fraunces", color: color.ink, fontSize: 19, fontWeight: "600" },
-  sourceDetail: { fontFamily: "JetBrainsMono", color: color.inkQuiet, fontSize: 10, letterSpacing: 0.6 },
-  input: { height: 44, paddingHorizontal: 14, borderRadius: 4, borderWidth: 0.5, borderColor: color.ruleStrong, backgroundColor: color.paperStrong, color: color.ink, fontSize: 13 },
-  fetchButton: { height: 44, paddingHorizontal: 18, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: color.terracotta },
-  fetchText: { color: "#fff", fontFamily: "Inter", fontSize: 14, fontWeight: "700" },
+  smartInputWrap: { position: "relative" },
+  smartInput: { minHeight: 180, paddingTop: 14, paddingRight: 78, paddingBottom: 14, paddingLeft: 16, borderRadius: 4, borderWidth: 0.5, borderColor: color.ruleStrong, backgroundColor: color.paperStrong, color: color.ink, fontFamily: "Fraunces", fontSize: 15, lineHeight: 23 },
+  smartInputUrl: { minHeight: 52, height: 52, fontFamily: "JetBrainsMono", fontSize: 13, lineHeight: 18 },
+  modeBadge: { position: "absolute", top: 12, right: 12, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  modeBadgeText: { fontFamily: "JetBrainsMono", fontSize: 10, fontWeight: "500", letterSpacing: 1.2, color: "#fff", textTransform: "uppercase" },
   status: { fontFamily: "JetBrainsMono", fontSize: 11, letterSpacing: 0.66, color: color.inkQuiet },
-  textArea: { minHeight: 180, padding: 14, borderRadius: 4, borderWidth: 0.5, borderColor: color.ruleStrong, backgroundColor: color.paperStrong, color: color.ink, fontFamily: "Fraunces", fontSize: 15, lineHeight: 23 },
-  primaryButton: { height: 52, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: color.ink },
+  primaryButton: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 4, backgroundColor: color.ink },
+  primaryButtonDisabled: { backgroundColor: color.ruleStrong },
   primaryButtonText: { color: "#fff", fontFamily: "Inter", fontSize: 15, fontWeight: "700" },
+  primaryArrow: { color: "rgba(255,255,255,0.6)", fontFamily: "JetBrainsMono", fontSize: 13 },
   recentRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: color.rule },
   recentLabel: { fontFamily: "JetBrainsMono", fontSize: 13, color: color.ink },
   recentDate: { fontFamily: "Inter", fontSize: 12, color: color.inkQuiet },
@@ -1161,8 +1185,8 @@ const s = {
   segmented: { flexDirection: "row", padding: 4, gap: 4 },
   segment: { flex: 1, paddingVertical: 10, borderRadius: 3, alignItems: "center" },
   segmentText: { fontFamily: "Inter", fontSize: 13, color: color.inkMid, fontWeight: "600" },
-  tabBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 12, flexDirection: "row", backgroundColor: color.paper },
-  tabButton: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 6 },
+  tabBar: { position: "absolute", left: 16, right: 16, bottom: 0, paddingTop: 8, paddingHorizontal: 8, flexDirection: "row", backgroundColor: "rgba(250,246,236,0.88)", borderRadius: 22, borderWidth: 0.5, borderColor: "rgba(201,100,66,0.22)", overflow: "hidden" },
+  tabButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 6 },
   tabLabel: { fontFamily: "JetBrainsMono", fontSize: 10, letterSpacing: 0.6, color: color.inkQuiet },
   tabIconSlot: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   bookIcon: { width: 22, height: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },

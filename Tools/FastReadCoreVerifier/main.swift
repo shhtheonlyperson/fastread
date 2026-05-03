@@ -11,6 +11,14 @@ func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
 let tokens = RSVPEngine.tokenize("  Read\tfast.\nNow  ")
 expect(tokens == ["Read", "fast.", "Now"], "tokenize should split whitespace and preserve punctuation")
 expect(RSVPEngine.tokenize("Read\u{00a0}fast") == ["Read", "fast"], "tokenize should normalize nbsp")
+expect(
+    RSVPEngine.tokenize("快速閱讀，眼睛更輕鬆。") == ["快速", "閱讀，", "眼睛", "更輕", "鬆。"],
+    "tokenize should split Traditional Chinese into two-character chunks with punctuation attached"
+)
+expect(
+    RSVPEngine.tokenize("FastRead 支援中文。") == ["FastRead", "支援", "中文。"],
+    "tokenize should preserve mixed Latin and CJK runs"
+)
 
 expect(RSVPEngine.focusIndex(in: "a") == 0, "one focusable character should use index 0")
 expect(RSVPEngine.focusIndex(in: "read") == 1, "2-5 focusable characters should use focusable index 1")
@@ -25,6 +33,7 @@ expect(
 let base = RSVPEngine.duration(for: "read", wpm: 600, punctuationPause: false)
 expect(base == 100, "600 wpm base duration should be 100ms")
 expect(RSVPEngine.duration(for: "read.", wpm: 600, punctuationPause: true) > base, "punctuation should pause")
+expect(RSVPEngine.duration(for: "閱讀", wpm: 600, punctuationPause: false) == 150, "CJK chunks should get 1.5x base duration")
 expect(RSVPEngine.duration(for: "internationalization", wpm: 600, punctuationPause: false) > base, "long words should last longer")
 expect(RSVPEngine.duration(for: "read)", wpm: 600, punctuationPause: true) > base, "closing parenthesis should pause")
 expect(RSVPEngine.duration(for: "read\")", wpm: 600, punctuationPause: true) > base, "quote plus closer should pause")
