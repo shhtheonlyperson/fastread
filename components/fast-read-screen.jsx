@@ -674,9 +674,12 @@ function ReaderScreen({
   const minutesLeft = estimateMinutes(Math.max(tokens.length - wordIndex, 0), wpm);
   const topPad = topPadding(insets, isLandscape);
   const bottomPad = bottomPadding(isLandscape);
+  const [isRangeScrubbing, setIsRangeScrubbing] = useState(false);
+  const lockRangeScroll = useCallback(() => setIsRangeScrubbing(true), []);
+  const unlockRangeScroll = useCallback(() => setIsRangeScrubbing(false), []);
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} scrollEnabled={!isRangeScrubbing} showsVerticalScrollIndicator={false}>
       <View style={[s.readerHeader, { paddingTop: topPad }, isLandscape && s.readerHeaderLandscape]}>
         <Pressable onPress={onBack}>
           <SectionLabel>{"< Library"}</SectionLabel>
@@ -694,7 +697,7 @@ function ReaderScreen({
               <RSVPStage token={token} focusStyle={focusStyle} wordFont={wordFont} compact={isLandscape} />
             </View>
             <View style={{ paddingHorizontal: 16, paddingBottom: isLandscape ? 14 : 20, gap: 8 }}>
-              <Scrubber value={progress} onChange={onScrub} />
+              <Scrubber value={progress} onChange={onScrub} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
               <View style={s.rowBetween}>
                 <Text style={s.percent}>
                   {wordIndex + 1} / {tokens.length}
@@ -706,7 +709,7 @@ function ReaderScreen({
 
           <Transport isPlaying={isPlaying} onPlayPause={onPlayPause} onMove={onMove} onFocus={onFocus} compact={isLandscape} />
 
-          <PaceControl wpm={wpm} setWpm={setWpm} compact={isLandscape} />
+          <PaceControl wpm={wpm} setWpm={setWpm} compact={isLandscape} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
         </View>
 
         <View style={[s.readerContextWrap, isLandscape && s.readerContextWrapLandscape]}>
@@ -868,15 +871,18 @@ function StatsScreen({ insets, isLandscape, library, stats, ui }) {
 
 function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, setPunctuationPause, focusStyle, setFocusStyle, wordFont, setWordFont, locale, setLocale }) {
   const bottomPad = bottomPadding(isLandscape);
+  const [isRangeScrubbing, setIsRangeScrubbing] = useState(false);
+  const lockRangeScroll = useCallback(() => setIsRangeScrubbing(true), []);
+  const unlockRangeScroll = useCallback(() => setIsRangeScrubbing(false), []);
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} scrollEnabled={!isRangeScrubbing} showsVerticalScrollIndicator={false}>
       <PageTitle insets={insets} isLandscape={isLandscape} label="Settings" title={"The shape\nof your read."} />
       <View style={{ paddingHorizontal: 16, gap: 22 }}>
         <SettingsGroup label="Pace">
           <SettingsRow label="Words per minute" value={wpm} />
           <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 4 }}>
-            <Scrubber value={(wpm - 150) / 850} onChange={(value) => setWpm(Math.round((150 + value * 850) / 25) * 25)} />
+            <Scrubber value={(wpm - 150) / 850} onChange={(value) => setWpm(Math.round((150 + value * 850) / 25) * 25)} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
             <View style={s.rowBetween}>
               <Text style={s.tinyMono}>Slow / 150</Text>
               <Text style={s.tinyMono}>Comfortable / 500</Text>
@@ -968,7 +974,7 @@ function Transport({ isPlaying, onPlayPause, onMove, onFocus, dark = false, comp
   );
 }
 
-function PaceControl({ wpm, setWpm, compact = false }) {
+function PaceControl({ wpm, setWpm, compact = false, onScrubStart, onScrubEnd }) {
   return (
     <View style={[s.pace, compact && s.paceCompact]}>
       <View style={s.rowBetween}>
@@ -977,7 +983,7 @@ function PaceControl({ wpm, setWpm, compact = false }) {
           {wpm} <Text style={s.paceUnit}>wpm</Text>
         </Text>
       </View>
-      <Scrubber value={(wpm - 150) / 850} onChange={(value) => setWpm(Math.round((150 + value * 850) / 25) * 25)} />
+      <Scrubber value={(wpm - 150) / 850} onChange={(value) => setWpm(Math.round((150 + value * 850) / 25) * 25)} onScrubStart={onScrubStart} onScrubEnd={onScrubEnd} />
       <View style={s.rowBetween}>
         <Text style={s.tinyMono}>150</Text>
         <Text style={s.tinyMono}>500</Text>
@@ -987,29 +993,58 @@ function PaceControl({ wpm, setWpm, compact = false }) {
   );
 }
 
-function Scrubber({ value, onChange }) {
+function Scrubber({ value, onChange, onScrubStart, onScrubEnd }) {
   const [width, setWidth] = useState(1);
   const widthRef = useRef(1);
   const onChangeRef = useRef(onChange);
+  const onScrubStartRef = useRef(onScrubStart);
+  const onScrubEndRef = useRef(onScrubEnd);
+  const isScrubbingRef = useRef(false);
   onChangeRef.current = onChange;
+  onScrubStartRef.current = onScrubStart;
+  onScrubEndRef.current = onScrubEnd;
   const apply = useCallback(
     (event) => {
-      onChangeRef.current(rangeValueFromLocation(event.nativeEvent.locationX, widthRef.current));
+      const locationX = event?.nativeEvent?.locationX;
+      if (!Number.isFinite(locationX)) return;
+      onChangeRef.current(rangeValueFromLocation(locationX, widthRef.current));
     },
     [],
+  );
+  const beginScrub = useCallback(
+    (event) => {
+      if (!isScrubbingRef.current) {
+        isScrubbingRef.current = true;
+        onScrubStartRef.current?.();
+      }
+      apply(event);
+    },
+    [apply],
+  );
+  const endScrub = useCallback(
+    (event) => {
+      apply(event);
+      if (isScrubbingRef.current) {
+        isScrubbingRef.current = false;
+        onScrubEndRef.current?.();
+      }
+    },
+    [apply],
   );
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
         onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
         onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: apply,
+        onPanResponderGrant: beginScrub,
         onPanResponderMove: apply,
-        onPanResponderRelease: apply,
-        onPanResponderTerminate: apply,
+        onPanResponderRelease: endScrub,
+        onPanResponderTerminate: endScrub,
       }),
-    [apply],
+    [apply, beginScrub, endScrub],
   );
   const handleLayout = useCallback((event) => {
     const nextWidth = Math.max(event.nativeEvent.layout.width, 1);

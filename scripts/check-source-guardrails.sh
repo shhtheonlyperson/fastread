@@ -42,6 +42,14 @@ require_pattern "PanResponder\\.create" \
   "Expo range controls must track finger movement continuously instead of only applying on press release." \
   components/fast-read-screen.jsx
 
+require_pattern "scrollEnabled=\\{!isRangeScrubbing\\}" \
+  "Expo range controls must lock the vertical ScrollView while the user is scrubbing horizontally." \
+  components/fast-read-screen.jsx
+
+require_pattern "onStartShouldSetPanResponderCapture: \\(\\) => true" \
+  "Expo range controls must capture scrubber touches before the parent ScrollView can steal the gesture." \
+  components/fast-read-screen.jsx
+
 require_pattern "clipboardBeamActive" \
   "Expo paste button must keep a visibly stronger active beam while reading/fetching clipboard content." \
   components/fast-read-screen.jsx
