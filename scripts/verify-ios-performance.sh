@@ -9,7 +9,7 @@ require_pattern() {
   local message="$2"
   shift 2
 
-  if ! rg -q "$pattern" "$@"; then
+  if ! grep -ERq "$pattern" "$@"; then
     echo "$message" >&2
     exit 1
   fi
@@ -20,7 +20,7 @@ reject_pattern() {
   local message="$2"
   shift 2
 
-  if rg -n "$pattern" "$@"; then
+  if grep -ERn "$pattern" "$@"; then
     echo "$message" >&2
     exit 1
   fi
@@ -34,7 +34,7 @@ reject_pattern "FullTextPreview|The full text|step:" \
   "Found a known perf-regression pattern in reader/settings UI." \
   FastReadApp/ReaderView.swift FastReadApp/SettingsView.swift
 
-reject_pattern "NSAttributedString\\s*\\(data:" \
+reject_pattern "NSAttributedString[[:space:]]*\\(data:" \
   "Do not reintroduce synchronous NSAttributedString HTML parsing on paste/load paths." \
   FastReadApp
 
