@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { extractArticle } from "../src/article-extract.js";
-import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
+import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, rangeValueFromPageX, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "0.2.0";
@@ -995,7 +995,9 @@ function PaceControl({ wpm, setWpm, compact = false, onScrubStart, onScrubEnd })
 
 function Scrubber({ value, onChange, onScrubStart, onScrubEnd }) {
   const [width, setWidth] = useState(1);
+  const scrubberRef = useRef(null);
   const widthRef = useRef(1);
+  const trackPageXRef = useRef(null);
   const onChangeRef = useRef(onChange);
   const onScrubStartRef = useRef(onScrubStart);
   const onScrubEndRef = useRef(onScrubEnd);
@@ -1003,27 +1005,54 @@ function Scrubber({ value, onChange, onScrubStart, onScrubEnd }) {
   onChangeRef.current = onChange;
   onScrubStartRef.current = onScrubStart;
   onScrubEndRef.current = onScrubEnd;
+  const updateTrackGeometry = useCallback((afterMeasure) => {
+    const node = scrubberRef.current;
+    if (!node?.measureInWindow) {
+      afterMeasure?.();
+      return;
+    }
+
+    node.measureInWindow((pageX, _pageY, measuredWidth) => {
+      if (Number.isFinite(pageX)) {
+        trackPageXRef.current = pageX;
+      }
+      if (Number.isFinite(measuredWidth) && measuredWidth > 0) {
+        const nextWidth = Math.max(measuredWidth, 1);
+        widthRef.current = nextWidth;
+        setWidth(nextWidth);
+      }
+      afterMeasure?.();
+    });
+  }, []);
   const apply = useCallback(
-    (event) => {
+    (event, gestureState) => {
+      const pageX = Number.isFinite(gestureState?.moveX) ? gestureState.moveX : event?.nativeEvent?.pageX;
+      const trackPageX = trackPageXRef.current;
+      if (Number.isFinite(pageX) && Number.isFinite(trackPageX)) {
+        onChangeRef.current(rangeValueFromPageX(pageX, trackPageX, widthRef.current));
+        return;
+      }
+
       const locationX = event?.nativeEvent?.locationX;
-      if (!Number.isFinite(locationX)) return;
-      onChangeRef.current(rangeValueFromLocation(locationX, widthRef.current));
+      if (Number.isFinite(locationX)) {
+        onChangeRef.current(rangeValueFromLocation(locationX, widthRef.current));
+      }
     },
     [],
   );
   const beginScrub = useCallback(
-    (event) => {
+    (event, gestureState) => {
       if (!isScrubbingRef.current) {
         isScrubbingRef.current = true;
         onScrubStartRef.current?.();
       }
-      apply(event);
+      updateTrackGeometry(() => apply(event, gestureState));
     },
-    [apply],
+    [apply, updateTrackGeometry],
   );
   const endScrub = useCallback(
-    (event) => {
-      apply(event);
+    (event, gestureState) => {
+      apply(event, gestureState);
       if (isScrubbingRef.current) {
         isScrubbingRef.current = false;
         onScrubEndRef.current?.();
@@ -1050,7 +1079,8 @@ function Scrubber({ value, onChange, onScrubStart, onScrubEnd }) {
     const nextWidth = Math.max(event.nativeEvent.layout.width, 1);
     widthRef.current = nextWidth;
     setWidth(nextWidth);
-  }, []);
+    requestAnimationFrame(() => updateTrackGeometry());
+  }, [updateTrackGeometry]);
   const adjustBy = useCallback(
     (delta) => {
       onChange(clamp(value + delta, 0, 1));
@@ -1059,6 +1089,7 @@ function Scrubber({ value, onChange, onScrubStart, onScrubEnd }) {
   );
   return (
     <View
+      ref={scrubberRef}
       accessibilityActions={[
         { name: "increment", label: "Increase" },
         { name: "decrement", label: "Decrease" },
