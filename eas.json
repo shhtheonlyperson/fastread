@@ -14,5 +14,14 @@
     "production": {
       "autoIncrement": true
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "huge.huang@gmail.com",
+        "ascAppId": "6765981867",
+        "appleTeamId": "QLJ9ZM278S"
+      }
+    }
   }
 }
