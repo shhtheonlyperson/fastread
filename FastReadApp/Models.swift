@@ -70,14 +70,6 @@ struct ReadingArticle: Identifiable, Codable, Equatable {
     var wordIndex: Int
     var timesOpened: Int
     var isFinished: Bool
-
-    var tokens: [String] {
-        RSVPEngine.tokenize(text)
-    }
-
-    var wordCount: Int {
-        tokens.count
-    }
 }
 
 struct DayWords: Identifiable, Codable, Equatable {

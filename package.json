@@ -10,6 +10,11 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "test": "node --test",
+    "test:swift": "swift test",
+    "perf:web": "node --test test/performance-guardrails.test.mjs",
+    "perf:ios": "swift run FastReadPerformanceVerifier",
+    "verify": "npm run verify:ios-performance",
+    "verify:ios-performance": "scripts/verify-ios-performance.sh",
     "serve": "node server.js"
   },
   "dependencies": {

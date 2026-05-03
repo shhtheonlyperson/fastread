@@ -46,7 +46,7 @@ struct SettingsView: View {
             SettingsRow {
                 Text("Words per minute")
                 Spacer()
-                Text("\(Int(store.wpm))")
+                Text("\(Int(store.wpm.rounded()))")
                     .font(JRFont.serif(18, weight: .semibold))
             }
 
@@ -56,8 +56,7 @@ struct SettingsView: View {
                         get: { store.wpm },
                         set: { store.setWPM($0) }
                     ),
-                    in: 150...1_000,
-                    step: 25
+                    in: 150...1_000
                 )
                 .tint(JRColor.terracotta)
 

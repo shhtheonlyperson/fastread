@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   countReadingUnits,
+  contextWindow,
   durationForToken,
   estimateMinutes,
   getFocusIndex,
@@ -56,4 +57,32 @@ test("progress and ETA helpers handle empty and non-empty input", () => {
   assert.equal(getProgress(4, 10), 50);
   assert.equal(estimateMinutes(900, 900), 1);
   assert.equal(countReadingUnits("快速閱讀"), 2);
+});
+
+test("contextWindow keeps reader previews bounded", () => {
+  assert.deepEqual(contextWindow(0, 0), {
+    lowerBound: 0,
+    upperBound: 0,
+    count: 0,
+    hasLeadingOverflow: false,
+    hasTrailingOverflow: false,
+  });
+
+  assert.deepEqual(contextWindow(10, 0), {
+    lowerBound: 0,
+    upperBound: 10,
+    count: 10,
+    hasLeadingOverflow: false,
+    hasTrailingOverflow: false,
+  });
+
+  assert.deepEqual(contextWindow(1000, 500), {
+    lowerBound: 482,
+    upperBound: 537,
+    count: 55,
+    hasLeadingOverflow: true,
+    hasTrailingOverflow: true,
+  });
+
+  assert.equal(contextWindow(50_000, 25_000).count, 55);
 });
