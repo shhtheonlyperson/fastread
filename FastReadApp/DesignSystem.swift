@@ -225,4 +225,87 @@ extension View {
     func paperBackground() -> some View {
         background(JRColor.paper.ignoresSafeArea())
     }
+
+    @ViewBuilder
+    func borderBeam(
+        border: Color = .primary,
+        hideFadeBorder: Bool = false,
+        beam: [Color] = [.blue, .purple],
+        beamBlur: CGFloat = 10,
+        cornerRadius: CGFloat = 20,
+        isEnabled: Bool = true
+    ) -> some View {
+        modifier(
+            BorderBeamEffect(
+                border: border,
+                hideFadeBorder: hideFadeBorder,
+                beam: beam,
+                beamBlur: beamBlur,
+                cornerRadius: cornerRadius,
+                isEnabled: isEnabled
+            )
+        )
+    }
+}
+
+private struct BorderBeamEffect: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var border: Color
+    var hideFadeBorder: Bool
+    var beam: [Color]
+    var beamBlur: CGFloat
+    var cornerRadius: CGFloat
+    var isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                ZStack {
+                    if !hideFadeBorder {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .stroke(border.opacity(0.22), lineWidth: 0.6)
+                    }
+
+                    if isEnabled && !reduceMotion {
+                        KeyframeAnimator(initialValue: 0.0, repeating: true) { value in
+                            let rotation = value * 360
+                            let borderGradient = AngularGradient(
+                                colors: [.clear, border, .clear],
+                                center: .center,
+                                startAngle: .degrees(140 + rotation),
+                                endAngle: .degrees(270 + rotation)
+                            )
+                            let beamGradient = LinearGradient(
+                                colors: beam,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .fill(beamGradient)
+                                .mask {
+                                    ZStack {
+                                        Rectangle()
+                                            .fill(.white)
+                                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                            .inset(by: max(1, beamBlur / 3))
+                                            .fill(.white)
+                                            .blur(radius: beamBlur)
+                                            .blendMode(.destinationOut)
+                                    }
+                                    .compositingGroup()
+                                }
+                                .mask {
+                                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                        .stroke(borderGradient, lineWidth: 2.4)
+                                }
+                        } keyframes: { _ in
+                            LinearKeyframe(1, duration: 2.5)
+                        }
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+    }
 }

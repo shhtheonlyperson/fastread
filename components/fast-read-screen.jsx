@@ -1,24 +1,25 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
+import * as Clipboard from "expo-clipboard";
 import { StatusBar } from "expo-status-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useFonts } from "expo-font";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Keyboard,
+  Animated,
+  Easing,
   Pressable,
   ScrollView,
   Switch,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { extractArticle } from "../src/article-extract.js";
-import { clamp, containsCjk, durationForToken, estimateMinutes, joinTokensForDisplay, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
+import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "0.2.0";
@@ -307,12 +308,12 @@ export default function FastReadScreen() {
       return;
     }
 
-    if (hasFinished) {
+    if (shouldRestartPlayback(wordIndex, tokens.length, hasFinished)) {
       setWordIndex(0);
       setHasFinished(false);
     }
     setIsPlaying(true);
-  }, [article, hasFinished, isPlaying, tokens.length]);
+  }, [article, hasFinished, isPlaying, tokens.length, wordIndex]);
 
   if (!fontsLoaded || !hasHydrated) {
     return (
@@ -491,33 +492,38 @@ function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOp
 }
 
 function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
-  const [input, setInput] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const beamValue = useRef(new Animated.Value(0)).current;
   const bottomPad = bottomPadding(isLandscape);
-  const trimmed = input.trim();
-  const isUrl = looksLikeUrl(trimmed);
-  const hasInput = trimmed.length > 0;
-  const wordCount = hasInput && !isUrl ? tokenize(trimmed).length : 0;
-  const actionLabel = loading
-    ? "Fetching article..."
-    : isUrl
-      ? "Fetch & open in reader"
-      : hasInput
-        ? `Open ${wordCount.toLocaleString()} words in reader`
-        : "Paste or type to begin";
 
-  const handleAction = useCallback(async () => {
-    Keyboard.dismiss();
-    if (!hasInput || loading) return;
+  useEffect(() => {
+    if (loading) {
+      beamValue.setValue(0);
+      return undefined;
+    }
 
-    if (!isUrl) {
-      onAddArticle(trimmed);
+    const animation = Animated.loop(
+      Animated.timing(beamValue, {
+        toValue: 1,
+        duration: 2500,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [beamValue, loading]);
+
+  const fetchURL = useCallback(async (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setStatus("Clipboard URL is empty.");
       return;
     }
 
     setLoading(true);
-    setStatus("Loading...");
+    setStatus("Fetching URL.");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
@@ -545,50 +551,70 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
       clearTimeout(timeout);
       setLoading(false);
     }
-  }, [hasInput, input, isUrl, loading, onAddArticle, trimmed]);
+  }, [onAddArticle]);
+
+  const openClipboardValue = useCallback(async (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setStatus("Clipboard is empty.");
+      return;
+    }
+
+    if (looksLikeUrl(trimmed)) {
+      await fetchURL(trimmed);
+      return;
+    }
+
+    setStatus("Clipboard text loaded.");
+    onAddArticle(trimmed);
+  }, [fetchURL, onAddArticle]);
+
+  const handlePaste = useCallback(async () => {
+    if (loading) return;
+    try {
+      const value = await Clipboard.getStringAsync();
+      await openClipboardValue(value || "");
+    } catch (error) {
+      setStatus(error?.message || "Clipboard is unavailable.");
+    }
+  }, [loading, openClipboardValue]);
+
+  const beamColor = beamValue.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ["rgba(201,100,66,0.22)", "rgba(223,161,93,0.95)", "rgba(201,100,66,0.22)"],
+  });
+  const beamShadow = beamValue.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.08, 0.22, 0.08],
+  });
 
   return (
-    <ScrollView style={s.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-      <PageTitle insets={insets} isLandscape={isLandscape} label="New reading" title={"Add something\nto read."} sub={"Paste a link or any text. We'll figure out which it is."} />
+    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
+      <PageTitle insets={insets} isLandscape={isLandscape} label="New reading" title={"Capture\nyour next read."} sub={"One tap opens clipboard text or fetches a copied URL."} />
       <View style={{ paddingHorizontal: 24, gap: 28 }}>
-        <View style={s.smartInputWrap}>
-          <TextInput
-            value={input}
-            onChangeText={(value) => {
-              setInput(value);
-              setStatus("");
-            }}
-            multiline={!isUrl}
-            numberOfLines={isUrl ? 1 : 6}
-            textAlignVertical="top"
-            placeholder="https://example.com/article  -  or paste an article, memo, or transcript..."
-            placeholderTextColor="rgba(138,122,106,0.68)"
-            autoCapitalize="none"
-            autoCorrect={!isUrl}
-            keyboardType={isUrl ? "url" : "default"}
-            onSubmitEditing={isUrl ? handleAction : undefined}
-            style={[s.smartInput, isUrl && s.smartInputUrl]}
-          />
-          {hasInput ? (
-            <View style={[s.modeBadge, { backgroundColor: isUrl ? color.terracotta : color.ink }]}>
-              <Text style={s.modeBadgeText}>{isUrl ? "Link" : "Text"}</Text>
-            </View>
-          ) : null}
+        <View>
+          <SectionLabel>Clipboard</SectionLabel>
+          <Animated.View style={[s.clipboardBeam, { borderColor: beamColor, shadowOpacity: loading ? 0 : beamShadow }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={loading ? "Fetching clipboard content" : "Paste from clipboard"} disabled={loading} onPress={handlePaste} style={[s.clipboardButton, loading && s.clipboardButtonDisabled]}>
+              <View style={s.clipboardIcon}>
+                <Text style={s.clipboardIconText}>{loading ? "↻" : "⌘"}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.clipboardTitle}>{loading ? "Fetching" : "Paste from clipboard"}</Text>
+                <Text style={s.clipboardSub}>{loading ? "Preparing readable text" : "URL or text"}</Text>
+              </View>
+              {loading ? <ActivityIndicator color={color.terracotta} size="small" /> : <Text style={s.clipboardArrow}>{"->"}</Text>}
+            </Pressable>
+          </Animated.View>
         </View>
 
         {status ? <Text style={[s.status, { color: color.terracotta }]}>{status.toUpperCase()}</Text> : null}
-
-        <Pressable onPress={handleAction} disabled={!hasInput || loading} style={[s.primaryButton, (!hasInput || loading) && s.primaryButtonDisabled]}>
-          {loading ? <ActivityIndicator color="#fff" size="small" /> : null}
-          <Text style={[s.primaryButtonText, !hasInput && { color: color.inkQuiet }]}>{actionLabel}</Text>
-          {!loading && hasInput ? <Text style={s.primaryArrow}>{"->"}</Text> : null}
-        </Pressable>
 
         <View>
           <SectionLabel>Recent sources</SectionLabel>
           {recentSources.length ? (
             recentSources.map((item, index) => (
-              <Pressable key={item.id} onPress={() => setInput(item.url || item.label)} style={[s.recentRow, index === 0 && { marginTop: 12 }]}>
+              <Pressable key={item.id} disabled={loading || !item.url} onPress={() => item.url && fetchURL(item.url)} style={[s.recentRow, index === 0 && { marginTop: 12 }, loading && { opacity: 0.55 }]}>
                 <Text style={s.recentLabel}>{item.label}</Text>
                 <Text style={s.recentDate}>{item.date}</Text>
               </Pressable>
@@ -662,25 +688,41 @@ function ReaderScreen({
           <PaceControl wpm={wpm} setWpm={setWpm} compact={isLandscape} />
         </View>
 
-        <View style={[s.fullTextWrap, isLandscape && s.fullTextWrapLandscape]}>
-          <SectionLabel>The full text</SectionLabel>
-          <Text style={s.fullText}>
-            {tokens.map((item, index) => {
-              const parts = splitForFocus(item);
-              const baseColor = index < wordIndex ? color.inkQuiet : index === wordIndex ? color.ink : color.inkMid;
-              return (
-                <Text key={`${item}-${index}`} style={{ color: baseColor, fontWeight: index === wordIndex ? "600" : "400" }}>
-                  {parts.before}
-                  <Text style={{ color: color.terracotta, fontWeight: "700" }}>{parts.focus}</Text>
-                  {parts.after}
-                  {tokenSeparator(item, tokens[index + 1])}
-                </Text>
-              );
-            })}
-          </Text>
+        <View style={[s.readerContextWrap, isLandscape && s.readerContextWrapLandscape]}>
+          <SectionLabel>Context</SectionLabel>
+          <ReaderContextPreview tokens={tokens} wordIndex={wordIndex} />
         </View>
       </View>
     </ScrollView>
+  );
+}
+
+function ReaderContextPreview({ tokens, wordIndex }) {
+  if (!tokens.length) {
+    return <Text style={s.readerContextText}>No readable text available.</Text>;
+  }
+
+  const window = contextWindow(tokens.length, wordIndex, 6, 12);
+  const visibleTokens = tokens.slice(window.lowerBound, window.upperBound);
+
+  return (
+    <Text numberOfLines={4} style={s.readerContextText}>
+      {window.hasLeadingOverflow ? <Text style={{ color: color.inkQuiet }}>... </Text> : null}
+      {visibleTokens.map((item, offset) => {
+        const index = window.lowerBound + offset;
+        const parts = splitForFocus(item);
+        const baseColor = index < wordIndex ? color.inkQuiet : index === wordIndex ? color.ink : color.inkMid;
+        return (
+          <Text key={`${item}-${index}`} style={{ color: baseColor, fontWeight: index === wordIndex ? "600" : "400" }}>
+            {parts.before}
+            <Text style={{ color: color.terracotta, fontWeight: "700" }}>{parts.focus}</Text>
+            {parts.after}
+            {tokenSeparator(item, tokens[index + 1])}
+          </Text>
+        );
+      })}
+      {window.hasTrailingOverflow ? <Text style={{ color: color.inkQuiet }}> ...</Text> : null}
+    </Text>
   );
 }
 
@@ -896,7 +938,7 @@ function Transport({ isPlaying, onPlayPause, onMove, onFocus, dark = false, comp
     <View style={[s.transport, compact && s.transportCompact, dark ? { paddingTop: 0 } : null]}>
       <RoundButton label="-10" dark={dark} compact={compact} onPress={() => onMove(-10)} />
       <RoundButton label="<" dark={dark} small compact={compact} onPress={() => onMove(-1)} />
-      <Pressable onPress={onPlayPause} style={[s.playButton, compact && s.playButtonCompact, dark && { width: compact ? 58 : 72, height: compact ? 58 : 72 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={isPlaying ? "Pause reading" : "Play reading"} hitSlop={12} onPress={onPlayPause} style={[s.playButton, compact && s.playButtonCompact, dark && { width: compact ? 58 : 72, height: compact ? 58 : 72 }]}>
         <Text style={s.playText}>{isPlaying ? "II" : "▶"}</Text>
       </Pressable>
       <RoundButton label=">" dark={dark} small compact={compact} onPress={() => onMove(1)} />
@@ -1345,14 +1387,16 @@ const s = {
   pageHeading: { fontFamily: "Fraunces", fontSize: 36, lineHeight: 38, fontWeight: "500", letterSpacing: -0.9, color: color.ink },
   pageHeadingLandscape: { fontSize: 30, lineHeight: 32 },
   pageSub: { fontFamily: "Inter", fontSize: 14, lineHeight: 21, color: color.inkMid },
-  smartInputWrap: { position: "relative" },
-  smartInput: { minHeight: 180, paddingTop: 14, paddingRight: 78, paddingBottom: 14, paddingLeft: 16, borderRadius: 4, borderWidth: 0.5, borderColor: color.ruleStrong, backgroundColor: color.paperStrong, color: color.ink, fontFamily: "Fraunces", fontSize: 15, lineHeight: 23 },
-  smartInputUrl: { minHeight: 52, height: 52, fontFamily: "JetBrainsMono", fontSize: 13, lineHeight: 18 },
-  modeBadge: { position: "absolute", top: 12, right: 12, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  modeBadgeText: { fontFamily: "JetBrainsMono", fontSize: 10, fontWeight: "500", letterSpacing: 1.2, color: "#fff", textTransform: "uppercase" },
+  clipboardBeam: { marginTop: 10, borderRadius: 6, borderWidth: 1.2, backgroundColor: color.paperStrong, shadowColor: color.terracotta, shadowOffset: { width: 0, height: 8 }, shadowRadius: 18 },
+  clipboardButton: { minHeight: 92, flexDirection: "row", alignItems: "center", gap: 16, padding: 18, borderRadius: 6 },
+  clipboardButtonDisabled: { opacity: 0.72 },
+  clipboardIcon: { width: 48, height: 48, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(201,100,66,0.11)" },
+  clipboardIconText: { color: color.terracotta, fontFamily: "Inter", fontSize: 20, fontWeight: "800" },
+  clipboardTitle: { fontFamily: "Fraunces", fontSize: 22, lineHeight: 26, fontWeight: "600", letterSpacing: -0.3, color: color.ink },
+  clipboardSub: { marginTop: 4, fontFamily: "JetBrainsMono", fontSize: 11, fontWeight: "500", letterSpacing: 0.66, color: color.inkQuiet, textTransform: "uppercase" },
+  clipboardArrow: { color: color.inkQuiet, fontFamily: "JetBrainsMono", fontSize: 13, fontWeight: "700" },
   status: { fontFamily: "JetBrainsMono", fontSize: 11, letterSpacing: 0.66, color: color.inkQuiet },
   primaryButton: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 4, backgroundColor: color.ink },
-  primaryButtonDisabled: { backgroundColor: color.ruleStrong },
   primaryButtonText: { color: "#fff", fontFamily: "Inter", fontSize: 15, fontWeight: "700" },
   primaryArrow: { color: "rgba(255,255,255,0.6)", fontFamily: "JetBrainsMono", fontSize: 13 },
   recentRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: color.rule },
@@ -1366,8 +1410,8 @@ const s = {
   readerBodyLandscape: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingHorizontal: 16 },
   readerControls: { gap: 0 },
   readerControlsLandscape: { flex: 0.48 },
-  fullTextWrap: { paddingHorizontal: 24, paddingTop: 24 },
-  fullTextWrapLandscape: { flex: 0.52, paddingHorizontal: 0, paddingTop: 0 },
+  readerContextWrap: { paddingHorizontal: 24, paddingTop: 24 },
+  readerContextWrapLandscape: { flex: 0.52, paddingHorizontal: 0, paddingTop: 0 },
   stage: { position: "relative", width: "100%", justifyContent: "center" },
   stageWord: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", width: "100%" },
   stageText: { flex: 1, fontWeight: "500", letterSpacing: -0.5 },
@@ -1391,7 +1435,7 @@ const s = {
   paceValue: { fontFamily: "Fraunces", fontSize: 22, fontWeight: "700", color: color.ink },
   paceUnit: { fontFamily: "JetBrainsMono", fontSize: 11, color: color.inkQuiet, letterSpacing: 1.54 },
   tinyMono: { fontFamily: "JetBrainsMono", fontSize: 10, letterSpacing: 0.6, color: color.inkQuiet },
-  fullText: { marginTop: 10, fontFamily: "Fraunces", fontSize: 15.5, lineHeight: 24, color: color.inkMid },
+  readerContextText: { marginTop: 10, fontFamily: "Fraunces", fontSize: 15.5, lineHeight: 24, color: color.inkMid },
   focusScreen: { flex: 1, backgroundColor: color.focusDark },
   focusOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
   focusTop: { flexDirection: "row", alignItems: "center", paddingHorizontal: 24, gap: 12 },

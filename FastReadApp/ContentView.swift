@@ -43,9 +43,13 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            JustReadTabBar(selection: $selectedTab)
+            if selectedTab != .reader {
+                JustReadTabBar(selection: $selectedTab)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .preferredColorScheme(.light)
+        .animation(.easeOut(duration: 0.18), value: selectedTab)
         .focusModeCover(isPresented: $showingFocusMode, store: store)
     }
 }

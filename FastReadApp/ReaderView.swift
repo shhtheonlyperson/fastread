@@ -535,8 +535,8 @@ private struct ContextTextPreview: View {
     let tokens: [String]
     let currentIndex: Int
 
-    private let beforeCount = 18
-    private let afterCount = 36
+    private let beforeCount = 6
+    private let afterCount = 12
 
     var body: some View {
         if tokens.isEmpty {
@@ -545,6 +545,7 @@ private struct ContextTextPreview: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             previewText
+                .lineLimit(4)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
