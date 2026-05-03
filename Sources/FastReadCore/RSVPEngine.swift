@@ -13,6 +13,28 @@ public enum RSVPEngine {
         }
     }
 
+    public struct ContextWindow: Equatable {
+        public let lowerBound: Int
+        public let upperBound: Int
+        public let hasLeadingOverflow: Bool
+        public let hasTrailingOverflow: Bool
+
+        public init(lowerBound: Int, upperBound: Int, hasLeadingOverflow: Bool, hasTrailingOverflow: Bool) {
+            self.lowerBound = lowerBound
+            self.upperBound = upperBound
+            self.hasLeadingOverflow = hasLeadingOverflow
+            self.hasTrailingOverflow = hasTrailingOverflow
+        }
+
+        public var range: Range<Int> {
+            lowerBound..<upperBound
+        }
+
+        public var count: Int {
+            max(upperBound - lowerBound, 0)
+        }
+    }
+
     public static func tokenize(_ input: String?) -> [String] {
         guard let input else { return [] }
         let normalized = input.replacingOccurrences(of: "\u{00a0}", with: " ")
@@ -82,6 +104,34 @@ public enum RSVPEngine {
     public static func estimateMinutes(wordCount: Int, wpm: Double) -> Double {
         let safeWPM = safeWPM(wpm)
         return Double(wordCount) / safeWPM
+    }
+
+    public static func contextWindow(
+        tokenCount: Int,
+        currentIndex: Int,
+        before: Int = 18,
+        after: Int = 36
+    ) -> ContextWindow {
+        guard tokenCount > 0 else {
+            return ContextWindow(
+                lowerBound: 0,
+                upperBound: 0,
+                hasLeadingOverflow: false,
+                hasTrailingOverflow: false
+            )
+        }
+
+        let safeBefore = max(before, 0)
+        let safeAfter = max(after, 0)
+        let clampedIndex = clamp(currentIndex, min: 0, max: tokenCount - 1)
+        let lowerBound = max(0, clampedIndex - safeBefore)
+        let upperBound = min(tokenCount, clampedIndex + safeAfter + 1)
+        return ContextWindow(
+            lowerBound: lowerBound,
+            upperBound: upperBound,
+            hasLeadingOverflow: lowerBound > 0,
+            hasTrailingOverflow: upperBound < tokenCount
+        )
     }
 
     public static func clamp<T: Comparable>(_ value: T, min: T, max: T) -> T {
@@ -220,5 +270,82 @@ public enum RSVPEngine {
 
     private static func isASCIIPunctuationPause(_ character: Character) -> Bool {
         [".", ",", "!", "?", ";", ":"].contains(character)
+    }
+}
+
+public enum SourceInputClassifier {
+    public static func normalizedURLString(from value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(where: { $0.isWhitespace }) else { return nil }
+
+        let normalized = trimmed.range(
+            of: #"^[a-z][a-z0-9+.-]*://"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) == nil
+            ? "https://\(trimmed)"
+            : trimmed
+
+        guard
+            let components = URLComponents(string: normalized),
+            let scheme = components.scheme?.lowercased(),
+            ["http", "https"].contains(scheme),
+            let host = components.host,
+            isPlausibleHost(host)
+        else {
+            return nil
+        }
+
+        return normalized
+    }
+
+    public static func isLikelySingleURL(_ value: String) -> Bool {
+        normalizedURLString(from: value) != nil
+    }
+
+    private static func isPlausibleHost(_ host: String) -> Bool {
+        host == "localhost" || host.contains(".") || host.contains(":")
+    }
+}
+
+public enum ArticleTextExtractor {
+    public static func readableText(from html: String) -> String {
+        normalize(stripTags(html))
+    }
+
+    public static func extractTitle(from html: String) -> String? {
+        guard let range = html.range(of: #"<title[^>]*>(.*?)</title>"#, options: [.regularExpression, .caseInsensitive]) else {
+            return nil
+        }
+        let raw = html[range]
+            .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+        let title = normalize(stripTags(String(raw)))
+        return title.isEmpty ? nil : title
+    }
+
+    public static func stripTags(_ html: String) -> String {
+        html
+            .replacingOccurrences(of: #"<head[\s\S]*?</head>"#, with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"<(script|style|noscript|svg)[\s\S]*?</\1>"#, with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"</(p|div|article|section|h[1-6]|li|br)[^>]*>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"<[^>]+>"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&rsquo;", with: "'")
+            .replacingOccurrences(of: "&lsquo;", with: "'")
+            .replacingOccurrences(of: "&ldquo;", with: "\"")
+            .replacingOccurrences(of: "&rdquo;", with: "\"")
+            .replacingOccurrences(of: "&mdash;", with: "-")
+            .replacingOccurrences(of: "&ndash;", with: "-")
+    }
+
+    public static func normalize(_ text: String) -> String {
+        text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

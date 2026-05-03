@@ -53,8 +53,7 @@ struct AddSourceView: View {
                 icon: "doc.on.clipboard"
             ) {
 #if canImport(UIKit)
-                draftText = UIPasteboard.general.string ?? draftText
-                status = draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Clipboard is empty." : "Clipboard text ready."
+                applyPastedText(UIPasteboard.general.string ?? "")
 #else
                 status = "Clipboard is unavailable."
 #endif
@@ -167,6 +166,10 @@ struct AddSourceView: View {
                             .allowsHitTesting(false)
                     }
                 }
+                .plainTextInputBehavior()
+                .onChange(of: draftText) { _, newValue in
+                    routePastedURLIfNeeded(newValue)
+                }
         }
     }
 
@@ -246,6 +249,7 @@ struct AddSourceView: View {
 
         isLoading = true
         status = ""
+        defer { isLoading = false }
 
         do {
             let result = try await ArticleLoader.fetch(urlString: url)
@@ -255,8 +259,32 @@ struct AddSourceView: View {
         } catch {
             status = error.localizedDescription
         }
+    }
 
-        isLoading = false
+    private func applyPastedText(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            status = "Clipboard is empty."
+            return
+        }
+
+        if SourceInputClassifier.isLikelySingleURL(trimmed) {
+            url = trimmed
+            draftText = ""
+            status = "URL ready. Tap Fetch."
+        } else {
+            draftText = value
+            status = "Clipboard text ready."
+        }
+    }
+
+    private func routePastedURLIfNeeded(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard SourceInputClassifier.isLikelySingleURL(trimmed) else { return }
+
+        url = trimmed
+        draftText = ""
+        status = "URL ready. Tap Fetch."
     }
 }
 
@@ -267,6 +295,17 @@ private extension View {
         self
             .textInputAutocapitalization(.never)
             .keyboardType(.URL)
+            .autocorrectionDisabled()
+#else
+        self
+#endif
+    }
+
+    @ViewBuilder
+    func plainTextInputBehavior() -> some View {
+#if os(iOS)
+        self
+            .textInputAutocapitalization(.sentences)
             .autocorrectionDisabled()
 #else
         self

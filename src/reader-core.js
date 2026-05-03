@@ -145,3 +145,29 @@ export function estimateMinutes(wordCount, wpm) {
   const safeWpm = clamp(Number(wpm) || 450, 100, 1200);
   return wordCount / safeWpm;
 }
+
+export function contextWindow(tokenCount, currentIndex, before = 18, after = 36) {
+  if (!tokenCount || tokenCount < 0) {
+    return {
+      lowerBound: 0,
+      upperBound: 0,
+      count: 0,
+      hasLeadingOverflow: false,
+      hasTrailingOverflow: false,
+    };
+  }
+
+  const safeBefore = Math.max(Number(before) || 0, 0);
+  const safeAfter = Math.max(Number(after) || 0, 0);
+  const clampedIndex = clamp(Number(currentIndex) || 0, 0, tokenCount - 1);
+  const lowerBound = Math.max(0, clampedIndex - safeBefore);
+  const upperBound = Math.min(tokenCount, clampedIndex + safeAfter + 1);
+
+  return {
+    lowerBound,
+    upperBound,
+    count: Math.max(upperBound - lowerBound, 0),
+    hasLeadingOverflow: lowerBound > 0,
+    hasTrailingOverflow: upperBound < tokenCount,
+  };
+}

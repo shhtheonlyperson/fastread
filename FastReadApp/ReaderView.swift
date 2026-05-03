@@ -20,7 +20,7 @@ struct ReaderView: View {
                             .padding(.top, 18)
                         paceControl
                             .padding(.top, 22)
-                        fullText
+                        readingContext
                             .padding(.top, 24)
                     }
                     .padding(.bottom, 112)
@@ -217,7 +217,7 @@ struct ReaderView: View {
                 SectionLabel(text: "Pace")
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(Int(store.wpm))")
+                    Text("\(Int(store.wpm.rounded()))")
                         .font(JRFont.serif(22, weight: .semibold))
                         .foregroundStyle(JRColor.ink)
                     Text("wpm")
@@ -232,8 +232,7 @@ struct ReaderView: View {
                     get: { store.wpm },
                     set: { store.setWPM($0) }
                 ),
-                in: 150...1_000,
-                step: 25
+                in: 150...1_000
             )
             .tint(JRColor.terracotta)
 
@@ -251,10 +250,10 @@ struct ReaderView: View {
         .padding(.horizontal, 24)
     }
 
-    private var fullText: some View {
+    private var readingContext: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "The full text")
-            FullTextPreview(tokens: store.currentTokens, currentIndex: store.currentIndex)
+            SectionLabel(text: "Context")
+            ContextTextPreview(tokens: store.currentTokens, currentIndex: store.currentIndex)
                 .font(JRFont.serif(15.5))
                 .lineSpacing(5)
                 .foregroundStyle(JRColor.inkMid)
@@ -285,7 +284,7 @@ struct FocusModeView: View {
             VStack(spacing: 0) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("FOCUS · \(Int(store.wpm)) WPM")
+                        Text("FOCUS · \(Int(store.wpm.rounded())) WPM")
                             .font(JRFont.mono(10, weight: .medium))
                             .tracking(1.4)
                             .foregroundStyle(JRColor.paper.opacity(0.5))
@@ -532,20 +531,40 @@ private struct DarkTransportButton<Content: View>: View {
     }
 }
 
-private struct FullTextPreview: View {
+private struct ContextTextPreview: View {
     let tokens: [String]
     let currentIndex: Int
 
+    private let beforeCount = 18
+    private let afterCount = 36
+
     var body: some View {
-        previewText
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        if tokens.isEmpty {
+            Text("No readable text available.")
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            previewText
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var previewText: Text {
-        tokens.enumerated().reduce(Text("")) { partial, item in
-            let index = item.offset
-            let split = RSVPEngine.splitForFocus(item.element)
+        let window = RSVPEngine.contextWindow(
+            tokenCount: tokens.count,
+            currentIndex: currentIndex,
+            before: beforeCount,
+            after: afterCount
+        )
+        let visibleTokens = Array(tokens[window.range])
+        let leading = window.hasLeadingOverflow ? Text("... ").foregroundColor(JRColor.inkQuiet) : Text("")
+        let trailing = window.hasTrailingOverflow ? Text(" ...").foregroundColor(JRColor.inkQuiet) : Text("")
+
+        return visibleTokens.enumerated().reduce(leading) { partial, item in
+            let index = window.lowerBound + item.offset
+            let token = item.element
+            let split = RSVPEngine.splitForFocus(token)
             let isCurrent = index == currentIndex
             let isRead = index < currentIndex
             let baseColor = isRead ? JRColor.inkQuiet : isCurrent ? JRColor.ink : JRColor.inkMid
@@ -553,6 +572,6 @@ private struct FullTextPreview: View {
                 + Text(split.before).foregroundColor(baseColor).fontWeight(isCurrent ? .semibold : .regular)
                 + Text(split.focus).foregroundColor(JRColor.terracotta).fontWeight(.semibold)
                 + Text(split.after + " ").foregroundColor(baseColor).fontWeight(isCurrent ? .semibold : .regular)
-        }
+        } + trailing
     }
 }

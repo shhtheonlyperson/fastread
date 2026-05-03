@@ -4,6 +4,7 @@ struct LibraryView: View {
     @EnvironmentObject private var store: ReadingStore
     let onResume: () -> Void
     let onOpenArticle: (ReadingArticle) -> Void
+    @State private var articlePendingDeletion: ReadingArticle?
 
     private var current: ReadingArticle? {
         store.currentArticle ?? store.articles.first { !$0.isFinished } ?? store.articles.first
@@ -27,6 +28,31 @@ struct LibraryView: View {
             .padding(.bottom, 112)
         }
         .background(JRColor.paper)
+        .confirmationDialog(
+            "Delete from Library?",
+            isPresented: isShowingDeleteConfirmation,
+            titleVisibility: .visible,
+            presenting: articlePendingDeletion
+        ) { article in
+            Button("Delete", role: .destructive) {
+                store.deleteArticle(article.id)
+                articlePendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { article in
+            Text("Remove \"\(article.title)\" and its saved progress from this device.")
+        }
+    }
+
+    private var isShowingDeleteConfirmation: Binding<Bool> {
+        Binding(
+            get: { articlePendingDeletion != nil },
+            set: { isPresented in
+                if !isPresented {
+                    articlePendingDeletion = nil
+                }
+            }
+        )
     }
 
     private var masthead: some View {
@@ -74,14 +100,16 @@ struct LibraryView: View {
     }
 
     private func continueCard(_ current: ReadingArticle) -> some View {
-        Button(action: onResume) {
+        let wordCount = store.wordCount(for: current)
+
+        return Button(action: onResume) {
             JRCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         SectionLabel(text: "Continue reading")
                         Spacer()
                         SectionLabel(
-                            text: "\(Int(Double(max(current.wordCount, 1)) * current.progress)) of \(current.wordCount)",
+                            text: "\(Int(Double(max(wordCount, 1)) * current.progress)) of \(wordCount)",
                             color: JRColor.terracotta
                         )
                     }
@@ -173,21 +201,38 @@ struct LibraryView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(store.articles.enumerated()), id: \.element.id) { index, article in
-                        Button {
-                            onOpenArticle(article)
-                        } label: {
-                            ArticleRow(article: article)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .overlay(alignment: .top) {
-                                    if index != 0 {
-                                        Rectangle()
-                                            .fill(JRColor.rule)
-                                            .frame(height: 0.5)
-                                    }
-                                }
+                        HStack(spacing: 0) {
+                            Button {
+                                onOpenArticle(article)
+                            } label: {
+                                ArticleRow(article: article)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            Button(role: .destructive) {
+                                articlePendingDeletion = article
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(JRColor.inkQuiet)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Delete \(article.title)")
+                            .padding(.trailing, 8)
                         }
-                        .buttonStyle(.plain)
+                        .overlay(alignment: .top) {
+                            if index != 0 {
+                                Rectangle()
+                                    .fill(JRColor.rule)
+                                    .frame(height: 0.5)
+                            }
+                        }
                     }
                 }
                 .background(JRColor.paperStrong)

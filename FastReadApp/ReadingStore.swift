@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import OSLog
 
 @MainActor
 final class ReadingStore: ObservableObject {
@@ -22,6 +23,7 @@ final class ReadingStore: ObservableObject {
     @Published var sourceStatus = ""
 
     private var playbackTask: Task<Void, Never>?
+    private var tokenCache: [String: TokenCacheEntry] = [:]
     private let defaults: UserDefaults
 
     var currentArticle: ReadingArticle? {
@@ -30,7 +32,8 @@ final class ReadingStore: ObservableObject {
     }
 
     var currentTokens: [String] {
-        currentArticle?.tokens ?? []
+        guard let currentArticle else { return [] }
+        return tokens(for: currentArticle)
     }
 
     var currentIndex: Int {
@@ -115,7 +118,11 @@ final class ReadingStore: ObservableObject {
     }
 
     func setWPM(_ value: Double) {
-        wpm = RSVPEngine.clamp(value.rounded(.toNearestOrAwayFromZero), min: 150, max: 1_000)
+        wpm = RSVPEngine.clamp(value, min: 150, max: 1_000)
+    }
+
+    func wordCount(for article: ReadingArticle) -> Int {
+        tokens(for: article).count
     }
 
     func togglePlay() {
@@ -123,7 +130,10 @@ final class ReadingStore: ObservableObject {
     }
 
     func play() {
-        guard !currentTokens.isEmpty, currentIndex < currentTokens.count - 1 else { return }
+        guard currentTokens.count > 1 else { return }
+        if currentIndex >= currentTokens.count - 1 {
+            setIndex(0)
+        }
         isPlaying = true
         scheduleNext()
     }
@@ -151,7 +161,8 @@ final class ReadingStore: ObservableObject {
 
     func setIndex(_ index: Int) {
         updateSelectedArticle { article in
-            article.wordIndex = RSVPEngine.clamp(index, min: 0, max: max(RSVPEngine.tokenize(article.text).count - 1, 0))
+            let count = tokens(for: article).count
+            article.wordIndex = RSVPEngine.clamp(index, min: 0, max: max(count - 1, 0))
             article.isFinished = false
             article.finishedAt = nil
             article.tag = article.progress > 0 ? "Reading now" : "Saved"
@@ -163,7 +174,7 @@ final class ReadingStore: ObservableObject {
         let wasFinished = currentArticle.isFinished
         pause()
         updateSelectedArticle { article in
-            article.wordIndex = max(RSVPEngine.tokenize(article.text).count - 1, 0)
+            article.wordIndex = max(tokens(for: article).count - 1, 0)
             article.progress = 1
             article.isFinished = true
             article.finishedAt = Date()
@@ -201,6 +212,7 @@ final class ReadingStore: ObservableObject {
             timesOpened: 1,
             isFinished: false
         )
+        tokenCache[article.id] = TokenCacheEntry(text: trimmed, tokens: tokens)
         articles.insert(article, at: 0)
         selectedArticleID = article.id
         persistSelectedArticleID()
@@ -209,6 +221,28 @@ final class ReadingStore: ObservableObject {
 
     func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
         addDraftArticle(text: text, title: title, source: source, sourceURL: url)
+    }
+
+    func deleteArticle(_ id: ReadingArticle.ID) {
+        guard let deletedIndex = articles.firstIndex(where: { $0.id == id }) else { return }
+        let deletedSelectedArticle = articles[deletedIndex].id == selectedArticleID
+
+        if deletedSelectedArticle {
+            pause()
+        }
+
+        articles.remove(at: deletedIndex)
+        tokenCache.removeValue(forKey: id)
+
+        if deletedSelectedArticle {
+            selectedArticleID = articles.indices.contains(deletedIndex)
+                ? articles[deletedIndex].id
+                : articles.last?.id
+        }
+
+        ensureSelectedArticle()
+        persistSelectedArticleID()
+        persistArticles()
     }
 
     private func scheduleNext() {
@@ -221,8 +255,13 @@ final class ReadingStore: ObservableObject {
             punctuationPause: punctuationPause
         )
 
-        playbackTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
+        playbackTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
             self?.advanceFromTimer()
         }
     }
@@ -247,7 +286,7 @@ final class ReadingStore: ObservableObject {
         var article = articles[selectedArticleIndex]
         mutate(&article)
 
-        let count = RSVPEngine.tokenize(article.text).count
+        let count = tokens(for: article).count
         article.wordIndex = RSVPEngine.clamp(article.wordIndex, min: 0, max: max(count - 1, 0))
         if count > 0 {
             article.progress = article.isFinished ? 1 : Double(article.wordIndex + 1) / Double(count)
@@ -450,6 +489,18 @@ final class ReadingStore: ObservableObject {
         return max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: words, wpm: wpm))))
     }
 
+    private func tokens(for article: ReadingArticle) -> [String] {
+        if let cached = tokenCache[article.id], cached.text == article.text {
+            return cached.tokens
+        }
+
+        let tokens = PerformanceTrace.measure("Tokenize Article") {
+            RSVPEngine.tokenize(article.text)
+        }
+        tokenCache[article.id] = TokenCacheEntry(text: article.text, tokens: tokens)
+        return tokens
+    }
+
     private static func makeLede(from text: String, tokens: [String]) -> String {
         let limit = containsCJK(text) ? 42 : 18
         let selected = tokens.prefix(limit)
@@ -475,11 +526,29 @@ struct RecentSource: Identifiable, Equatable {
     var id: String { (url ?? label).lowercased() }
 }
 
+private enum PerformanceTrace {
+    private static let log = OSLog(subsystem: "com.shh.fastread", category: .pointsOfInterest)
+
+    static func measure<T>(_ name: StaticString, _ operation: () throws -> T) rethrows -> T {
+        let id = OSSignpostID(log: log)
+        os_signpost(.begin, log: log, name: name, signpostID: id)
+        defer {
+            os_signpost(.end, log: log, name: name, signpostID: id)
+        }
+        return try operation()
+    }
+}
+
 private struct SettingsPayload: Codable {
     var wpm: Double
     var punctuationPause: Bool
     var focusIndicator: FocusIndicatorStyle
     var wordTypeface: WordTypeface
+}
+
+private struct TokenCacheEntry {
+    var text: String
+    var tokens: [String]
 }
 
 private enum StorageKey {
@@ -527,10 +596,9 @@ enum ArticleLoader {
     private static let maxHTMLBytes = 6 * 1024 * 1024
 
     static func fetch(urlString: String) async throws -> ArticleFetchResult {
-        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalized = trimmed.range(of: #"^[a-z][a-z0-9+.-]*://"#, options: [.regularExpression, .caseInsensitive]) == nil
-            ? "https://\(trimmed)"
-            : trimmed
+        guard let normalized = SourceInputClassifier.normalizedURLString(from: urlString) else {
+            throw ArticleFetchError.invalidURL
+        }
         guard let url = URL(string: normalized), let scheme = url.scheme else {
             throw ArticleFetchError.invalidURL
         }
@@ -561,22 +629,16 @@ enum ArticleLoader {
         let html = String(data: data, encoding: .utf8)
             ?? String(data: data, encoding: .isoLatin1)
             ?? ""
-        let attributed = try? NSAttributedString(
-            data: Data(html.utf8),
-            options: [
-                .documentType: NSAttributedString.DocumentType.html,
-                .characterEncoding: String.Encoding.utf8.rawValue,
-            ],
-            documentAttributes: nil
-        )
-        let text = normalizeExtractedText(attributed?.string ?? stripTags(html))
+        let text = PerformanceTrace.measure("Extract Article Text") {
+            ArticleTextExtractor.readableText(from: html)
+        }
         let words = RSVPEngine.tokenize(text)
 
         guard words.count >= 20 else {
             throw ArticleFetchError.unreadable
         }
 
-        let title = extractTitle(from: html) ?? url.host(percentEncoded: false) ?? "Fetched article"
+        let title = ArticleTextExtractor.extractTitle(from: html) ?? url.host(percentEncoded: false) ?? "Fetched article"
         return ArticleFetchResult(
             title: title,
             source: url.host(percentEncoded: false) ?? "Web",
@@ -586,35 +648,4 @@ enum ArticleLoader {
         )
     }
 
-    private static func extractTitle(from html: String) -> String? {
-        guard let range = html.range(of: #"<title[^>]*>(.*?)</title>"#, options: [.regularExpression, .caseInsensitive]) else {
-            return nil
-        }
-        let raw = html[range]
-            .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
-        let title = normalizeExtractedText(String(raw))
-        return title.isEmpty ? nil : title
-    }
-
-    private static func stripTags(_ html: String) -> String {
-        html
-            .replacingOccurrences(of: #"<(script|style|noscript|svg)[\s\S]*?</\1>"#, with: " ", options: [.regularExpression, .caseInsensitive])
-            .replacingOccurrences(of: #"</(p|div|article|section|h[1-6]|li|br)[^>]*>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
-            .replacingOccurrences(of: #"<[^>]+>"#, with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&rsquo;", with: "'")
-            .replacingOccurrences(of: "&ldquo;", with: "\"")
-            .replacingOccurrences(of: "&rdquo;", with: "\"")
-    }
-
-    private static func normalizeExtractedText(_ text: String) -> String {
-        text
-            .components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 }

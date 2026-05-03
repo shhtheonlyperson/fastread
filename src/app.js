@@ -1,6 +1,7 @@
 import {
   DEFAULT_TEXT,
   clamp,
+  contextWindow,
   durationForToken,
   estimateMinutes,
   getProgress,
@@ -92,8 +93,13 @@ function renderWord(token) {
 
 function renderPreview() {
   const fragment = document.createDocumentFragment();
+  const window = contextWindow(tokens.length, index);
 
-  tokens.forEach((token) => {
+  if (window.hasLeadingOverflow) {
+    fragment.append("... ");
+  }
+
+  tokens.slice(window.lowerBound, window.upperBound).forEach((token) => {
     const parts = splitForFocus(token);
     const word = document.createElement("span");
     word.className = "focus-word";
@@ -107,6 +113,10 @@ function renderPreview() {
     word.append(before, focus, after);
     fragment.append(word, " ");
   });
+
+  if (window.hasTrailingOverflow) {
+    fragment.append("...");
+  }
 
   els.focusPreview.replaceChildren(fragment);
 }
