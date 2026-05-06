@@ -33,7 +33,10 @@ struct ContentView: View {
                 case .reader:
                     ReaderView(
                         onBack: { selectedTab = .home },
-                        onFocus: { showingFocusMode = true }
+                        onFocus: {
+                            store.play()
+                            showingFocusMode = true
+                        }
                     )
                 case .stats:
                     StatsView()

@@ -207,10 +207,13 @@ export default function FastReadScreen() {
   }, [activeArticleId, isPlaying, punctuationPause, recordWords, token, tokens.length, wpm]);
 
   useEffect(() => {
-    ScreenOrientation.unlockAsync().catch((error) => {
-      console.warn("Unable to unlock screen orientation.", error);
+    const orientation = focusMode
+      ? ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+      : ScreenOrientation.unlockAsync();
+    orientation.catch((error) => {
+      console.warn("Unable to update screen orientation.", error);
     });
-  }, []);
+  }, [focusMode]);
 
   useEffect(() => {
     if (!activeArticleId || !tokens.length) return;
@@ -318,6 +321,17 @@ export default function FastReadScreen() {
     setIsPlaying(true);
   }, [article, hasFinished, isPlaying, tokens.length, wordIndex]);
 
+  const enterFocusAndPlay = useCallback(() => {
+    if (!article || !tokens.length) return;
+
+    if (shouldRestartPlayback(wordIndex, tokens.length, hasFinished)) {
+      setWordIndex(0);
+      setHasFinished(false);
+    }
+    setIsPlaying(true);
+    setFocusMode(true);
+  }, [article, hasFinished, tokens.length, wordIndex]);
+
   if (!fontsLoaded || !hasHydrated) {
     return (
       <View style={[s.app, { alignItems: "center", justifyContent: "center" }]}>
@@ -351,16 +365,13 @@ export default function FastReadScreen() {
             tokens={tokens}
             wordIndex={wordIndex}
             progress={progress}
-            isPlaying={isPlaying}
             wpm={wpm}
             setWpm={setWpm}
             focusStyle={focusStyle}
             wordFont={wordFont}
             onBack={() => setActiveTab("home")}
-            onMove={move}
             onScrub={setProgress}
-            onPlayPause={togglePlayback}
-            onFocus={() => setFocusMode(true)}
+            onEnterFocus={enterFocusAndPlay}
           />
         ) : null}
         {activeTab === "reader" && !article ? <ReaderEmptyScreen insets={insets} isLandscape={appIsLandscape} onAdd={() => setActiveTab("source")} /> : null}
@@ -660,16 +671,13 @@ function ReaderScreen({
   tokens,
   wordIndex,
   progress,
-  isPlaying,
   wpm,
   setWpm,
   focusStyle,
   wordFont,
   onBack,
-  onMove,
   onScrub,
-  onPlayPause,
-  onFocus,
+  onEnterFocus,
 }) {
   const minutesLeft = estimateMinutes(Math.max(tokens.length - wordIndex, 0), wpm);
   const topPad = topPadding(insets, isLandscape);
@@ -693,8 +701,9 @@ function ReaderScreen({
       <View style={[s.readerBody, isLandscape && s.readerBodyLandscape]}>
         <View style={[s.readerControls, isLandscape && s.readerControlsLandscape]}>
           <Card padding={0}>
-            <View style={{ paddingHorizontal: 16, paddingTop: isLandscape ? 12 : 20, paddingBottom: 8 }}>
+            <View style={[s.readerStageShell, { paddingHorizontal: 16, paddingTop: isLandscape ? 12 : 20, paddingBottom: 8 }]}>
               <RSVPStage token={token} focusStyle={focusStyle} wordFont={wordFont} compact={isLandscape} />
+              <EnterFocusButton compact={isLandscape} onPress={onEnterFocus} />
             </View>
             <View style={{ paddingHorizontal: 16, paddingBottom: isLandscape ? 14 : 20, gap: 8 }}>
               <Scrubber value={progress} onChange={onScrub} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
@@ -706,8 +715,6 @@ function ReaderScreen({
               </View>
             </View>
           </Card>
-
-          <Transport isPlaying={isPlaying} onPlayPause={onPlayPause} onMove={onMove} onFocus={onFocus} compact={isLandscape} />
 
           <PaceControl wpm={wpm} setWpm={setWpm} compact={isLandscape} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
         </View>
@@ -957,6 +964,16 @@ function FocusGuide({ type, dark }) {
       <View pointerEvents="none" style={[s.guideDot, { top: 22 }]} />
       <View pointerEvents="none" style={[s.guideDot, { bottom: 22 }]} />
     </>
+  );
+}
+
+function EnterFocusButton({ compact = false, onPress }) {
+  return (
+    <View pointerEvents="box-none" style={s.enterFocusLayer}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Play in focus mode" hitSlop={12} onPress={onPress} style={[s.enterFocusButton, compact && s.enterFocusButtonCompact]}>
+        <Text style={[s.enterFocusGlyph, compact && s.enterFocusGlyphCompact]}>▶</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1545,6 +1562,7 @@ const s = {
   readerControlsLandscape: { flex: 0.48 },
   readerContextWrap: { paddingHorizontal: 24, paddingTop: 24 },
   readerContextWrapLandscape: { flex: 0.52, paddingHorizontal: 0, paddingTop: 0 },
+  readerStageShell: { position: "relative" },
   stage: { position: "relative", width: "100%", justifyContent: "center" },
   stageWord: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", width: "100%" },
   stageText: { flex: 1, fontWeight: "500", letterSpacing: -0.5 },
@@ -1560,6 +1578,11 @@ const s = {
   playButton: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", backgroundColor: color.terracotta },
   playButtonCompact: { width: 54, height: 54, borderRadius: 27 },
   playText: { color: "#fff", fontFamily: "Inter", fontSize: 20, fontWeight: "800" },
+  enterFocusLayer: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" },
+  enterFocusButton: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(31,26,23,0.035)", borderWidth: 0.5, borderColor: "rgba(31,26,23,0.10)" },
+  enterFocusButtonCompact: { width: 46, height: 46, borderRadius: 23 },
+  enterFocusGlyph: { marginLeft: 3, color: "rgba(31,26,23,0.34)", fontFamily: "Inter", fontSize: 20, fontWeight: "800" },
+  enterFocusGlyphCompact: { fontSize: 18 },
   roundButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: 0.5, borderColor: color.ruleStrong },
   roundButtonCompact: { width: 40, height: 40, borderRadius: 20 },
   roundText: { color: color.ink, fontFamily: "JetBrainsMono", fontSize: 12, fontWeight: "700" },

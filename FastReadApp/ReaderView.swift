@@ -16,8 +16,6 @@ struct ReaderView: View {
                         stageCard
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
-                        transport
-                            .padding(.top, 18)
                         paceControl
                             .padding(.top, 22)
                         readingContext
@@ -96,12 +94,16 @@ struct ReaderView: View {
     private var stageCard: some View {
         JRCard(padding: 0) {
             VStack(spacing: 0) {
-                RSVPStage(
-                    token: store.currentToken,
-                    focusStyle: store.focusIndicator,
-                    wordTypeface: store.wordTypeface
-                )
-                .frame(minHeight: 180)
+                ZStack {
+                    RSVPStage(
+                        token: store.currentToken,
+                        focusStyle: store.focusIndicator,
+                        wordTypeface: store.wordTypeface
+                    )
+                    .frame(minHeight: 180)
+
+                    EnterFocusPlayButton(action: onFocus)
+                }
                 .padding(.horizontal, 16)
                 .padding(.top, 20)
                 .padding(.bottom, 8)
@@ -165,50 +167,6 @@ struct ReaderView: View {
         .padding(12)
         .background(JRColor.paperDeep.opacity(0.72))
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-    }
-
-    private var transport: some View {
-        HStack(spacing: 14) {
-            TransportButton(label: "Back 10") {
-                store.move(by: -10)
-            } content: {
-                Image(systemName: "gobackward.10")
-                    .font(.system(size: 18, weight: .semibold))
-            }
-
-            TransportButton(label: "Previous word") {
-                store.move(by: -1)
-            } content: {
-                Image(systemName: "backward.end.fill")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-
-            Button {
-                store.togglePlay()
-            } label: {
-                Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 64, height: 64)
-                    .background(JRColor.terracotta)
-                    .clipShape(Circle())
-                    .shadow(color: JRColor.terracotta.opacity(0.32), radius: 14, y: 4)
-            }
-            .buttonStyle(.plain)
-
-            TransportButton(label: "Next word") {
-                store.move(by: 1)
-            } content: {
-                Image(systemName: "forward.end.fill")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-
-            TransportButton(label: "Focus mode", action: onFocus) {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 16, weight: .semibold))
-            }
-        }
-        .padding(.horizontal, 24)
     }
 
     private var paceControl: some View {
@@ -494,22 +452,22 @@ private struct FocusIndicator: View {
     }
 }
 
-private struct TransportButton<Content: View>: View {
-    let label: String
+private struct EnterFocusPlayButton: View {
     let action: () -> Void
-    @ViewBuilder let content: Content
 
     var body: some View {
         Button(action: action) {
-            content
-                .foregroundStyle(JRColor.ink)
-                .frame(width: 44, height: 44)
-                .background(Color.clear)
+            Image(systemName: "play.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(JRColor.ink.opacity(0.34))
+                .padding(.leading, 2)
+                .frame(width: 52, height: 52)
+                .background(JRColor.ink.opacity(0.035))
                 .clipShape(Circle())
-                .overlay(Circle().stroke(JRColor.ruleStrong, lineWidth: 0.5))
+                .overlay(Circle().stroke(JRColor.ink.opacity(0.10), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .accessibilityLabel("Play in focus mode")
     }
 }
 
