@@ -72,7 +72,7 @@
         "Both swift test and npm test pass"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

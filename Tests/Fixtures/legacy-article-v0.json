@@ -1,0 +1,15 @@
+{
+  "id": "article-1714000000000",
+  "title": "Legacy Article",
+  "source": "example.com",
+  "author": "You",
+  "date": "Apr 25, 2024",
+  "readTime": "3 min",
+  "lede": "An older saved article from before optional date fields were added.",
+  "tag": "readingNow",
+  "text": "This is the body text of a legacy reading article. It should still decode cleanly under the current ReadingArticle schema.",
+  "progress": 0.42,
+  "wordIndex": 17,
+  "timesOpened": 2,
+  "isFinished": false
+}
