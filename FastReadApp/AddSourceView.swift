@@ -143,6 +143,10 @@ struct AddSourceView: View {
 
         do {
             let result = try await ArticleLoader.fetch(urlString: urlString)
+            guard result.wordCount >= 20 else {
+                status = "Could not find enough readable text on that page."
+                return
+            }
             store.addFetchedArticle(title: result.title, source: result.source, text: result.text, url: result.url)
             status = "Loaded · \(result.wordCount) words"
             onLoaded()

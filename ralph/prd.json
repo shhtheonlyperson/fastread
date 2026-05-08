@@ -58,7 +58,7 @@
         "swift test passes; existing AddSourceView call sites still compile and behave identically"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

@@ -9,6 +9,9 @@ Started: Thu May  7 22:42:30 PDT 2026
 - Class-based selectors recognized: `entry-content`, `wp-block-post-content`, `post-content`, `article-content`, `article__content`, `article-body`, `story-body` (priority 80, beats `<article>`/`<main>`).
 - `src/url-ingest.js` exports `fetchAndExtract({ url, fetcher, maxBytes, signal })` plus typed error classes `InvalidURL`, `HttpError`, `OversizedError`, `UnsupportedContentType`, `TimeoutError`. Inject `fetcher` (defaults to `globalThis.fetch`) for unit testability — never call real network in tests.
 - The Swift port (US-004) must mirror the same error taxonomy: invalidURL, httpError(Int), oversized, unsupportedContentType(String), timeout.
+- Swift `ArticleLoader.fetch(urlString:session:maxBytes:)` lives in `Sources/FastReadCore/UrlIngest.swift` and accepts a `URLDataFetching`-conforming session (URLSession by default). Tests inject `URLSession(configuration: ephemeral)` with a `URLProtocol` stub.
+- `Sources/FastReadCore/*.swift` files are compiled into both the SwiftPM `FastReadCore` library AND the FastReadApp Xcode target directly (not as a module dependency). When adding a new file under `Sources/FastReadCore/`, also add it to `FastRead.xcodeproj/project.pbxproj` in 4 places: PBXBuildFile, PBXFileReference, the FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase files list.
+- Swift 6 strict concurrency: static mutable shared state in tests (e.g. URLProtocol stub handler) needs `nonisolated(unsafe)` plus an `NSLock` guard, since the test target compiles with concurrency checks on.
 ---
 
 ## 2026-05-07 - US-001
@@ -56,4 +59,21 @@ Started: Thu May  7 22:42:30 PDT 2026
   - For decoding pages with non-utf-8 charset declarations, prefer reading via `arrayBuffer()` and using `TextDecoder(charset)` rather than `response.text()`. We fall back to ISO-8859-1 only when utf-8 decoding produces a U+FFFD replacement char.
   - The accept header / supported content-type regex is duplicated in JS and Swift. Keep them in sync when touching either side (US-004 will mirror this taxonomy in Swift).
   - Tests construct fake Response objects with `headers.get(name)` (case-insensitive), `ok`, `status`, `url`, `text()`, `arrayBuffer()`. Reuse this `makeResponse` helper pattern for any future ingest tests rather than pulling in `undici`/`msw`.
+---
+
+## 2026-05-07 - US-004
+- Extracted Swift URL fetch into pure `ArticleLoader.fetch(urlString:session:maxBytes:)` in `Sources/FastReadCore/UrlIngest.swift` with the JS-parity error taxonomy: `invalidURL`, `httpError(Int)`, `oversized`, `unsupportedContentType(String)`, `timeout`.
+- Files added/changed:
+  - `Sources/FastReadCore/UrlIngest.swift` (new): public `ArticleFetchError` (LocalizedError, Equatable), `ArticleFetchResult`, `URLDataFetching` protocol (URLSession conforms), and `ArticleLoader.fetch(...)`.
+  - `Tests/FastReadCoreTests/UrlIngestTests.swift` (new): 7 tests using a `URLProtocol` stub mounted via `URLSession(configuration: .ephemeral)` — happy path, 404, oversized via Content-Length, oversized via streamed body, application/pdf, timeout (URLError.timedOut), ftp scheme.
+  - `FastReadApp/ReadingStore.swift`: deleted the old in-line `ArticleFetchError`/`ArticleFetchResult`/`ArticleLoader` (now provided by FastReadCore).
+  - `FastReadApp/AddSourceView.swift`: post-fetch guard for `result.wordCount >= 20` preserves the previous "not enough readable text" status string (the new fetcher does not enforce minWords, matching JS parity).
+  - `FastRead.xcodeproj/project.pbxproj`: added `UrlIngest.swift` to PBXBuildFile, PBXFileReference, FastReadCore PBXGroup, and the FastRead PBXSourcesBuildPhase.
+- `swift test` (16 tests passing), `npm test` (36 passing), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - Inject sessions via a tiny `URLDataFetching` protocol with `func data(for: URLRequest) async throws -> (Data, URLResponse)`. Don't take `URLSession` directly — it makes test fakes painful. URLSession already conforms naturally.
+  - To test URLProtocol stubs against `URLSession`, use `URLSessionConfiguration.ephemeral` (NOT `.shared`/`.default`) and set `config.protocolClasses = [Stub.self]`. The session must be created fresh per test and `invalidateAndCancel`-ed in tearDown.
+  - `URLError(.timedOut)` thrown from a stub's `startLoading` propagates back through `URLSession.data(for:)` as a thrown `URLError` — map both `.timedOut` and `.cancelled` URLError codes to `ArticleFetchError.timeout`.
+  - Both content-length and post-read body size checks are needed: tests cover both "Content-Length declares > maxBytes with tiny body" (header pre-check) and "Content-Length absent/wrong but body itself > maxBytes" (post-check).
+  - Removed `unreadable`/minWords from the fetcher to match JS taxonomy. The UI-level minWords check (20) lives in `AddSourceView.fetchURL` so behavior stays identical from the user's POV.
 ---
