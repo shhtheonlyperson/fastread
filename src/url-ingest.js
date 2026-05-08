@@ -43,7 +43,7 @@ export class TimeoutError extends Error {
   }
 }
 
-export async function fetchAndExtract({
+export async function fetchHtml({
   url,
   fetcher = globalThis.fetch,
   maxBytes = DEFAULT_MAX_BYTES,
@@ -66,7 +66,7 @@ export async function fetchAndExtract({
   }
 
   if (typeof fetcher !== "function") {
-    throw new TypeError("fetchAndExtract requires a fetcher function.");
+    throw new TypeError("fetchHtml requires a fetcher function.");
   }
 
   let response;
@@ -111,6 +111,11 @@ export async function fetchAndExtract({
 
   const html = decodeBody(bytes, contentType);
   const finalUrl = response.url || parsed.toString();
+  return { html, finalUrl };
+}
+
+export async function fetchAndExtract(options = {}) {
+  const { html, finalUrl } = await fetchHtml(options);
   const article = extractArticle(html, finalUrl);
   return { article, finalUrl };
 }

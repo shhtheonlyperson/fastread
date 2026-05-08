@@ -29,6 +29,11 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (requestUrl.pathname === "/api/raw") {
+      await handleRaw(requestUrl, res);
+      return;
+    }
+
     await serveStatic(requestUrl.pathname, res);
   } catch (error) {
     sendJson(res, 500, { error: error.message || "Unexpected server error" });
@@ -85,6 +90,58 @@ async function handleExtract(requestUrl, res) {
     }
 
     sendJson(res, 200, article);
+  } catch (error) {
+    sendJson(res, 502, { error: error.name === "AbortError" ? "Fetch timed out" : error.message });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function handleRaw(requestUrl, res) {
+  const target = requestUrl.searchParams.get("url") || "";
+  const validated = await validateFetchUrl(target);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(validated.href, {
+      headers: {
+        accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2",
+        "user-agent": "Mozilla/5.0 FastRead local reader",
+      },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      sendJson(res, 502, { error: `Fetch failed with HTTP ${response.status}` });
+      return;
+    }
+
+    const contentType = response.headers.get("content-type") || "text/html; charset=utf-8";
+    const length = Number(response.headers.get("content-length") || 0);
+    if (length > MAX_HTML_BYTES) {
+      sendJson(res, 413, { error: "Page is too large to extract" });
+      return;
+    }
+    if (!/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
+      sendJson(res, 415, { error: `Unsupported content type: ${contentType}` });
+      return;
+    }
+
+    const html = await response.text();
+    if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) {
+      sendJson(res, 413, { error: "Page is too large to extract" });
+      return;
+    }
+
+    const body = Buffer.from(html, "utf8");
+    res.writeHead(200, {
+      "content-type": contentType,
+      "content-length": body.byteLength,
+      "x-final-url": response.url || validated.href,
+    });
+    res.end(body);
   } catch (error) {
     sendJson(res, 502, { error: error.name === "AbortError" ? "Fetch timed out" : error.message });
   } finally {

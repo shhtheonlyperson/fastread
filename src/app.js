@@ -9,6 +9,8 @@ import {
   tokenSeparator,
   tokenize,
 } from "./reader-core.js";
+import { loadUrlDocument } from "./web-flow.js";
+import { flattenText } from "./document.js";
 
 const STORAGE_KEY = "fastread-state-v1";
 
@@ -43,6 +45,11 @@ let index = 0;
 let isPlaying = false;
 let hasFinished = false;
 let timer = null;
+let currentDocument = null;
+
+export function getCurrentDocument() {
+  return currentDocument;
+}
 
 const icons = {
   play: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>`,
@@ -160,17 +167,24 @@ async function loadUrl(event) {
   setUrlStatus("Loading...");
 
   try {
-    const response = await fetch(`/api/extract?url=${encodeURIComponent(url)}`);
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(payload.error || `Request failed with HTTP ${response.status}`);
-    }
-
-    els.textInput.value = payload.text;
+    const proxyFetcher = async (target, init) => {
+      const response = await fetch(`/api/raw?url=${encodeURIComponent(target)}`, init);
+      const finalUrl = response.headers.get("x-final-url") || target;
+      return new Proxy(response, {
+        get(obj, prop) {
+          if (prop === "url") return finalUrl;
+          const value = obj[prop];
+          return typeof value === "function" ? value.bind(obj) : value;
+        },
+      });
+    };
+    const fetcher = typeof window !== "undefined" && window.__fastreadFetcher ? window.__fastreadFetcher : proxyFetcher;
+    const { document: doc, text } = await loadUrlDocument({ url, fetcher });
+    currentDocument = doc;
+    els.textInput.value = text;
     refreshTokens(true);
-    const title = payload.title ? `${payload.title} | ` : "";
-    setUrlStatus(`${title}${payload.wordCount} words loaded.`);
+    const title = doc.title ? `${doc.title} | ` : "";
+    setUrlStatus(`${title}${tokens.length} words loaded.`);
   } catch (error) {
     setUrlStatus(error.message || "Could not load that URL.", true);
   } finally {
