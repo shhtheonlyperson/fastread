@@ -3,61 +3,61 @@ import Foundation
 import OSLog
 
 @MainActor
-final class ReadingStore: ObservableObject {
-    @Published var articles: [ReadingArticle]
-    @Published var selectedArticleID: String?
-    @Published var stats: ReadingStats
-    @Published var wpm: Double {
+public final class ReadingStore: ObservableObject {
+    @Published public var articles: [ReadingArticle]
+    @Published public var selectedArticleID: String?
+    @Published public var stats: ReadingStats
+    @Published public var wpm: Double {
         didSet { persistSettings() }
     }
-    @Published var punctuationPause: Bool {
+    @Published public var punctuationPause: Bool {
         didSet { persistSettings() }
     }
-    @Published var focusIndicator: FocusIndicatorStyle {
+    @Published public var focusIndicator: FocusIndicatorStyle {
         didSet { persistSettings() }
     }
-    @Published private(set) var isPlaying = false
-    @Published var sourceStatus = ""
+    @Published public private(set) var isPlaying = false
+    @Published public var sourceStatus = ""
 
     private var playbackTask: Task<Void, Never>?
     private var tokenCache: [String: TokenCacheEntry] = [:]
     private let defaults: UserDefaults
 
-    var currentArticle: ReadingArticle? {
+    public var currentArticle: ReadingArticle? {
         guard let selectedArticleIndex else { return articles.first }
         return articles[selectedArticleIndex]
     }
 
-    var currentTokens: [String] {
+    public var currentTokens: [String] {
         guard let currentArticle else { return [] }
         return tokens(for: currentArticle)
     }
 
-    var currentIndex: Int {
+    public var currentIndex: Int {
         guard let currentArticle else { return 0 }
         return RSVPEngine.clamp(currentArticle.wordIndex, min: 0, max: max(currentTokens.count - 1, 0))
     }
 
-    var currentToken: String {
+    public var currentToken: String {
         guard !currentTokens.isEmpty else { return "" }
         return currentTokens[currentIndex]
     }
 
-    var readerProgress: Double {
+    public var readerProgress: Double {
         guard !currentTokens.isEmpty else { return 0 }
         return Double(currentIndex + 1) / Double(currentTokens.count)
     }
 
-    var minutesRemaining: Double {
+    public var minutesRemaining: Double {
         RSVPEngine.estimateMinutes(wordCount: max(currentTokens.count - currentIndex, 0), wpm: wpm)
     }
 
-    var selectedArticleIndex: Int? {
+    public var selectedArticleIndex: Int? {
         guard let selectedArticleID else { return articles.isEmpty ? nil : 0 }
         return articles.firstIndex { $0.id == selectedArticleID } ?? (articles.isEmpty ? nil : 0)
     }
 
-    var recentSources: [RecentSource] {
+    public var recentSources: [RecentSource] {
         var seen = Set<String>()
         return articles
             .compactMap { article -> RecentSource? in
@@ -76,7 +76,7 @@ final class ReadingStore: ObservableObject {
             .map { $0 }
     }
 
-    init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let settings = Self.loadSettings(from: defaults)
 
@@ -96,7 +96,7 @@ final class ReadingStore: ObservableObject {
         playbackTask?.cancel()
     }
 
-    func openArticle(_ id: ReadingArticle.ID, resume: Bool) {
+    public func openArticle(_ id: ReadingArticle.ID, resume: Bool) {
         pause()
         guard articles.contains(where: { $0.id == id }) else { return }
         selectedArticleID = id
@@ -114,19 +114,19 @@ final class ReadingStore: ObservableObject {
         }
     }
 
-    func setWPM(_ value: Double) {
+    public func setWPM(_ value: Double) {
         wpm = RSVPEngine.clamp(value, min: 150, max: 1_000)
     }
 
-    func wordCount(for article: ReadingArticle) -> Int {
+    public func wordCount(for article: ReadingArticle) -> Int {
         tokens(for: article).count
     }
 
-    func togglePlay() {
+    public func togglePlay() {
         isPlaying ? pause() : play()
     }
 
-    func play() {
+    public func play() {
         guard currentTokens.count > 1 else { return }
         if currentIndex >= currentTokens.count - 1 {
             setIndex(0)
@@ -135,18 +135,18 @@ final class ReadingStore: ObservableObject {
         scheduleNext()
     }
 
-    func pause() {
+    public func pause() {
         isPlaying = false
         playbackTask?.cancel()
         playbackTask = nil
     }
 
-    func move(by delta: Int) {
+    public func move(by delta: Int) {
         pause()
         setIndex(currentIndex + delta)
     }
 
-    func scrub(to progress: Double) {
+    public func scrub(to progress: Double) {
         let wasPlaying = isPlaying
         pause()
         let target = Int((progress * Double(max(currentTokens.count - 1, 0))).rounded())
@@ -156,22 +156,22 @@ final class ReadingStore: ObservableObject {
         }
     }
 
-    func jumpToToken(_ tokenIndex: Int) {
+    public func jumpToToken(_ tokenIndex: Int) {
         pause()
         setIndex(tokenIndex)
     }
 
-    func currentSectionBoundaries() -> [Document.SectionBoundary] {
+    public func currentSectionBoundaries() -> [Document.SectionBoundary] {
         guard let document = currentArticle?.document else { return [] }
         return Document.sectionBoundaries(document)
     }
 
-    func currentFrontMatterDetection() -> Document.FrontMatterDetection? {
+    public func currentFrontMatterDetection() -> Document.FrontMatterDetection? {
         guard let document = currentArticle?.document else { return nil }
         return Document.detectFrontMatter(document)
     }
 
-    func setIndex(_ index: Int) {
+    public func setIndex(_ index: Int) {
         updateSelectedArticle { article in
             let count = tokens(for: article).count
             article.wordIndex = RSVPEngine.clamp(index, min: 0, max: max(count - 1, 0))
@@ -181,7 +181,7 @@ final class ReadingStore: ObservableObject {
         }
     }
 
-    func markRead() {
+    public func markRead() {
         guard let currentArticle else { return }
         let wasFinished = currentArticle.isFinished
         pause()
@@ -198,7 +198,7 @@ final class ReadingStore: ObservableObject {
         }
     }
 
-    func addDraftArticle(text: String, title: String = "Pasted text", source: String = "Clipboard", sourceURL: String? = nil) {
+    public func addDraftArticle(text: String, title: String = "Pasted text", source: String = "Clipboard", sourceURL: String? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -213,12 +213,12 @@ final class ReadingStore: ObservableObject {
         addArticle(document: document, source: source, sourceURL: sourceURL)
     }
 
-    func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
+    public func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
         addDraftArticle(text: text, title: title, source: source, sourceURL: url)
     }
 
     @discardableResult
-    func addEpubArticle(data: Data, filename: String? = nil) throws -> ReadingArticle? {
+    public func addEpubArticle(data: Data, filename: String? = nil) throws -> ReadingArticle? {
         let document = try ImporterRegistry.shared.importEpub(
             data: data,
             options: ImportOptions(sourceUrl: "", title: "", author: "")
@@ -239,7 +239,7 @@ final class ReadingStore: ObservableObject {
         return articles.first
     }
 
-    func addArticle(document: Document, source: String, sourceURL: String? = nil) {
+    public func addArticle(document: Document, source: String, sourceURL: String? = nil) {
         let flattened = Document.flattenText(document)
         let trimmed = flattened.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -275,7 +275,7 @@ final class ReadingStore: ObservableObject {
         persistArticles()
     }
 
-    func deleteArticle(_ id: ReadingArticle.ID) {
+    public func deleteArticle(_ id: ReadingArticle.ID) {
         guard let deletedIndex = articles.firstIndex(where: { $0.id == id }) else { return }
         let deletedSelectedArticle = articles[deletedIndex].id == selectedArticleID
 
@@ -568,12 +568,18 @@ final class ReadingStore: ObservableObject {
     }
 }
 
-struct RecentSource: Identifiable, Equatable {
-    var label: String
-    var date: String
-    var url: String?
+public struct RecentSource: Identifiable, Equatable, Sendable {
+    public var label: String
+    public var date: String
+    public var url: String?
 
-    var id: String { (url ?? label).lowercased() }
+    public init(label: String, date: String, url: String? = nil) {
+        self.label = label
+        self.date = date
+        self.url = url
+    }
+
+    public var id: String { (url ?? label).lowercased() }
 }
 
 private enum PerformanceTrace {
@@ -590,14 +596,14 @@ private enum PerformanceTrace {
 }
 
 private struct SettingsPayload: Codable {
-    var wpm: Double
-    var punctuationPause: Bool
-    var focusIndicator: FocusIndicatorStyle
+    public var wpm: Double
+    public var punctuationPause: Bool
+    public var focusIndicator: FocusIndicatorStyle
 }
 
 private struct TokenCacheEntry {
-    var text: String
-    var tokens: [String]
+    public var text: String
+    public var tokens: [String]
 }
 
 private enum StorageKey {

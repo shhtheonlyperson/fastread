@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Pre-push gate: full verifier — source guardrails, unit + integration
+# Swift tests, headless verifier executables, and a Release iOS build
+# without signing. Mirrors what CI runs on every push to main and every
+# pull request.
+#
+# Skip with `git push --no-verify` only when the user has explicitly
+# asked you to.
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+scripts/verify-ios-performance.sh

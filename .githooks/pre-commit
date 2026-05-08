@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Pre-commit gate: source-level guardrails plus the fast Swift test suite.
+# Skip with `git commit --no-verify` only when the user has explicitly
+# asked you to. Per the project convention, every commit must pass unit
+# + integration tests; the gated EPUB corpus / e2e suites stay out of
+# this hook because they need external fixtures.
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+bash scripts/check-source-guardrails.sh
+swift test
