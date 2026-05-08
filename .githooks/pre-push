@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Pre-push gate: full verifier — source guardrails, unit + integration
-# Swift tests, headless verifier executables, and a Release iOS build
-# without signing. Mirrors what CI runs on every push to main and every
-# pull request.
+# Swift tests, headless verifier executables, a Release iOS build
+# without signing, and the FastReadUITests happy-path XCUITest on the
+# pinned iPhone 17 Pro simulator. Mirrors what CI runs on every push to
+# main and every pull request.
 #
 # Skip with `git push --no-verify` only when the user has explicitly
 # asked you to.
