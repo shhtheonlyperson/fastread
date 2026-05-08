@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject private var store: ReadingStore
     @State private var selectedTab: AppTab = .home
     @State private var showingFocusMode = false
+    @State private var showingSplash = true
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -46,13 +47,21 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if selectedTab != .reader {
+            if selectedTab != .reader && !showingSplash {
                 JustReadTabBar(selection: $selectedTab)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if showingSplash {
+                SplashView { showingSplash = false }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+                    .zIndex(10)
             }
         }
         .preferredColorScheme(.light)
         .animation(.easeOut(duration: 0.18), value: selectedTab)
+        .animation(.easeInOut(duration: 0.3), value: showingSplash)
         .focusModeCover(isPresented: $showingFocusMode, store: store)
     }
 }
