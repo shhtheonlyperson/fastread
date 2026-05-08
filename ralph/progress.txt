@@ -15,6 +15,7 @@ Started: Thu May  7 22:42:30 PDT 2026
 - `ReadingArticle` (Swift) lives in `Sources/FastReadCore/ReadingArticle.swift` as a `public` Codable struct with an explicit `public init`. The Xcode app target compiles it directly via pbxproj; FastReadApp call sites do NOT need `import FastReadCore`. Required (non-optional) fields: id, title, source, author, date, readTime, lede, tag, text, progress, wordIndex, timesOpened, isFinished. Optional date fields: sourceURL, createdAt, lastOpenedAt, finishedAt — older v0 JSON omits these.
 - The JS persisted root shape (see `setItemAsync`/`getItemAsync` in `components/fast-read-screen.jsx`) is `{ library, articleId, wordIndex, wpm, ... }`: `wordIndex` and `isFinished`-equivalents live on the wrapper, not on each library item. Each library item itself uses `tagKey` (not `tag`).
 - `src/document.js` exports `createDocument`, `createSection`, `flattenText`, `tokenizeDocument`, `sectionBoundaries`. `flattenText` joins sections with `"\n\n"`. Section kinds: `body`|`chapter`|`page`. Use these factories instead of constructing object literals so the validation (id non-empty, kind enum) stays centralized.
+- `Sources/FastReadCore/Document.swift` mirrors `src/document.js`: public `Document`/`Section` structs (Codable, Equatable, Sendable) and `SectionKind` enum (raw String "body"/"chapter"/"page"). Static helpers `Document.flattenText(_:)` and `Document.sectionBoundaries(_:)`. JSON shape matches JS exactly — JS-produced fixtures decode directly via `JSONDecoder().decode(Document.self, ...)`.
 ---
 
 ## 2026-05-07 - US-001
@@ -108,4 +109,19 @@ Started: Thu May  7 22:42:30 PDT 2026
   - `sectionBoundaries` is implemented by re-tokenizing the cumulative joined text after each section rather than summing per-section tokenize counts. This is robust against any future tokenizer changes that might treat section seams differently (e.g. CJK punctuation joining across `\n\n`). It is O(N²) in section count, but EPUB chapter counts in practice are small enough that this stays cheap.
   - `tokenize` from `reader-core.js` already collapses NBSP→space and flushes on whitespace, so joining sections with `"\n\n"` separates tokens cleanly across both ASCII and CJK paths. Future Swift port (US-007) can mirror the same join-then-tokenize approach.
   - Section ids are caller-provided strings; we don't auto-generate them. EPUB importer (US-014) should use spine item ids; HtmlAdapter (US-008) should use a stable single-section id like `"body"` for backward-compat.
+---
+
+## 2026-05-07 - US-007
+- Defined the format-agnostic Document schema in Swift with Codable structs and parity helpers mirroring `src/document.js`.
+- Files added/changed:
+  - `Sources/FastReadCore/Document.swift` (new): public `SectionKind` (body|chapter|page), `Section`, and `Document` (Codable, Equatable, Sendable). Static `Document.flattenText(_:)` joins sections with "\n\n"; `Document.sectionBoundaries(_:)` returns `[SectionBoundary]` computed via re-tokenizing the cumulative joined text (mirrors JS implementation).
+  - `Tests/Fixtures/document-sample.json` (new): JS-produced sample (multi-chapter, CJK title) — generated via `node -e` against `src/document.js` and committed verbatim.
+  - `Tests/FastReadCoreTests/DocumentTests.swift` (new): 5 tests — empty doc flatten/boundaries, body-only doc, multi-chapter CJK boundaries match `RSVPEngine.tokenize`, Codable round-trip, and decode of `document-sample.json` matches a hand-built expected `Document`.
+  - `FastRead.xcodeproj/project.pbxproj`: registered `Document.swift` in PBXBuildFile, PBXFileReference, FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase (4 places, per existing pattern).
+- `swift test` (24 tests passing, 5 new), `npm test` (43 passing), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - `Document` and `Section` are `public Codable, Equatable, Sendable`. JSON keys produced by Swift `JSONEncoder` match the JS `createDocument`/`createSection` shape exactly: `title`, `author`, `sourceUrl`, `sourceKind`, `sections[]` and `id`, `title`, `kind`, `text`. `SectionKind` derives `Codable` from `String` raw values, so JS lowercase strings ("body"/"chapter"/"page") decode directly. Future importers (US-009, US-014, US-015) can rely on this without custom CodingKeys.
+  - `Document.sectionBoundaries(_:)` mirrors the JS approach exactly: re-tokenize the running joined text after each section rather than summing per-section token counts. Keeps Swift behavior parity-safe with JS for future tokenizer tweaks (CJK seams etc.).
+  - To produce a JS-equivalent fixture from Node, an inline `node -e "import('./src/document.js').then(...)"` call against `createDocument`/`createSection` is the easiest path; commit the printed JSON verbatim. The Swift test then decodes and compares to a hand-built `Document` via `==` — this is a stronger check than re-encode equality (which can diverge in key order / whitespace).
+  - The JS-produced sample is committed at `Tests/Fixtures/document-sample.json`. Future Document changes that alter the JS shape MUST regenerate this fixture and update the Swift expected struct in `DocumentTests.testDocumentSampleFixtureMatchesJSProducedShape`.
 ---

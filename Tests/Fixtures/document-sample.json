@@ -1,0 +1,26 @@
+{
+  "title": "Sample Document 範例",
+  "author": "Ada Lovelace",
+  "sourceUrl": "https://example.com/sample",
+  "sourceKind": "epub",
+  "sections": [
+    {
+      "id": "ch-1",
+      "title": "Chapter One",
+      "kind": "chapter",
+      "text": "The quick brown fox jumps over the lazy dog."
+    },
+    {
+      "id": "ch-2",
+      "title": "第二章",
+      "kind": "chapter",
+      "text": "快速的棕色狐狸跳過懶狗。"
+    },
+    {
+      "id": "p-1",
+      "title": "Appendix",
+      "kind": "page",
+      "text": "A short appendix page."
+    }
+  ]
+}
