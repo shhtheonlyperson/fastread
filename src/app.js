@@ -11,6 +11,7 @@ import {
 } from "./reader-core.js";
 import { loadUrlDocument } from "./web-flow.js";
 import { flattenText } from "./document.js";
+import { importDocument } from "./importers/index.js";
 
 const STORAGE_KEY = "fastread-state-v1";
 
@@ -38,6 +39,8 @@ const els = {
   copyText: document.querySelector("#copy-text"),
   clearText: document.querySelector("#clear-text"),
   focusMode: document.querySelector("#focus-mode"),
+  epubInput: document.querySelector("#epub-input"),
+  epubStatus: document.querySelector("#epub-status"),
 };
 
 let tokens = [];
@@ -198,6 +201,37 @@ function setUrlStatus(message, isError = false) {
   els.urlStatus.dataset.state = isError ? "error" : message ? "ok" : "";
 }
 
+function setEpubStatus(message, isError = false) {
+  if (!els.epubStatus) return;
+  els.epubStatus.textContent = message;
+  els.epubStatus.dataset.state = isError ? "error" : message ? "ok" : "";
+}
+
+async function loadEpubFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  stop();
+  setEpubStatus("Loading EPUB...");
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const doc = importDocument({ kind: "epub", input: buf });
+    const text = flattenText(doc);
+    if (!text.trim()) {
+      throw new Error("EPUB has no readable text.");
+    }
+    currentDocument = doc;
+    els.textInput.value = text;
+    refreshTokens(true);
+    const chapters = doc.sections.length;
+    const title = doc.title ? `${doc.title} | ` : "";
+    setEpubStatus(`${title}${chapters} chapter${chapters === 1 ? "" : "s"}, ${tokens.length} words.`);
+  } catch (error) {
+    setEpubStatus(error?.message || "Could not read that EPUB.", true);
+  } finally {
+    event.target.value = "";
+  }
+}
+
 async function toggleFocusMode() {
   const entering = !document.body.classList.contains("is-focus-mode");
   document.body.classList.toggle("is-focus-mode", entering);
@@ -305,6 +339,7 @@ async function copy(value, button, doneLabel) {
 }
 
 els.urlForm.addEventListener("submit", loadUrl);
+if (els.epubInput) els.epubInput.addEventListener("change", loadEpubFile);
 els.urlInput.addEventListener("input", saveState);
 els.textInput.addEventListener("input", () => refreshTokens(true));
 els.wpm.addEventListener("input", () => {
