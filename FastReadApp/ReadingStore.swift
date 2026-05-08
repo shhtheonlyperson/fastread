@@ -156,6 +156,21 @@ final class ReadingStore: ObservableObject {
         }
     }
 
+    func jumpToToken(_ tokenIndex: Int) {
+        pause()
+        setIndex(tokenIndex)
+    }
+
+    func currentSectionBoundaries() -> [Document.SectionBoundary] {
+        guard let document = currentArticle?.document else { return [] }
+        return Document.sectionBoundaries(document)
+    }
+
+    func currentFrontMatterDetection() -> Document.FrontMatterDetection? {
+        guard let document = currentArticle?.document else { return nil }
+        return Document.detectFrontMatter(document)
+    }
+
     func setIndex(_ index: Int) {
         updateSelectedArticle { article in
             let count = tokens(for: article).count

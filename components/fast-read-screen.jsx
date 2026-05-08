@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Modal,
   PanResponder,
   Pressable,
   ScrollView,
@@ -23,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchHtml } from "../src/url-ingest.js";
 import { importDocument } from "../src/importers/index.js";
-import { flattenText } from "../src/document.js";
+import { flattenText, sectionBoundaries, detectFrontMatter } from "../src/document.js";
 import { clamp, containsCjk, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, rangeValueFromPageX, shouldRestartPlayback, splitForFocus, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
@@ -94,6 +95,13 @@ const localeData = {
         emptySub: "Add text or fetch a URL first. JustRead will preserve your real library and progress locally.",
         emptyAction: "Add something to read",
         pace: "Pace",
+        contents: "Contents",
+        close: "Close",
+        skipBanner: (count) => `You're in front matter · ${count} section${count === 1 ? "" : "s"} look like cover, copyright, foreword.`,
+        skipAction: "Skip ->",
+        tocMeta: (pct, read, total) => `${pct}% · ${read.toLocaleString()} of ${total.toLocaleString()} words`,
+        untitledSection: "Untitled section",
+        skipFooterAction: "Skip front matter ->",
       },
       settings: {
         label: "Settings",
@@ -166,6 +174,13 @@ const localeData = {
         emptySub: "先加入文字或擷取網址。JustRead 會在本機保留你的書架與進度。",
         emptyAction: "加入閱讀內容",
         pace: "速度",
+        contents: "目錄",
+        close: "關閉",
+        skipBanner: (count) => `目前在前言區 · 共 ${count} 個章節屬於封面、版權或序`,
+        skipAction: "跳過 →",
+        tocMeta: (pct, read, total) => `${pct}% · ${read.toLocaleString()} / ${total.toLocaleString()} 字`,
+        untitledSection: "未命名章節",
+        skipFooterAction: "跳過前言 →",
       },
       settings: {
         label: "設定",
@@ -441,6 +456,15 @@ export default function FastReadScreen() {
     [tokens.length],
   );
 
+  const jumpToToken = useCallback(
+    (tokenIndex) => {
+      setIsPlaying(false);
+      setHasFinished(false);
+      setWordIndex(clamp(Math.floor(Number(tokenIndex) || 0), 0, Math.max(tokens.length - 1, 0)));
+    },
+    [tokens.length],
+  );
+
   const togglePlayback = useCallback(() => {
     if (!article || !tokens.length) return;
 
@@ -508,6 +532,7 @@ export default function FastReadScreen() {
             onBack={() => setActiveTab("home")}
             onScrub={setProgress}
             onEnterFocus={enterFocusAndPlay}
+            onJumpToToken={jumpToToken}
           />
         ) : null}
         {activeTab === "reader" && !article ? <ReaderEmptyScreen insets={insets} isLandscape={appIsLandscape} ui={ui} onAdd={() => setActiveTab("source")} /> : null}
@@ -871,25 +896,66 @@ function ReaderScreen({
   onBack,
   onScrub,
   onEnterFocus,
+  onJumpToToken,
 }) {
   const minutesLeft = estimateMinutes(Math.max(tokens.length - wordIndex, 0), wpm);
   const topPad = topPadding(insets, isLandscape);
   const bottomPad = bottomPadding(isLandscape);
   const [isRangeScrubbing, setIsRangeScrubbing] = useState(false);
+  const [isTocOpen, setIsTocOpen] = useState(false);
   const lockRangeScroll = useCallback(() => setIsRangeScrubbing(true), []);
   const unlockRangeScroll = useCallback(() => setIsRangeScrubbing(false), []);
 
+  const document = article?.document || null;
+  const boundaries = useMemo(() => (document ? sectionBoundaries(document) : []), [document]);
+  const frontMatter = useMemo(() => (document ? detectFrontMatter(document) : null), [document]);
+  const inFrontMatter = Boolean(
+    frontMatter && frontMatter.firstChapterTokenIndex > 0 && wordIndex < frontMatter.firstChapterTokenIndex,
+  );
+  const skipToFirstChapter = useCallback(() => {
+    if (frontMatter && frontMatter.firstChapterTokenIndex > 0) {
+      onJumpToToken?.(frontMatter.firstChapterTokenIndex);
+    }
+  }, [frontMatter, onJumpToToken]);
+  const handleSelectSection = useCallback(
+    (sectionIndex) => {
+      const b = boundaries[sectionIndex];
+      if (!b) return;
+      onJumpToToken?.(b.tokenStart);
+      setIsTocOpen(false);
+    },
+    [boundaries, onJumpToToken],
+  );
+
   return (
+    <>
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} scrollEnabled={!isRangeScrubbing} showsVerticalScrollIndicator={false}>
       <View style={[s.readerHeader, { paddingTop: topPad }, isLandscape && s.readerHeaderLandscape]}>
-        <Pressable onPress={onBack}>
-          <SectionLabel>{`< ${ui.reader.library}`}</SectionLabel>
-        </Pressable>
+        <View style={s.readerHeaderRow}>
+          <Pressable onPress={onBack}>
+            <SectionLabel>{`< ${ui.reader.library}`}</SectionLabel>
+          </Pressable>
+          {document && document.sections.length > 1 ? (
+            <Pressable onPress={() => setIsTocOpen(true)} accessibilityRole="button" accessibilityLabel={ui.reader.contents}>
+              <SectionLabel>{`${ui.reader.contents} >`}</SectionLabel>
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={s.readerTitle}>{article.title}</Text>
         <Text style={s.readerMeta}>
           {article.source} / {article.author} / {article.date}
         </Text>
       </View>
+
+      {inFrontMatter ? (
+        <View style={s.skipBanner}>
+          <View style={s.skipBannerDot} />
+          <Text style={s.skipBannerCopy}>{ui.reader.skipBanner(frontMatter.frontMatterSectionIds.length)}</Text>
+          <Pressable onPress={skipToFirstChapter}>
+            <Text style={s.skipBannerAction}>{ui.reader.skipAction}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={[s.readerBody, isLandscape && s.readerBodyLandscape]}>
         <View style={[s.readerControls, isLandscape && s.readerControlsLandscape]}>
@@ -913,6 +979,84 @@ function ReaderScreen({
         </View>
       </View>
     </ScrollView>
+    {document ? (
+      <TocDrawer
+        ui={ui}
+        visible={isTocOpen}
+        onClose={() => setIsTocOpen(false)}
+        sections={document.sections}
+        boundaries={boundaries}
+        frontMatter={frontMatter}
+        wordIndex={wordIndex}
+        onSelect={handleSelectSection}
+        onSkipFrontMatter={() => {
+          skipToFirstChapter();
+          setIsTocOpen(false);
+        }}
+      />
+    ) : null}
+    </>
+  );
+}
+
+function TocDrawer({ ui, visible, onClose, sections, boundaries, frontMatter, wordIndex, onSelect, onSkipFrontMatter }) {
+  const totalTokens = boundaries[boundaries.length - 1]?.tokenEnd || 0;
+  const progressPct = totalTokens ? Math.round((wordIndex / totalTokens) * 100) : 0;
+  const skipCount = frontMatter?.frontMatterSectionIds?.length || 0;
+  const currentIndex = useMemo(() => {
+    for (let i = 0; i < boundaries.length; i += 1) {
+      const b = boundaries[i];
+      if (wordIndex >= b.tokenStart && wordIndex < b.tokenEnd) return i;
+    }
+    return Math.max(boundaries.length - 1, 0);
+  }, [boundaries, wordIndex]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={s.tocScrim} onPress={onClose} />
+      <View style={s.tocDrawer}>
+        <View style={s.tocHeader}>
+          <Text style={s.tocTitle}>{ui.reader.contents}</Text>
+          <Pressable onPress={onClose}>
+            <SectionLabel>{ui.reader.close}</SectionLabel>
+          </Pressable>
+        </View>
+        <Text style={s.tocMeta}>{ui.reader.tocMeta(progressPct, wordIndex, totalTokens)}</Text>
+
+        <ScrollView style={s.tocList} contentContainerStyle={{ paddingBottom: 24 }}>
+          {sections.map((section, i) => {
+            const b = boundaries[i] || { tokenStart: 0, tokenEnd: 0 };
+            const units = b.tokenEnd - b.tokenStart;
+            const isFront = (frontMatter?.frontMatterSectionIds || []).includes(section.id);
+            const isCurrent = i === currentIndex;
+            const isRead = !isCurrent && wordIndex >= b.tokenEnd && b.tokenEnd > 0;
+            const num = isFront ? "—" : String(i + 1 - skipCount).padStart(2, "0");
+            const pct = units === 0 ? "—" : isFront && wordIndex >= b.tokenEnd ? "✓" : isCurrent ? `${Math.round(((wordIndex - b.tokenStart) / Math.max(units, 1)) * 100)}%` : isRead ? "100%" : "—";
+            return (
+              <Pressable
+                key={section.id}
+                onPress={() => onSelect(i)}
+                style={[s.tocRow, isCurrent && s.tocRowCurrent, isFront && s.tocRowFront]}
+              >
+                <Text style={[s.tocNum, isFront && s.tocNumFront, isCurrent && s.tocNumCurrent]}>{num}</Text>
+                <Text style={[s.tocRowTitle, isFront && s.tocRowTitleFront, isCurrent && s.tocRowTitleCurrent]} numberOfLines={2}>
+                  {section.title || ui.reader.untitledSection}
+                </Text>
+                <Text style={[s.tocPct, isCurrent && s.tocPctCurrent]}>{pct}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {skipCount > 0 && wordIndex < (frontMatter?.firstChapterTokenIndex || 0) ? (
+          <View style={s.tocFooter}>
+            <Pressable onPress={onSkipFrontMatter} style={s.tocSkipButton}>
+              <Text style={s.tocSkipButtonText}>{ui.reader.skipFooterAction}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    </Modal>
   );
 }
 
@@ -1728,8 +1872,91 @@ const s = {
   recentDate: { fontFamily: "Inter", fontSize: 12, color: color.inkQuiet },
   readerHeader: { paddingHorizontal: 24, paddingBottom: 16, gap: 8 },
   readerHeaderLandscape: { paddingBottom: 10 },
+  readerHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   readerTitle: { marginTop: 4, fontFamily: "Fraunces", fontSize: 22, lineHeight: 25, fontWeight: "500", letterSpacing: -0.4, color: color.ink },
   readerMeta: { fontFamily: "Inter", fontSize: 12, color: color.inkQuiet },
+  skipBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: 24,
+    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(201,100,66,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(201,100,66,0.22)",
+  },
+  skipBannerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: color.terracotta },
+  skipBannerCopy: { flex: 1, fontFamily: "Inter", fontSize: 13, lineHeight: 17, color: color.inkMid },
+  skipBannerAction: { fontFamily: "JetBrainsMono", fontSize: 11, letterSpacing: 1.4, color: color.terracotta, textTransform: "uppercase" },
+  tocScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15,12,10,0.42)" },
+  tocDrawer: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: "82%",
+    maxWidth: 360,
+    backgroundColor: color.paper,
+    borderLeftWidth: 1,
+    borderLeftColor: color.ruleStrong,
+    flexDirection: "column",
+  },
+  tocHeader: {
+    paddingTop: 56,
+    paddingHorizontal: 22,
+    paddingBottom: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    borderBottomWidth: 1,
+    borderBottomColor: color.rule,
+  },
+  tocTitle: { fontFamily: "Fraunces", fontSize: 22, fontWeight: "700", color: color.ink },
+  tocMeta: { paddingHorizontal: 22, paddingTop: 12, paddingBottom: 4, fontFamily: "JetBrainsMono", fontSize: 11, color: color.inkQuiet, letterSpacing: 1.4 },
+  tocList: { flex: 1, paddingTop: 6 },
+  tocRow: {
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: color.rule,
+  },
+  tocRowCurrent: { backgroundColor: "rgba(201,100,66,0.08)" },
+  tocRowFront: {},
+  tocNum: { width: 30, fontFamily: "JetBrainsMono", fontSize: 11, color: color.inkQuiet, letterSpacing: 0.6 },
+  tocNumFront: { color: color.inkQuiet },
+  tocNumCurrent: { color: color.terracotta, fontWeight: "700" },
+  tocRowTitle: { flex: 1, fontFamily: "Fraunces", fontSize: 15, lineHeight: 19, color: color.ink },
+  tocRowTitleFront: { color: color.inkQuiet },
+  tocRowTitleCurrent: { color: color.terracotta, fontWeight: "600" },
+  tocPct: { fontFamily: "JetBrainsMono", fontSize: 10.5, color: color.inkQuiet },
+  tocPctCurrent: { color: color.terracotta, fontWeight: "700" },
+  tocFooter: {
+    padding: 16,
+    paddingBottom: 28,
+    borderTopWidth: 1,
+    borderTopColor: color.rule,
+    backgroundColor: color.paper,
+  },
+  tocSkipButton: {
+    backgroundColor: color.terracotta,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  tocSkipButtonText: {
+    fontFamily: "JetBrainsMono",
+    fontSize: 11,
+    color: "#fff",
+    letterSpacing: 2,
+    textTransform: "uppercase",
+    fontWeight: "700",
+  },
   readerBody: { gap: 0 },
   readerBodyLandscape: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingHorizontal: 16 },
   readerControls: { gap: 0 },
