@@ -10,6 +10,8 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "test": "node --test",
+    "test:epub-corpus": "FASTREAD_RUN_EPUB_CORPUS=1 node --test test/epub-corpus.test.mjs",
+    "fixtures:epub": "node scripts/generate-epub-fixtures.mjs",
     "guard:source": "scripts/check-source-guardrails.sh",
     "test:swift": "swift test",
     "perf:web": "node --test test/performance-guardrails.test.mjs",

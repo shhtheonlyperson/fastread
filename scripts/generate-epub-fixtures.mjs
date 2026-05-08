@@ -1,15 +1,19 @@
 // Generate small public-domain EPUB fixtures using fflate.
-// Run via: node test/fixtures/epub/generate-fixtures.mjs
+// Run via: bun run fixtures:epub  (or: node scripts/generate-epub-fixtures.mjs)
 //
 // Sources are short excerpts from clearly public-domain works:
 //   - Pride and Prejudice by Jane Austen (1813)
 //   - 道德經 (Tao Te Ching, Laozi, 6th century BCE) — zh-Hant
+//
+// Lives outside test/ on purpose: `node --test` discovers any *.mjs under
+// test/ and used to re-run this generator on every test invocation, which
+// rewrote the binary fixtures and dirtied the working tree.
 import { zipSync, strToU8 } from "fflate";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = join(dirname(fileURLToPath(import.meta.url)), "..", "test", "fixtures", "epub");
 mkdirSync(here, { recursive: true });
 
 function makeEpub(spec) {
