@@ -95,4 +95,95 @@ final class DocumentTests: XCTestCase {
         let reDecoded = try JSONDecoder().decode(Document.self, from: reEncoded)
         XCTAssertEqual(reDecoded, decoded)
     }
+
+    private func chapterText(_ words: Int) -> String {
+        Array(repeating: "word", count: words).joined(separator: " ")
+    }
+
+    func testDetectFrontMatterEmptyDocument() {
+        let result = Document.detectFrontMatter(Document())
+        XCTAssertNil(result.firstChapterSectionIndex)
+        XCTAssertEqual(result.firstChapterTokenIndex, 0)
+        XCTAssertEqual(result.frontMatterSectionIds, [])
+        XCTAssertEqual(result.totalTokens, 0)
+        XCTAssertFalse(result.hasSkippableFrontMatter)
+    }
+
+    func testDetectFrontMatterChineseTitlesAreClassified() {
+        let doc = Document(
+            sourceKind: "epub",
+            sections: [
+                Section(id: "cov", title: "封面", kind: .chapter, text: "封面"),
+                Section(id: "ver", title: "版權頁", kind: .chapter, text: "版權所有 翻印必究"),
+                Section(id: "tof", title: "目錄", kind: .chapter, text: "第一章 第二章"),
+                Section(id: "rec", title: "推薦序 · 房思琪是個謎", kind: .chapter, text: chapterText(120)),
+                Section(id: "ch1", title: "樂園", kind: .chapter, text: chapterText(2500)),
+                Section(id: "ch2", title: "失樂園", kind: .chapter, text: chapterText(2500)),
+            ]
+        )
+        let result = Document.detectFrontMatter(doc)
+        XCTAssertEqual(result.firstChapterSectionIndex, 4)
+        XCTAssertEqual(result.frontMatterSectionIds, ["cov", "ver", "tof", "rec"])
+        XCTAssertGreaterThan(result.firstChapterTokenIndex, 0)
+        XCTAssertTrue(result.hasSkippableFrontMatter)
+    }
+
+    func testDetectFrontMatterEnglishTitlesAreClassified() {
+        let doc = Document(
+            sourceKind: "epub",
+            sections: [
+                Section(id: "cover", title: "Cover", kind: .chapter, text: ""),
+                Section(id: "title", title: "Title Page", kind: .chapter, text: "Pride and Prejudice"),
+                Section(id: "copy", title: "Copyright", kind: .chapter, text: "Public domain."),
+                Section(id: "fore", title: "Foreword", kind: .chapter, text: chapterText(50)),
+                Section(id: "ch1", title: "Chapter 1", kind: .chapter, text: chapterText(2000)),
+            ]
+        )
+        let result = Document.detectFrontMatter(doc)
+        XCTAssertEqual(result.firstChapterSectionIndex, 4)
+        XCTAssertEqual(result.frontMatterSectionIds, ["cover", "title", "copy", "fore"])
+    }
+
+    func testDetectFrontMatterFallsBackToShortSectionHeuristic() {
+        let doc = Document(
+            sourceKind: "epub",
+            sections: [
+                Section(id: "s0", title: "Section 0", kind: .chapter, text: chapterText(40)),
+                Section(id: "s1", title: "Section 1", kind: .chapter, text: chapterText(60)),
+                Section(id: "s2", title: "Section 2", kind: .chapter, text: chapterText(3000)),
+                Section(id: "s3", title: "Section 3", kind: .chapter, text: chapterText(3000)),
+            ]
+        )
+        let result = Document.detectFrontMatter(doc)
+        XCTAssertEqual(result.firstChapterSectionIndex, 2)
+        XCTAssertEqual(result.frontMatterSectionIds, ["s0", "s1"])
+    }
+
+    func testDetectFrontMatterNoSkipWhenFirstSectionIsAChapter() {
+        let doc = Document(
+            sourceKind: "epub",
+            sections: [
+                Section(id: "ch1", title: "Chapter 1", kind: .chapter, text: chapterText(3000)),
+                Section(id: "ch2", title: "Chapter 2", kind: .chapter, text: chapterText(3000)),
+            ]
+        )
+        let result = Document.detectFrontMatter(doc)
+        XCTAssertEqual(result.firstChapterSectionIndex, 0)
+        XCTAssertEqual(result.frontMatterSectionIds, [])
+        XCTAssertEqual(result.firstChapterTokenIndex, 0)
+        XCTAssertFalse(result.hasSkippableFrontMatter)
+    }
+
+    func testDetectFrontMatterDoesNotMisclassifyChapterTitleStartingWith前() {
+        let doc = Document(
+            sourceKind: "epub",
+            sections: [
+                Section(id: "fmw", title: "推薦序", kind: .chapter, text: chapterText(50)),
+                Section(id: "ch1", title: "前進的勇氣", kind: .chapter, text: chapterText(2500)),
+            ]
+        )
+        let result = Document.detectFrontMatter(doc)
+        XCTAssertEqual(result.firstChapterSectionIndex, 1)
+        XCTAssertEqual(result.frontMatterSectionIds, ["fmw"])
+    }
 }
