@@ -81,8 +81,8 @@ test("importers: PlainTextAdapter replays plaintext golden fixture", () => {
 
 test("importers: importDocument throws UnknownImporterKind for unregistered kind", () => {
   assert.throws(
-    () => importDocument({ kind: "epub", input: "" }),
-    (err) => err instanceof UnknownImporterKind && err.kind === "epub",
+    () => importDocument({ kind: "pdf", input: "" }),
+    (err) => err instanceof UnknownImporterKind && err.kind === "pdf",
   );
 });
 

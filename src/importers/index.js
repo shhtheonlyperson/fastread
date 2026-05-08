@@ -1,5 +1,6 @@
 import { extractArticle, normalizeText } from "../article-extract.js";
 import { createDocument, createSection } from "../document.js";
+import { EpubAdapter } from "./epub-adapter.js";
 
 export class UnknownImporterKind extends Error {
   constructor(kind) {
@@ -76,6 +77,7 @@ export function listAdapters() {
 
 registerAdapter(PlainTextAdapter);
 registerAdapter(HtmlAdapter);
+registerAdapter(EpubAdapter);
 
 export function importDocument({ kind, input, sourceUrl, ...rest } = {}) {
   const adapter = REGISTRY.get(kind);

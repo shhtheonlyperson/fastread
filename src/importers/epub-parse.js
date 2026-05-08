@@ -237,5 +237,5 @@ export function parseEpub(arrayBuffer) {
     });
   }
 
-  return { metadata, spine };
+  return { metadata, spine, opfPath, entries };
 }
