@@ -236,7 +236,7 @@
         "npm test passes; the web flow is verified manually (note in progress.txt) since dev-browser tooling for Expo web may not be available"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

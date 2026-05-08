@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
 import { StatusBar } from "expo-status-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useFonts } from "expo-font";
@@ -587,6 +588,47 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
     onAddArticle(trimmed);
   }, [fetchURL, onAddArticle]);
 
+  const handlePickEpub = useCallback(async () => {
+    if (loading) return;
+    setLoading(true);
+    setStatus("Opening file picker.");
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/epub+zip"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result?.canceled) {
+        setStatus("");
+        return;
+      }
+      const asset = result?.assets?.[0];
+      if (!asset?.uri) {
+        setStatus("No file selected.");
+        return;
+      }
+      setStatus("Reading EPUB.");
+      const response = await fetch(asset.uri);
+      const arrayBuffer = await response.arrayBuffer();
+      const buf = new Uint8Array(arrayBuffer);
+      const document = importDocument({ kind: "epub", input: buf });
+      const flatText = flattenText(document);
+      if (!flatText.trim()) {
+        throw new Error("EPUB has no readable text.");
+      }
+      const wordCount = tokenize(flatText).length;
+      const chapters = document.sections.length;
+      const title = document.title || asset.name || "EPUB";
+      const source = document.author || "EPUB";
+      onAddArticle(flatText, title, source, null, { document });
+      setStatus(`Loaded ${chapters} chapter${chapters === 1 ? "" : "s"}, ${wordCount} words.`);
+    } catch (error) {
+      setStatus(error?.message || "Could not read that EPUB.");
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, onAddArticle]);
+
   const handlePaste = useCallback(async () => {
     if (isBeamActive) return;
     setIsPasteActive(true);
@@ -647,6 +689,20 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
         </View>
 
         {status ? <Text style={[s.status, { color: color.terracotta }]}>{status.toUpperCase()}</Text> : null}
+
+        <View>
+          <SectionLabel>EPUB file</SectionLabel>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pick EPUB file"
+            disabled={isBeamActive}
+            onPress={handlePickEpub}
+            style={[s.recentRow, { marginTop: 12 }, isBeamActive && { opacity: 0.55 }]}
+          >
+            <Text style={s.recentLabel}>Pick EPUB</Text>
+            <Text style={s.recentDate}>.epub</Text>
+          </Pressable>
+        </View>
 
         <View>
           <SectionLabel>Recent sources</SectionLabel>

@@ -277,3 +277,21 @@ Started: Thu May  7 22:42:30 PDT 2026
   - Path resolution requires the same dance as JS: nav.xhtml/toc.ncx hrefs are nav-relative; manifest hrefs are OPF-relative. Resolve `joinPath(navPath, href)` to absolute, then strip the OPF directory prefix to get an OPF-relative key for the lookup. Don't try to strip directory tokens manually with regex — the helper handles `..`/`.` segments correctly.
   - Token-count parity for the two fixtures: Pride 43 (Swift) vs 44 (JS) and Tao 41 (Swift) vs 41 (JS) — both within +/-2%. If you change `htmlToText` regex order or normalize rules, rerun and update both sides; the JS baseline lives inline in `test/epub-adapter.test.mjs`.
 ---
+
+## 2026-05-07 - US-016
+- Phase 2 (P1): EPUB file-picker UI on web + RN.
+- Files added/changed:
+  - `index.html`: added `.epub-row` with hidden `<input type="file" accept=".epub,application/epub+zip">` triggered via a `Pick EPUB` label, plus `#epub-status` for chapter/word feedback.
+  - `src/app.js`: imports `importDocument` from `src/importers/index.js`. New `loadEpubFile(event)` reads the picked file as ArrayBuffer, runs `importDocument({kind:'epub'})`, populates `currentDocument` + `els.textInput.value`, refreshes tokens, and reports `<title> | N chapters, M words.` (or a clear error). Hooked via `els.epubInput.addEventListener("change", ...)`.
+  - `styles.css`: added `.epub-row` flex layout with cursor:pointer for the file-picker label.
+  - `components/fast-read-screen.jsx`: imports `expo-document-picker`. New `handlePickEpub` callback opens `DocumentPicker.getDocumentAsync({type:["application/epub+zip"]})`, fetches the asset URI as ArrayBuffer, runs `importDocument({kind:'epub'})`, and calls `onAddArticle(flatText, document.title, document.author, null, { document })`. SourceScreen UI gains a `Pick EPUB` row above Recent sources; the existing beam loading state covers it.
+  - `package.json` / `bun.lock`: added `expo-document-picker@^55.0.13` (via `bun add expo-document-picker`).
+  - `test/epub-flow.test.mjs` (new): 3 tests — Pride and Prejudice fixture builds a library item with tokens > 0 and includes the chapter sentence; 道德經 fixture builds a 3-chapter zh-Hant library item; non-EPUB ArrayBuffer surfaces a typed error from `importDocument({kind:'epub'})`.
+- `npm test` passes (74 tests; 3 new).
+- Manual browser verification needed: dev-browser tooling for Expo web is not available in this worktree. The web flow is wired through `index.html` + `src/app.js` and exercised by the same `importDocument({kind:'epub'})` code path that `test/epub-flow.test.mjs` covers; manual verification of the file picker and status string in a real browser remains a TODO.
+- **Learnings for future iterations:**
+  - On RN, `expo-document-picker` returns assets with a `uri` (often a `file://` cache path); the simplest cross-platform read is `await fetch(uri).then(r => r.arrayBuffer())`. This works on iOS/Android/web inside Expo without pulling in `expo-file-system`.
+  - The hidden-file-input + label pattern (`<input id=".." hidden /><label for=".." class="text-button">Pick EPUB</label>`) is the cleanest way to style a file picker without losing native click-to-open semantics. Don't use a `<button>` that calls `.click()` — labels are accessible by default.
+  - `addArticle` in `components/fast-read-screen.jsx` already accepts an `opts.document`, so the EPUB path reuses it: `onAddArticle(flatText, title, source, null, { document })`. Future P2 importers (PDF) can follow the same call shape.
+  - `importDocument({kind:'epub'})` throws on garbage input (zip-magic check fails inside `readEpubEntries`), which the UI maps to a `Could not read that EPUB.` user-facing message. Future error states (chapter-extraction returns zero text) are covered by the explicit `flatText.trim()` check — both flows show a clear error.
+---

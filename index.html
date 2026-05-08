@@ -32,6 +32,11 @@
             <button id="load-url" class="text-button" type="submit">Load</button>
           </form>
           <p id="url-status" class="url-status" role="status"></p>
+          <div class="epub-row">
+            <label for="epub-input" class="text-button" id="epub-label">Pick EPUB</label>
+            <input id="epub-input" type="file" accept=".epub,application/epub+zip" hidden />
+            <span id="epub-status" class="url-status" role="status"></span>
+          </div>
           <textarea id="text-input" spellcheck="false" placeholder="Paste an article, memo, or transcript here."></textarea>
           <label class="toggle">
             <input id="punctuation-pause" type="checkbox" checked />
