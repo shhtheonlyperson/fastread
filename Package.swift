@@ -13,8 +13,16 @@ let package = Package(
         .executable(name: "FastReadCoreVerifier", targets: ["FastReadCoreVerifier"]),
         .executable(name: "FastReadPerformanceVerifier", targets: ["FastReadPerformanceVerifier"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19"),
+    ],
     targets: [
-        .target(name: "FastReadCore"),
+        .target(
+            name: "FastReadCore",
+            dependencies: [
+                .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+            ]
+        ),
         .executableTarget(
             name: "FastReadCoreVerifier",
             dependencies: ["FastReadCore"],
