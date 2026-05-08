@@ -7,9 +7,7 @@ public final class ReadingStore: ObservableObject {
     @Published public var articles: [ReadingArticle]
     @Published public var selectedArticleID: String?
     @Published public var stats: ReadingStats
-    @Published public var wpm: Double {
-        didSet { persistSettings() }
-    }
+    @Published public private(set) var wpm: Double
     @Published public var punctuationPause: Bool {
         didSet { persistSettings() }
     }
@@ -21,6 +19,7 @@ public final class ReadingStore: ObservableObject {
 
     private var playbackTask: Task<Void, Never>?
     private var tokenCache: [String: TokenCacheEntry] = [:]
+    private var documentMetadataCache: [String: DocumentMetadataCacheEntry] = [:]
     private let defaults: UserDefaults
 
     public var currentArticle: ReadingArticle? {
@@ -84,7 +83,7 @@ public final class ReadingStore: ObservableObject {
         self.articles = loadedArticles
         self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle)
         self.stats = Self.loadStats(from: defaults)
-        self.wpm = settings.wpm
+        self.wpm = Self.normalizedWPM(settings.wpm)
         self.punctuationPause = settings.punctuationPause
         self.focusIndicator = settings.focusIndicator
 
@@ -115,7 +114,11 @@ public final class ReadingStore: ObservableObject {
     }
 
     public func setWPM(_ value: Double) {
-        wpm = RSVPEngine.clamp(value, min: 150, max: 1_000)
+        updateWPM(value, persist: true)
+    }
+
+    public func previewWPM(_ value: Double) {
+        updateWPM(value, persist: false)
     }
 
     public func wordCount(for article: ReadingArticle) -> Int {
@@ -162,13 +165,13 @@ public final class ReadingStore: ObservableObject {
     }
 
     public func currentSectionBoundaries() -> [Document.SectionBoundary] {
-        guard let document = currentArticle?.document else { return [] }
-        return Document.sectionBoundaries(document)
+        guard let currentArticle else { return [] }
+        return documentMetadata(for: currentArticle).boundaries
     }
 
     public func currentFrontMatterDetection() -> Document.FrontMatterDetection? {
-        guard let document = currentArticle?.document else { return nil }
-        return Document.detectFrontMatter(document)
+        guard let currentArticle else { return nil }
+        return documentMetadata(for: currentArticle).frontMatter
     }
 
     public func setIndex(_ index: Int) {
@@ -285,6 +288,7 @@ public final class ReadingStore: ObservableObject {
 
         articles.remove(at: deletedIndex)
         tokenCache.removeValue(forKey: id)
+        documentMetadataCache.removeValue(forKey: id)
 
         if deletedSelectedArticle {
             selectedArticleID = articles.indices.contains(deletedIndex)
@@ -315,6 +319,22 @@ public final class ReadingStore: ObservableObject {
             }
             guard !Task.isCancelled else { return }
             self?.advanceFromTimer()
+        }
+    }
+
+    private func updateWPM(_ value: Double, persist: Bool) {
+        let next = Self.normalizedWPM(value)
+        guard next != wpm else {
+            if persist { persistSettings() }
+            return
+        }
+        let wasPlaying = isPlaying
+        wpm = next
+        if persist {
+            persistSettings()
+        }
+        if wasPlaying {
+            scheduleNext()
         }
     }
 
@@ -448,7 +468,7 @@ public final class ReadingStore: ObservableObject {
             let payload = try? JSONDecoder().decode(SettingsPayload.self, from: data)
         else {
             return SettingsPayload(
-                wpm: 540,
+                wpm: 550,
                 punctuationPause: true,
                 focusIndicator: .dot
             )
@@ -539,6 +559,11 @@ public final class ReadingStore: ObservableObject {
         return max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: words, wpm: wpm))))
     }
 
+    private static func normalizedWPM(_ value: Double) -> Double {
+        let clamped = RSVPEngine.clamp(value, min: 300, max: 1_000)
+        return (Double(((clamped - 300) / 25).rounded()) * 25) + 300
+    }
+
     private func tokens(for article: ReadingArticle) -> [String] {
         if let cached = tokenCache[article.id], cached.text == article.text {
             return cached.tokens
@@ -549,6 +574,21 @@ public final class ReadingStore: ObservableObject {
         }
         tokenCache[article.id] = TokenCacheEntry(text: article.text, tokens: tokens)
         return tokens
+    }
+
+    private func documentMetadata(for article: ReadingArticle) -> DocumentMetadataCacheEntry {
+        if let cached = documentMetadataCache[article.id] {
+            return cached
+        }
+        let metadata = PerformanceTrace.measure("Build Document Metadata") {
+            let boundaries = Document.sectionBoundaries(article.document)
+            return DocumentMetadataCacheEntry(
+                boundaries: boundaries,
+                frontMatter: Document.detectFrontMatter(article.document, boundaries: boundaries)
+            )
+        }
+        documentMetadataCache[article.id] = metadata
+        return metadata
     }
 
     private static func makeLede(from text: String, tokens: [String]) -> String {
@@ -606,10 +646,14 @@ private struct TokenCacheEntry {
     public var tokens: [String]
 }
 
+private struct DocumentMetadataCacheEntry {
+    public var boundaries: [Document.SectionBoundary]
+    public var frontMatter: Document.FrontMatterDetection
+}
+
 private enum StorageKey {
     static let settings = "justread.settings.v1"
     static let articles = "justread.articles.v1"
     static let stats = "justread.stats.v1"
     static let selectedArticle = "justread.selectedArticle.v1"
 }
-

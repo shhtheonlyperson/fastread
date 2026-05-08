@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: ReadingStore
     @Environment(\.openURL) private var openURL
+    @State private var paceDraft: Double?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -50,17 +51,27 @@ struct SettingsView: View {
             VStack(spacing: 2) {
                 Slider(
                     value: Binding(
-                        get: { store.wpm },
-                        set: { store.setWPM($0) }
+                        get: { paceDraft ?? store.wpm },
+                        set: { value in
+                            let next = snappedWPM(value)
+                            paceDraft = next
+                            store.previewWPM(next)
+                        }
                     ),
-                    in: 150...1_000
+                    in: 300...1_000,
+                    onEditingChanged: { isEditing in
+                        if !isEditing {
+                            store.setWPM(paceDraft ?? store.wpm)
+                            paceDraft = nil
+                        }
+                    }
                 )
                 .tint(JRColor.terracotta)
 
                 HStack {
-                    Text("Slow · 150")
+                    Text("Slow · 300")
                     Spacer()
-                    Text("Comfortable · 500")
+                    Text("Comfortable · 650")
                     Spacer()
                     Text("Sprint · 1000")
                 }
@@ -116,6 +127,11 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private func snappedWPM(_ value: Double) -> Double {
+        let clamped = RSVPEngine.clamp(value, min: 300, max: 1_000)
+        return (Double(((clamped - 300) / 25).rounded()) * 25) + 300
     }
 
     private var appVersion: String {

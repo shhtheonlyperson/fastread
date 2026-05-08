@@ -60,16 +60,14 @@ public struct Document: Codable, Equatable, Sendable {
     public static func sectionBoundaries(_ document: Document) -> [SectionBoundary] {
         var boundaries: [SectionBoundary] = []
         var cursor = 0
-        var runningText = ""
-        for (i, section) in document.sections.enumerated() {
-            let prefix = i == 0 ? "" : "\n\n"
-            let candidate = runningText + prefix + section.text
-            let tokensSoFar = RSVPEngine.tokenize(candidate).count
+        boundaries.reserveCapacity(document.sections.count)
+        for section in document.sections {
+            let tokenCount = RSVPEngine.tokenize(section.text).count
+            let tokenEnd = cursor + tokenCount
             boundaries.append(
-                SectionBoundary(sectionId: section.id, tokenStart: cursor, tokenEnd: tokensSoFar)
+                SectionBoundary(sectionId: section.id, tokenStart: cursor, tokenEnd: tokenEnd)
             )
-            cursor = tokensSoFar
-            runningText = candidate
+            cursor = tokenEnd
         }
         return boundaries
     }
@@ -123,6 +121,10 @@ public struct Document: Codable, Equatable, Sendable {
     private static let frontMatterShortUnits: Int = 500
 
     public static func detectFrontMatter(_ document: Document) -> FrontMatterDetection {
+        detectFrontMatter(document, boundaries: sectionBoundaries(document))
+    }
+
+    public static func detectFrontMatter(_ document: Document, boundaries: [SectionBoundary]) -> FrontMatterDetection {
         let empty = FrontMatterDetection(
             firstChapterSectionIndex: nil,
             firstChapterTokenIndex: 0,
@@ -130,7 +132,6 @@ public struct Document: Codable, Equatable, Sendable {
             totalTokens: 0
         )
         guard !document.sections.isEmpty else { return empty }
-        let boundaries = sectionBoundaries(document)
         let totalTokens = boundaries.last?.tokenEnd ?? 0
         if totalTokens == 0 { return empty }
 

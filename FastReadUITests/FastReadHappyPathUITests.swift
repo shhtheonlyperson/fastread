@@ -56,10 +56,12 @@ final class FastReadHappyPathUITests: XCTestCase {
 
         let contentsButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Contents'")).firstMatch
         XCTAssertTrue(contentsButton.waitForExistence(timeout: 5), "Contents header button missing")
+        let tocStart = Date()
         contentsButton.tap()
 
         let drawerTitle = app.staticTexts["Contents"].firstMatch
-        XCTAssertTrue(drawerTitle.waitForExistence(timeout: 5), "TOC drawer did not present")
+        XCTAssertTrue(drawerTitle.waitForExistence(timeout: 1.5), "TOC drawer did not present responsively")
+        XCTAssertLessThan(Date().timeIntervalSince(tocStart), 1.5, "TOC drawer presentation should stay under 1.5s")
 
         // After SKIP we are sitting on chapter 01, so tap a different chapter row
         // so the playhead clearly moves when the drawer dismisses.

@@ -171,11 +171,13 @@ final class ReadingStoreTests: XCTestCase {
     func testSetWPMClampsToBounds() {
         let store = makeStore()
         store.setWPM(50)
-        XCTAssertEqual(store.wpm, 150)
+        XCTAssertEqual(store.wpm, 300)
         store.setWPM(99_999)
         XCTAssertEqual(store.wpm, 1_000)
         store.setWPM(450)
         XCTAssertEqual(store.wpm, 450)
+        store.setWPM(463)
+        XCTAssertEqual(store.wpm, 475)
     }
 
     func testSettingsRoundTripThroughUserDefaults() {
@@ -187,9 +189,27 @@ final class ReadingStoreTests: XCTestCase {
         }
 
         let reborn = makeStore()
-        XCTAssertEqual(reborn.wpm, 620)
+        XCTAssertEqual(reborn.wpm, 625)
         XCTAssertEqual(reborn.punctuationPause, false)
         XCTAssertEqual(reborn.focusIndicator, .crosshair)
+    }
+
+    func testPreviewWPMDoesNotPersistUntilCommitted() {
+        do {
+            let store = makeStore()
+            store.setWPM(500)
+            store.previewWPM(720)
+            XCTAssertEqual(store.wpm, 725)
+        }
+
+        XCTAssertEqual(makeStore().wpm, 500)
+
+        do {
+            let store = makeStore()
+            store.setWPM(720)
+        }
+
+        XCTAssertEqual(makeStore().wpm, 725)
     }
 
     func testArticlesPersistAcrossInstances() {

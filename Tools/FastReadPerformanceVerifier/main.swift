@@ -92,6 +92,30 @@ measure("compute 20k context windows", budget: 35) {
     expect(total > 0, "context windows should be non-empty for long articles")
 }
 
+let sectionedDocument = Document(
+    title: "TOC performance fixture",
+    author: "JustRead",
+    sections: (0..<1_200).map { index in
+        Section(
+            id: "section-\(index)",
+            title: "Chapter \(index)",
+            kind: .chapter,
+            text: "Chapter \(index) " + makeLongArticle(wordCount: 60)
+        )
+    }
+)
+
+let tocBoundaries = measure("build 1200 section boundaries", budget: 180) {
+    Document.sectionBoundaries(sectionedDocument)
+}
+expect(tocBoundaries.count == 1_200, "TOC boundary count should match document sections")
+expect(tocBoundaries.last?.tokenEnd == RSVPEngine.tokenize(Document.flattenText(sectionedDocument)).count, "TOC token boundaries should match flattened document tokens")
+
+let frontMatter = measure("detect front matter with cached boundaries", budget: 20) {
+    Document.detectFrontMatter(sectionedDocument, boundaries: tocBoundaries)
+}
+expect(frontMatter.totalTokens == tocBoundaries.last?.tokenEnd, "front matter detection should reuse the supplied boundaries")
+
 measure("simulate 20k cached playback ticks", budget: 250) {
     var index = 0
     var totalDuration = 0
@@ -120,11 +144,11 @@ expect(extracted.contains("Paragraph 7999"), "HTML extractor should preserve lat
 expect(!extracted.contains("window.bad"), "HTML extractor should remove script content")
 
 measure("apply 20k WPM slider updates", budget: 25) {
-    var value = 540.0
+    var value = 550.0
     for index in 0..<20_000 {
-        value = RSVPEngine.clamp(150 + Double(index % 850) + 0.42, min: 150, max: 1_000)
+        value = RSVPEngine.clamp(300 + Double(index % 700) + 0.42, min: 300, max: 1_000)
     }
-    expect(value > 150, "WPM updates should preserve continuous values")
+    expect(value > 300, "WPM updates should preserve continuous values")
 }
 
 print("FastReadPerformanceVerifier passed")

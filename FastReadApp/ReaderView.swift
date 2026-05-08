@@ -3,6 +3,7 @@ import SwiftUI
 struct ReaderView: View {
     @EnvironmentObject private var store: ReadingStore
     @State private var isTocOpen = false
+    @State private var paceDraft: Double?
     let onBack: () -> Void
     let onFocus: () -> Void
 
@@ -39,26 +40,12 @@ struct ReaderView: View {
             }
         }
         .background(JRColor.paper)
-        .sheet(isPresented: $isTocOpen) {
-            TocDrawerView(
-                isOpen: $isTocOpen,
-                sections: store.currentArticle?.document.sections ?? [],
-                boundaries: store.currentSectionBoundaries(),
-                frontMatter: frontMatter,
-                wordIndex: store.currentIndex,
-                onSelect: { tokenIndex in
-                    store.jumpToToken(tokenIndex)
-                    isTocOpen = false
-                },
-                onSkipFrontMatter: {
-                    if let fm = frontMatter, fm.hasSkippableFrontMatter {
-                        store.jumpToToken(fm.firstChapterTokenIndex)
-                    }
-                    isTocOpen = false
-                }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+        .overlay(alignment: .bottom) {
+            if isTocOpen {
+                tocOverlay
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .zIndex(20)
+            }
         }
         .onDisappear {
             if store.currentTokens.isEmpty {
@@ -95,6 +82,56 @@ struct ReaderView: View {
                 .stroke(JRColor.terracotta.opacity(0.22), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var tocOverlay: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.18)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        closeToc()
+                    }
+
+                TocDrawerView(
+                    isOpen: $isTocOpen,
+                    sections: store.currentArticle?.document.sections ?? [],
+                    boundaries: store.currentSectionBoundaries(),
+                    frontMatter: frontMatter,
+                    wordIndex: store.currentIndex,
+                    onSelect: { tokenIndex in
+                        store.jumpToToken(tokenIndex)
+                        closeToc()
+                    },
+                    onSkipFrontMatter: {
+                        if let fm = frontMatter, fm.hasSkippableFrontMatter {
+                            store.jumpToToken(fm.firstChapterTokenIndex)
+                        }
+                        closeToc()
+                    }
+                )
+                .frame(maxHeight: min(proxy.size.height - 16, max(proxy.size.height * 0.82, 420)))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(JRColor.rule, lineWidth: 1)
+                )
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    private func closeToc() {
+        withAnimation(.easeOut(duration: 0.12)) {
+            isTocOpen = false
+        }
+    }
+
+    private func snappedWPM(_ value: Double) -> Double {
+        let clamped = RSVPEngine.clamp(value, min: 300, max: 1_000)
+        return (Double(((clamped - 300) / 25).rounded()) * 25) + 300
     }
 
     private var emptyReader: some View {
@@ -140,7 +177,11 @@ struct ReaderView: View {
                 Spacer()
 
                 if let document = store.currentArticle?.document, document.sections.count > 1 {
-                    Button(action: { isTocOpen = true }) {
+                    Button(action: {
+                        withAnimation(.easeOut(duration: 0.14)) {
+                            isTocOpen = true
+                        }
+                    }) {
                         HStack(spacing: 6) {
                             SectionLabel(text: "Contents")
                             Image(systemName: "list.bullet")
@@ -267,17 +308,27 @@ struct ReaderView: View {
 
             Slider(
                 value: Binding(
-                    get: { store.wpm },
-                    set: { store.setWPM($0) }
+                    get: { paceDraft ?? store.wpm },
+                    set: { value in
+                        let next = snappedWPM(value)
+                        paceDraft = next
+                        store.previewWPM(next)
+                    }
                 ),
-                in: 150...1_000
+                in: 300...1_000,
+                onEditingChanged: { isEditing in
+                    if !isEditing {
+                        store.setWPM(paceDraft ?? store.wpm)
+                        paceDraft = nil
+                    }
+                }
             )
             .tint(JRColor.terracotta)
 
             HStack {
-                Text("150")
+                Text("300")
                 Spacer()
-                Text("500")
+                Text("650")
                 Spacer()
                 Text("1000")
             }
