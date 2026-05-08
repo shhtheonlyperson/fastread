@@ -4,7 +4,7 @@ import Foundation
 import FoundationNetworking
 #endif
 
-public enum ArticleFetchError: LocalizedError, Equatable {
+public enum ArticleFetchError: LocalizedError, Equatable, Sendable {
     case invalidURL
     case httpError(Int)
     case oversized
@@ -27,7 +27,7 @@ public enum ArticleFetchError: LocalizedError, Equatable {
     }
 }
 
-public struct ArticleFetchResult: Equatable {
+public struct ArticleFetchResult: Equatable, Sendable {
     public var title: String
     public var source: String
     public var url: String
