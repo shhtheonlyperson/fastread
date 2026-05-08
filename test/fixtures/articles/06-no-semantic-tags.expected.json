@@ -1,7 +1,0 @@
-{
-  "title": "Notes on Tooling",
-  "source": "entry-content",
-  "wordCount": 113,
-  "head": "Notes on Tooling\n\nGood tools disappear in the hand. They feel like an extension of intent rather than a separate thing that needs to be operated, and you only notice them when something forces you out",
-  "tail": ".\n\nDesigners of small utilities should aim for the first kind. Make the common path quiet, even if that means the rare path is noisy, because the common path is where the user's life actually happens."
-}
