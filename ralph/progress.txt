@@ -1,0 +1,28 @@
+# Ralph Progress Log
+Started: Thu May  7 22:42:30 PDT 2026
+
+## Codebase Patterns
+- Tests use `node --test` with `node:test` and `node:assert/strict` (.test.mjs files in `test/`).
+- `src/article-extract.js` exports `extractArticle(html, sourceUrl)` returning `{ title, url, text, wordCount, source }`.
+- `extractArticle` candidate `source` values: `entry-content`, `main`, `article`, `main-element`, `json-ld`, `body`, `none`. Plain-text input is not an HTML path; tests treat `.txt` separately and produce a synthetic `source: "plaintext"`.
+- `countReadingUnits` (from `src/reader-core.js`) is the canonical word/CJK-unit counter. Use it for any token-count assertion.
+- Class-based selectors recognized: `entry-content`, `wp-block-post-content`, `post-content`, `article-content`, `article__content`, `article-body`, `story-body` (priority 80, beats `<article>`/`<main>`).
+---
+
+## 2026-05-07 - US-001
+- Implemented Phase 0 HTML/text golden-fixture corpus and JS snapshot test.
+- Files added:
+  - `test/fixtures/articles/01-clean-article.html` + `.expected.json` (clean `<article>`)
+  - `test/fixtures/articles/02-jsonld-article.html` + `.expected.json` (JSON-LD articleBody)
+  - `test/fixtures/articles/03-cjk-article.html` + `.expected.json` (Traditional Chinese, `entry-content`)
+  - `test/fixtures/articles/04-paywalled-chrome.html` + `.expected.json` (heavy nav/aside/footer, `<article>`)
+  - `test/fixtures/articles/05-plaintext.txt` + `.expected.json` (plain text path)
+  - `test/fixtures/articles/06-no-semantic-tags.html` + `.expected.json` (no `<article>`/`<main>`, uses `article-body` class)
+  - `test/article-extract.golden.test.mjs`
+- `npm test` passes (27 tests, including 6 new golden tests).
+- **Learnings for future iterations:**
+  - `extractArticle` already handles class-based selectors before falling back to `<article>`/`<main>`. Fixture #6 (no semantic tags) still works via the `article-body` class match — keep this in mind when planning HtmlAdapter (US-008).
+  - The fixture format is `{ title, source, wordCount, head: first 200 chars, tail: last 200 chars }`. Future Document-shape work (US-008) should keep `flattenText(document)` byte-equal to today's `extractArticle(...).text` so these fixtures keep passing.
+  - To regenerate baselines after intentional changes, run a small inline script that reads each `.html`/`.txt` and writes the sibling `.expected.json` (see commit for the one-off script pattern).
+  - Golden test file iterates `test/fixtures/articles/` at module load and emits one `test()` per fixture; failures attach a JSON diff to the assertion error message.
+---
