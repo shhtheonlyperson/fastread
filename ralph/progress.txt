@@ -12,6 +12,8 @@ Started: Thu May  7 22:42:30 PDT 2026
 - Swift `ArticleLoader.fetch(urlString:session:maxBytes:)` lives in `Sources/FastReadCore/UrlIngest.swift` and accepts a `URLDataFetching`-conforming session (URLSession by default). Tests inject `URLSession(configuration: ephemeral)` with a `URLProtocol` stub.
 - `Sources/FastReadCore/*.swift` files are compiled into both the SwiftPM `FastReadCore` library AND the FastReadApp Xcode target directly (not as a module dependency). When adding a new file under `Sources/FastReadCore/`, also add it to `FastRead.xcodeproj/project.pbxproj` in 4 places: PBXBuildFile, PBXFileReference, the FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase files list.
 - Swift 6 strict concurrency: static mutable shared state in tests (e.g. URLProtocol stub handler) needs `nonisolated(unsafe)` plus an `NSLock` guard, since the test target compiles with concurrency checks on.
+- `ReadingArticle` (Swift) lives in `Sources/FastReadCore/ReadingArticle.swift` as a `public` Codable struct with an explicit `public init`. The Xcode app target compiles it directly via pbxproj; FastReadApp call sites do NOT need `import FastReadCore`. Required (non-optional) fields: id, title, source, author, date, readTime, lede, tag, text, progress, wordIndex, timesOpened, isFinished. Optional date fields: sourceURL, createdAt, lastOpenedAt, finishedAt — older v0 JSON omits these.
+- The JS persisted root shape (see `setItemAsync`/`getItemAsync` in `components/fast-read-screen.jsx`) is `{ library, articleId, wordIndex, wpm, ... }`: `wordIndex` and `isFinished`-equivalents live on the wrapper, not on each library item. Each library item itself uses `tagKey` (not `tag`).
 ---
 
 ## 2026-05-07 - US-001
@@ -76,4 +78,21 @@ Started: Thu May  7 22:42:30 PDT 2026
   - `URLError(.timedOut)` thrown from a stub's `startLoading` propagates back through `URLSession.data(for:)` as a thrown `URLError` — map both `.timedOut` and `.cancelled` URLError codes to `ArticleFetchError.timeout`.
   - Both content-length and post-read body size checks are needed: tests cover both "Content-Length declares > maxBytes with tiny body" (header pre-check) and "Content-Length absent/wrong but body itself > maxBytes" (post-check).
   - Removed `unreadable`/minWords from the fetcher to match JS taxonomy. The UI-level minWords check (20) lives in `AddSourceView.fetchURL` so behavior stays identical from the user's POV.
+---
+
+## 2026-05-07 - US-005
+- Storage round-trip tests for ReadingArticle (Swift) and library item (JS).
+- Files added/changed:
+  - `Sources/FastReadCore/ReadingArticle.swift` (new): public Codable struct moved out of `FastReadApp/Models.swift` so the SwiftPM test target can import it via `@testable import FastReadCore`.
+  - `FastReadApp/Models.swift`: deleted the old internal `ReadingArticle` (now provided by FastReadCore, compiled into the app target via the existing pbxproj wiring).
+  - `FastRead.xcodeproj/project.pbxproj`: registered `ReadingArticle.swift` in PBXBuildFile, PBXFileReference, FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase.
+  - `Tests/Fixtures/legacy-article-v0.json` (new): v0 snapshot of a saved article omitting optional date fields (sourceURL, createdAt, lastOpenedAt, finishedAt all absent).
+  - `Tests/FastReadCoreTests/ReadingArticleCodableTests.swift` (new): 3 tests — full round-trip preserving every field, nil-optional round-trip, and v0 fixture decode.
+  - `test/library-storage.test.mjs` (new): 3 tests — full library item round-trip via `JSON.parse(JSON.stringify(...))`, finished-item edge fields, and a multi-item wrapper that mirrors the persisted shape (`{ library, articleId, wordIndex, wpm }`).
+- `swift test` (22 tests passing), `npm test` (42 passing), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - `ReadingArticle` now lives in `Sources/FastReadCore/ReadingArticle.swift` as a `public` Codable struct. The Xcode app target compiles the same file directly (via pbxproj), so app code keeps referencing `ReadingArticle` without an `import FastReadCore`. Future Document/Section types (US-007) should follow the same pattern: define in FastReadCore as `public`, register in pbxproj 4 places, and skip imports inside the app.
+  - Required (non-optional) fields on `ReadingArticle` — `tag`, `isFinished`, `progress`, `wordIndex`, `timesOpened`, `text`, `lede`, `readTime`, `date`, `author`, `source`, `id`, `title` — must all be present in any persisted JSON or `JSONDecoder` will throw. Optional date fields (`sourceURL`, `createdAt`, `lastOpenedAt`, `finishedAt`) may be omitted. Keep this in mind when changing the schema in Phase 1 (Document migration): adding a new non-optional field would break v0 fixture decoding.
+  - The JS library item shape uses `tagKey` (not `tag`), and `addArticle` does not set a top-level `wordIndex` or `isFinished` — those live on the wrapper alongside `library` (e.g. `{ library, articleId, wordIndex, wpm, ... }`). Mirror this when writing migration code: Swift has `wordIndex`/`isFinished` on the article; JS has them on the persisted root.
+  - `Bundle.module.url(forResource:withExtension:subdirectory:)` with `subdirectory: "Fixtures"` (matching the SwiftPM `.copy("Fixtures")` resource) is the canonical way to load fixtures from `Tests/Fixtures/` — already used by `ParityTests`; reused here for the v0 fixture.
 ---
