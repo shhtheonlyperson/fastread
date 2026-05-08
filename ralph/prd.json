@@ -146,7 +146,7 @@
         "npm test and swift test pass"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
