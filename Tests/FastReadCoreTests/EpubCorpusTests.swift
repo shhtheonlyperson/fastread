@@ -1,0 +1,93 @@
+import XCTest
+@testable import FastReadCore
+
+// Walks a directory of real EPUBs and asserts every file imports cleanly.
+//
+// Gated by FASTREAD_RUN_EPUB_CORPUS=1 — keeps the default `swift test` run
+// fast and CI-safe. Default path is the local local EPUB export at
+// ~/proj/local-epub/exports/all; override with FASTREAD_EPUB_CORPUS_DIR.
+// Cap iteration with FASTREAD_EPUB_CORPUS_LIMIT.
+//
+// For each *.epub:
+//   1. EpubImporter().import succeeds
+//   2. Document has at least one section with non-empty text
+//   3. flattenText + tokenize produces > 50 reading units
+//
+// Failures are aggregated into a single XCTFail so a noisy file doesn't
+// hide the others.
+final class EpubCorpusTests: XCTestCase {
+    private static let env = ProcessInfo.processInfo.environment
+    private static let enabled = env["FASTREAD_RUN_EPUB_CORPUS"] == "1"
+    private static let corpusDir: String = {
+        if let override = env["FASTREAD_EPUB_CORPUS_DIR"], !override.isEmpty {
+            return (override as NSString).expandingTildeInPath
+        }
+        return (NSHomeDirectory() as NSString).appendingPathComponent("proj/local-epub/exports/all")
+    }()
+    private static let limit: Int = {
+        if let raw = env["FASTREAD_EPUB_CORPUS_LIMIT"], let n = Int(raw), n > 0 {
+            return n
+        }
+        return Int.max
+    }()
+
+    private struct CorpusFailure {
+        let name: String
+        let reason: String
+    }
+
+    func testEveryEpubImportsAsNonEmptyDocument() throws {
+        try XCTSkipUnless(Self.enabled, "Set FASTREAD_RUN_EPUB_CORPUS=1 to run.")
+        let fileManager = FileManager.default
+        var isDir: ObjCBool = false
+        try XCTSkipUnless(
+            fileManager.fileExists(atPath: Self.corpusDir, isDirectory: &isDir) && isDir.boolValue,
+            "Corpus directory not found at \(Self.corpusDir)"
+        )
+
+        let dirURL = URL(fileURLWithPath: Self.corpusDir)
+        let allFiles = try fileManager.contentsOfDirectory(at: dirURL, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension.lowercased() == "epub" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        XCTAssertGreaterThan(allFiles.count, 0, "expected at least one .epub under \(Self.corpusDir)")
+
+        let files = Array(allFiles.prefix(Self.limit))
+        var failures: [CorpusFailure] = []
+        let importer = EpubImporter()
+
+        for url in files {
+            let name = url.lastPathComponent
+            do {
+                let data = try Data(contentsOf: url)
+                let doc = try importer.import(data: data, options: ImportOptions())
+                if doc.sourceKind != "epub" {
+                    failures.append(.init(name: name, reason: "sourceKind=\(doc.sourceKind)"))
+                    continue
+                }
+                if doc.sections.isEmpty {
+                    failures.append(.init(name: name, reason: "no sections"))
+                    continue
+                }
+                let nonEmpty = doc.sections.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                if nonEmpty.isEmpty {
+                    failures.append(.init(name: name, reason: "all sections empty"))
+                    continue
+                }
+                let units = RSVPEngine.countReadingUnits(Document.flattenText(doc))
+                if units < 50 {
+                    failures.append(.init(name: name, reason: "only \(units) reading units"))
+                    continue
+                }
+            } catch {
+                failures.append(.init(name: name, reason: "\(error)"))
+            }
+        }
+
+        if !failures.isEmpty {
+            let detail = failures.map { "  - \($0.name): \($0.reason)" }.joined(separator: "\n")
+            XCTFail("\(failures.count)/\(files.count) EPUB(s) failed import:\n\(detail)")
+        } else {
+            print("epub-corpus: \(files.count) EPUB(s) under \(Self.corpusDir) all imported cleanly.")
+        }
+    }
+}

@@ -1,7 +1,6 @@
 {
-  "title": "",
-  "source": "plaintext",
-  "wordCount": 133,
-  "head": "A short note on attention.\n\nAttention is a finite resource that must be replenished, much like physical strength or working memory capacity. When we treat it as unlimited we end every day depleted, an",
-  "tail": "is one way to practice this discipline. It forces you to notice when your mind has slipped away from the page, and it gives you a chance to bring it back before the meaning of the paragraph dissolves."
+  "head" : "A short note on attention. Attention is a finite resource that must be replenished, much like physical strength or working memory capacity. When we treat it as unlimited we end every day depleted, and",
+  "tail" : "is one way to practice this discipline. It forces you to notice when your mind has slipped away from the page, and it gives you a chance to bring it back before the meaning of the paragraph dissolves.",
+  "title" : "",
+  "wordCount" : 133
 }
