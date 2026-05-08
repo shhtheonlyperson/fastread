@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { extractArticle } from "../src/article-extract.js";
+import { fetchAndExtract } from "../src/url-ingest.js";
 import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, rangeValueFromPageX, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
@@ -539,26 +540,23 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
-      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only http and https URLs are supported.");
-      const response = await fetch(parsed.toString(), {
-        headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2" },
+      const { article, finalUrl } = await fetchAndExtract({
+        url: trimmed,
+        fetcher: fetch,
+        maxBytes: MAX_HTML_BYTES,
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`Fetch failed with HTTP ${response.status}.`);
-      const length = Number(response.headers.get("content-length") || 0);
-      if (length > MAX_HTML_BYTES) throw new Error("Page is too large to extract.");
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType && !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
-        throw new Error(`Unsupported content type: ${contentType}.`);
-      }
-      const html = await response.text();
-      if (html.length > MAX_HTML_BYTES) throw new Error("Page is too large to extract.");
-      const article = extractArticle(html, response.url || parsed.toString());
       if (!article.text || article.wordCount < 20) throw new Error("Could not find enough readable text on that page.");
-      onAddArticle(article.text, article.title || parsed.host, parsed.host, response.url || parsed.toString());
+      const finalParsed = new URL(finalUrl);
+      onAddArticle(article.text, article.title || finalParsed.host, finalParsed.host, finalUrl);
     } catch (error) {
-      setStatus(error.name === "AbortError" ? "Fetch timed out." : error.message || "Could not load that URL.");
+      const friendly =
+        error?.name === "TimeoutError" || error?.name === "AbortError"
+          ? "Fetch timed out."
+          : error?.name === "OversizedError"
+            ? "Page is too large to extract."
+            : error?.message || "Could not load that URL.";
+      setStatus(friendly);
     } finally {
       clearTimeout(timeout);
       setLoading(false);
