@@ -11,14 +11,21 @@ import XCTest
 // Skipped if the EPUB is not present so CI and other machines stay green.
 // Override the path via FASTREAD_E2E_EPUB.
 final class EpubE2ETests: XCTestCase {
+    // Default location is the iCloud Drive "books" folder. Reading anything
+    // under ~/Library/Mobile Documents/ requires the test runner's process
+    // (Terminal, Xcode, etc.) to have Files-and-Folders access for iCloud
+    // Drive — System Settings → Privacy & Security → Files and Folders.
+    // Without the grant, FileManager returns "operation not permitted" and
+    // the e2e suite skips with a hint.
     private static let defaultPath: String = {
         if let override = ProcessInfo.processInfo.environment["FASTREAD_E2E_EPUB"], !override.isEmpty {
             return (override as NSString).expandingTildeInPath
         }
-        return (NSHomeDirectory() as NSString).appendingPathComponent("proj/readmoo/exports/all/房思琪的初戀樂園.epub")
+        return (NSHomeDirectory() as NSString)
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/books/房思琪的初戀樂園.epub")
     }()
 
-    private static let epubAvailable: Bool = FileManager.default.fileExists(atPath: defaultPath)
+    private static let epubAvailable: Bool = FileManager.default.isReadableFile(atPath: defaultPath)
 
     private func loadDocument(file: StaticString = #filePath, line: UInt = #line) throws -> Document {
         let url = URL(fileURLWithPath: Self.defaultPath)
@@ -27,7 +34,14 @@ final class EpubE2ETests: XCTestCase {
     }
 
     private func skipIfMissing() throws {
-        try XCTSkipUnless(Self.epubAvailable, "EPUB not found at \(Self.defaultPath); set FASTREAD_E2E_EPUB to override.")
+        try XCTSkipUnless(
+            Self.epubAvailable,
+            """
+            EPUB not readable at \(Self.defaultPath).
+            • If the path looks right but the file is unreadable, the test runner is missing Files-and-Folders access for iCloud Drive — grant it in System Settings → Privacy & Security → Files and Folders.
+            • Override the default with FASTREAD_E2E_EPUB=/absolute/path/to/book.epub.
+            """
+        )
     }
 
     func testEpubImportsAsMultiChapterDocument() throws {
