@@ -14,6 +14,7 @@ Started: Thu May  7 22:42:30 PDT 2026
 - Swift 6 strict concurrency: static mutable shared state in tests (e.g. URLProtocol stub handler) needs `nonisolated(unsafe)` plus an `NSLock` guard, since the test target compiles with concurrency checks on.
 - `ReadingArticle` (Swift) lives in `Sources/FastReadCore/ReadingArticle.swift` as a `public` Codable struct with an explicit `public init`. The Xcode app target compiles it directly via pbxproj; FastReadApp call sites do NOT need `import FastReadCore`. Required (non-optional) fields: id, title, source, author, date, readTime, lede, tag, text, progress, wordIndex, timesOpened, isFinished. Optional date fields: sourceURL, createdAt, lastOpenedAt, finishedAt — older v0 JSON omits these.
 - The JS persisted root shape (see `setItemAsync`/`getItemAsync` in `components/fast-read-screen.jsx`) is `{ library, articleId, wordIndex, wpm, ... }`: `wordIndex` and `isFinished`-equivalents live on the wrapper, not on each library item. Each library item itself uses `tagKey` (not `tag`).
+- `src/document.js` exports `createDocument`, `createSection`, `flattenText`, `tokenizeDocument`, `sectionBoundaries`. `flattenText` joins sections with `"\n\n"`. Section kinds: `body`|`chapter`|`page`. Use these factories instead of constructing object literals so the validation (id non-empty, kind enum) stays centralized.
 ---
 
 ## 2026-05-07 - US-001
@@ -95,4 +96,16 @@ Started: Thu May  7 22:42:30 PDT 2026
   - Required (non-optional) fields on `ReadingArticle` — `tag`, `isFinished`, `progress`, `wordIndex`, `timesOpened`, `text`, `lede`, `readTime`, `date`, `author`, `source`, `id`, `title` — must all be present in any persisted JSON or `JSONDecoder` will throw. Optional date fields (`sourceURL`, `createdAt`, `lastOpenedAt`, `finishedAt`) may be omitted. Keep this in mind when changing the schema in Phase 1 (Document migration): adding a new non-optional field would break v0 fixture decoding.
   - The JS library item shape uses `tagKey` (not `tag`), and `addArticle` does not set a top-level `wordIndex` or `isFinished` — those live on the wrapper alongside `library` (e.g. `{ library, articleId, wordIndex, wpm, ... }`). Mirror this when writing migration code: Swift has `wordIndex`/`isFinished` on the article; JS has them on the persisted root.
   - `Bundle.module.url(forResource:withExtension:subdirectory:)` with `subdirectory: "Fixtures"` (matching the SwiftPM `.copy("Fixtures")` resource) is the canonical way to load fixtures from `Tests/Fixtures/` — already used by `ParityTests`; reused here for the v0 fixture.
+---
+
+## 2026-05-07 - US-006
+- Defined the format-agnostic Document schema in JS with pure factories and helpers.
+- Files added/changed:
+  - `src/document.js` (new): JSDoc typedefs for Document/Section + `createDocument`, `createSection`, `flattenText`, `tokenizeDocument`, `sectionBoundaries`. Validates `id` is non-empty and `kind ∈ {body, chapter, page}`.
+  - `test/document.test.mjs` (new): 4 tests — empty doc, single body section, multi-chapter doc with CJK titles + content (boundary math vs `tokenize(flattenText(...))`), and factory validation (bad kind / missing id).
+- `npm test` passes (47 tests; 4 new).
+- **Learnings for future iterations:**
+  - `sectionBoundaries` is implemented by re-tokenizing the cumulative joined text after each section rather than summing per-section tokenize counts. This is robust against any future tokenizer changes that might treat section seams differently (e.g. CJK punctuation joining across `\n\n`). It is O(N²) in section count, but EPUB chapter counts in practice are small enough that this stays cheap.
+  - `tokenize` from `reader-core.js` already collapses NBSP→space and flushes on whitespace, so joining sections with `"\n\n"` separates tokens cleanly across both ASCII and CJK paths. Future Swift port (US-007) can mirror the same join-then-tokenize approach.
+  - Section ids are caller-provided strings; we don't auto-generate them. EPUB importer (US-014) should use spine item ids; HtmlAdapter (US-008) should use a stable single-section id like `"body"` for backward-compat.
 ---
