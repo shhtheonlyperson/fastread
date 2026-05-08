@@ -10,6 +10,7 @@ struct AddSourceView: View {
 
     @State private var status = ""
     @State private var isLoading = false
+    @State private var showEpubPicker = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -18,6 +19,7 @@ struct AddSourceView: View {
 
                 VStack(alignment: .leading, spacing: 28) {
                     clipboardHero
+                    epubPicker
                     recentSources
                 }
                 .padding(.horizontal, 24)
@@ -25,6 +27,79 @@ struct AddSourceView: View {
             .padding(.bottom, 112)
         }
         .background(JRColor.paper)
+        .fileImporter(
+            isPresented: $showEpubPicker,
+            allowedContentTypes: epubContentTypes,
+            allowsMultipleSelection: false
+        ) { result in
+            handleEpubPick(result)
+        }
+    }
+
+    private var epubContentTypes: [UTType] {
+        var types: [UTType] = []
+        if let epub = UTType("org.idpf.epub-container") {
+            types.append(epub)
+        }
+        if #available(iOS 14.0, *) {
+            types.append(UTType.epub)
+        }
+        return types
+    }
+
+    private var epubPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "EPUB book")
+            Button {
+                showEpubPicker = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(JRColor.terracotta)
+                    Text("Pick EPUB")
+                        .font(JRFont.serif(18, weight: .semibold))
+                        .foregroundStyle(JRColor.ink)
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(JRColor.inkQuiet)
+                }
+                .padding(.vertical, 14)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(JRColor.paperStrong)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(isLoading)
+            .opacity(isLoading ? 0.55 : 1)
+        }
+    }
+
+    @MainActor
+    private func handleEpubPick(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            status = error.localizedDescription
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let needsScope = url.startAccessingSecurityScopedResource()
+            defer { if needsScope { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let data = try Data(contentsOf: url)
+                let filename = url.lastPathComponent
+                if let article = try store.addEpubArticle(data: data, filename: filename) {
+                    let words = store.wordCount(for: article)
+                    status = "Loaded · \(words) words"
+                    onLoaded()
+                } else {
+                    status = "Could not read that EPUB."
+                }
+            } catch {
+                status = "Could not read that EPUB."
+            }
+        }
     }
 
     private var masthead: some View {
@@ -143,6 +218,10 @@ struct AddSourceView: View {
 
         do {
             let result = try await ArticleLoader.fetch(urlString: urlString)
+            guard result.wordCount >= 20 else {
+                status = "Could not find enough readable text on that page."
+                return
+            }
             store.addFetchedArticle(title: result.title, source: result.source, text: result.text, url: result.url)
             status = "Loaded · \(result.wordCount) words"
             onLoaded()

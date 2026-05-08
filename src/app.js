@@ -9,6 +9,9 @@ import {
   tokenSeparator,
   tokenize,
 } from "./reader-core.js";
+import { loadUrlDocument } from "./web-flow.js";
+import { flattenText } from "./document.js";
+import { importDocument } from "./importers/index.js";
 
 const STORAGE_KEY = "fastread-state-v1";
 
@@ -36,6 +39,8 @@ const els = {
   copyText: document.querySelector("#copy-text"),
   clearText: document.querySelector("#clear-text"),
   focusMode: document.querySelector("#focus-mode"),
+  epubInput: document.querySelector("#epub-input"),
+  epubStatus: document.querySelector("#epub-status"),
 };
 
 let tokens = [];
@@ -43,6 +48,11 @@ let index = 0;
 let isPlaying = false;
 let hasFinished = false;
 let timer = null;
+let currentDocument = null;
+
+export function getCurrentDocument() {
+  return currentDocument;
+}
 
 const icons = {
   play: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>`,
@@ -160,17 +170,24 @@ async function loadUrl(event) {
   setUrlStatus("Loading...");
 
   try {
-    const response = await fetch(`/api/extract?url=${encodeURIComponent(url)}`);
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(payload.error || `Request failed with HTTP ${response.status}`);
-    }
-
-    els.textInput.value = payload.text;
+    const proxyFetcher = async (target, init) => {
+      const response = await fetch(`/api/raw?url=${encodeURIComponent(target)}`, init);
+      const finalUrl = response.headers.get("x-final-url") || target;
+      return new Proxy(response, {
+        get(obj, prop) {
+          if (prop === "url") return finalUrl;
+          const value = obj[prop];
+          return typeof value === "function" ? value.bind(obj) : value;
+        },
+      });
+    };
+    const fetcher = typeof window !== "undefined" && window.__fastreadFetcher ? window.__fastreadFetcher : proxyFetcher;
+    const { document: doc, text } = await loadUrlDocument({ url, fetcher });
+    currentDocument = doc;
+    els.textInput.value = text;
     refreshTokens(true);
-    const title = payload.title ? `${payload.title} | ` : "";
-    setUrlStatus(`${title}${payload.wordCount} words loaded.`);
+    const title = doc.title ? `${doc.title} | ` : "";
+    setUrlStatus(`${title}${tokens.length} words loaded.`);
   } catch (error) {
     setUrlStatus(error.message || "Could not load that URL.", true);
   } finally {
@@ -182,6 +199,37 @@ async function loadUrl(event) {
 function setUrlStatus(message, isError = false) {
   els.urlStatus.textContent = message;
   els.urlStatus.dataset.state = isError ? "error" : message ? "ok" : "";
+}
+
+function setEpubStatus(message, isError = false) {
+  if (!els.epubStatus) return;
+  els.epubStatus.textContent = message;
+  els.epubStatus.dataset.state = isError ? "error" : message ? "ok" : "";
+}
+
+async function loadEpubFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  stop();
+  setEpubStatus("Loading EPUB...");
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const doc = importDocument({ kind: "epub", input: buf });
+    const text = flattenText(doc);
+    if (!text.trim()) {
+      throw new Error("EPUB has no readable text.");
+    }
+    currentDocument = doc;
+    els.textInput.value = text;
+    refreshTokens(true);
+    const chapters = doc.sections.length;
+    const title = doc.title ? `${doc.title} | ` : "";
+    setEpubStatus(`${title}${chapters} chapter${chapters === 1 ? "" : "s"}, ${tokens.length} words.`);
+  } catch (error) {
+    setEpubStatus(error?.message || "Could not read that EPUB.", true);
+  } finally {
+    event.target.value = "";
+  }
 }
 
 async function toggleFocusMode() {
@@ -291,6 +339,7 @@ async function copy(value, button, doneLabel) {
 }
 
 els.urlForm.addEventListener("submit", loadUrl);
+if (els.epubInput) els.epubInput.addEventListener("change", loadEpubFile);
 els.urlInput.addEventListener("input", saveState);
 els.textInput.addEventListener("input", () => refreshTokens(true));
 els.wpm.addEventListener("input", () => {

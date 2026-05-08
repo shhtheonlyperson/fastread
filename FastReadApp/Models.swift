@@ -36,26 +36,6 @@ enum FocusIndicatorStyle: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-struct ReadingArticle: Identifiable, Codable, Equatable {
-    let id: String
-    var title: String
-    var source: String
-    var sourceURL: String?
-    var author: String
-    var date: String
-    var createdAt: Date?
-    var lastOpenedAt: Date?
-    var finishedAt: Date?
-    var readTime: String
-    var lede: String
-    var tag: String
-    var text: String
-    var progress: Double
-    var wordIndex: Int
-    var timesOpened: Int
-    var isFinished: Bool
-}
-
 struct DayWords: Identifiable, Codable, Equatable {
     var date: String?
     var day: String
