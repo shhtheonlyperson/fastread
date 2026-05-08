@@ -1,7 +1,6 @@
 {
-  "title": "Wire Service Headline",
-  "source": "json-ld",
-  "wordCount": 97,
-  "head": "Editors of the wire service confirmed on Tuesday that the long-running pilot project would be expanded to three additional regions next quarter, citing strong reader engagement metrics and a stable fu",
-  "tail": "al control will remain with each member newsroom, even as production tooling, fact-check workflows, and translation services move onto a shared backbone maintained by the consortium's technical staff."
+  "head" : "Loading...",
+  "tail" : "Loading...",
+  "title" : "Wire Service Headline",
+  "wordCount" : 1
 }
