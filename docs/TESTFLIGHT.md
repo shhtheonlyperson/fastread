@@ -1,5 +1,97 @@
 # TestFlight upload runbook
 
+## Current source of truth
+
+Use this section first. It reflects the successful May 8, 2026 upload and supersedes older assumptions in this file.
+
+- App Store Connect app: `JustRead Speed Reader`
+- ASC app id: `ASC_APP_ID_PLACEHOLDER`
+- Bundle id: `com.shhtheonlyperson.fastread`
+- Bundle id resource id: `BUNDLE_RESOURCE_ID_PLACEHOLDER`
+- Team id: `QLJ9ZM278S`
+- Issuer id: `ASC_ISSUER_ID_PLACEHOLDER`
+- Active ASC API key id: `ASC_KEY_ID_PLACEHOLDER`
+- Active key path: `~/.appstoreconnect/private_keys/AuthKey_ASC_KEY_ID_PLACEHOLDER.p8`
+- Stale/revoked key id to avoid: `REVOKED_ASC_KEY_ID_PLACEHOLDER`
+- Current TestFlight version line: `0.2.1`
+- Latest successfully uploaded build: `24`
+- Latest delivery/build UUID: `f1a73e84-9760-47b3-bca2-e1bad474f6d5`
+- Build `24` was only visible to testers after export compliance was cleared.
+
+Important: do not trust `.env.local` blindly. During the May 8 release, `.env.local` pointed at revoked key `REVOKED_ASC_KEY_ID_PLACEHOLDER`.
+
+The existing App Store Connect record is for `com.shhtheonlyperson.fastread`, not `com.shh.fastread`. If the Xcode project drifts back to `com.shh.fastread` or a different marketing version such as `1.4.0`, align the Release build back to the ASC record before uploading.
+
+The app should declare no non-exempt encryption in `FastReadApp/Info.plist`:
+
+```xml
+<key>ITSAppUsesNonExemptEncryption</key>
+<false/>
+```
+
+## May 8, 2026 working flow
+
+If a local Apple Distribution identity with private key is missing, create signing material through the ASC API instead of relying on Xcode account state:
+
+1. Generate an RSA 2048 CSR. Apple rejected EC CSRs with `CSR algorithm/size incorrect. Expected: RSA(2048)`.
+2. Create an `IOS_DISTRIBUTION` certificate using active API key `ASC_KEY_ID_PLACEHOLDER`.
+3. Create an `IOS_APP_STORE` profile for bundle id resource `BUNDLE_RESOURCE_ID_PLACEHOLDER`.
+4. Install the `.mobileprovision` under `~/Library/MobileDevice/Provisioning Profiles/`.
+5. Import the generated private key and `.cer` into the login keychain.
+6. Verify `security find-identity -v -p codesigning` shows `iPhone Distribution: ShihChi Huang (QLJ9ZM278S)`.
+7. Archive with manual Release signing scoped only to the app target. Do not pass `PROVISIONING_PROFILE_SPECIFIER` globally to `xcodebuild archive`; it also applies to Swift package targets like `ZIPFoundation` and fails.
+8. Export using `method=app-store-connect`, `signingStyle=manual`, team `QLJ9ZM278S`, and `provisioningProfiles` mapping `com.shhtheonlyperson.fastread` to the generated profile UUID.
+9. Validate and upload:
+
+```bash
+xcrun altool --validate-app \
+  -f build/export/JustRead.ipa \
+  -t ios \
+  --apiKey ASC_KEY_ID_PLACEHOLDER \
+  --apiIssuer ASC_ISSUER_ID_PLACEHOLDER
+
+xcrun altool --upload-app \
+  -f build/export/JustRead.ipa \
+  -t ios \
+  --apiKey ASC_KEY_ID_PLACEHOLDER \
+  --apiIssuer ASC_ISSUER_ID_PLACEHOLDER
+```
+
+After upload, poll ASC builds. Build `24` appeared as `VALID` roughly one minute after upload:
+
+```text
+version: 0.2.1
+build: 24
+processingState: VALID
+```
+
+Do not stop at `processingState: VALID`. Also inspect `buildBetaDetail`:
+
+```text
+internalBuildState: IN_BETA_TESTING
+externalBuildState: READY_FOR_BETA_SUBMISSION
+usesNonExemptEncryption: false
+```
+
+If the build shows `MISSING_EXPORT_COMPLIANCE`, clear it with:
+
+```http
+PATCH /v1/builds/{build_id}
+{
+  "data": {
+    "type": "builds",
+    "id": "{build_id}",
+    "attributes": {
+      "usesNonExemptEncryption": false
+    }
+  }
+}
+```
+
+On May 8, 2026, build `24` initially showed `MISSING_EXPORT_COMPLIANCE`. Setting `usesNonExemptEncryption=false` changed it to `IN_BETA_TESTING` internally.
+
+Internal TestFlight groups cannot be assigned through `POST /v1/builds/{id}/relationships/betaGroups`; Apple returns `Builds cannot be assigned to this internal group`. Treat a `VALID` uploaded build as the CLI completion point, then verify group availability in App Store Connect UI if needed.
+
 End-to-end steps for taking the current `main` build of JustRead to TestFlight from the command line. Assumes a working iOS Distribution certificate is reachable through Xcode (sign in once via Xcode → Settings → Accounts if you haven't on this machine).
 
 The repo is iOS-only; there is no Expo / EAS pipeline. Distribution goes through `xcodebuild archive` + `xcrun altool`.
