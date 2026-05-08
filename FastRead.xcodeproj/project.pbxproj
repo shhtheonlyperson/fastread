@@ -9,21 +9,23 @@
 /* Begin PBXBuildFile section */
 		056374111C5ECA1B6ABAD815 /* ReadingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B1E41A59263BDDBD274708 /* ReadingStore.swift */; };
 		08FBE14E0232E63844BE9123 /* Fraunces.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F01674E5AD04A666B0ACBAD9 /* Fraunces.ttf */; };
+		09AD17DA1A143CDDE10A3F10 /* ReadingArticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98798242F669C12BF85C749E /* ReadingArticle.swift */; };
+		0C265CD8831A4E689904BAC3 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADE6B2CF9774E32ADEF766C /* Document.swift */; };
 		0D60DE15C487A9CE6E5EDE59 /* RSVPEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4B7F5A93890ABF14673F1C /* RSVPEngine.swift */; };
-		A0B1C2D3E4F506172839404A /* UrlIngest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F50617283940414B /* UrlIngest.swift */; };
-		C2D3E4F506172839404A1B5C /* ReadingArticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E4F506172839404A1B5C6D /* ReadingArticle.swift */; };
-		E4F506172839404A1B5C6D7E /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = F506172839404A1B5C6D7E8F /* Document.swift */; };
-		F506172839404A1B5C6D7E91 /* Importers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06172839404A1B5C6D7E8F92 /* Importers.swift */; };
-		172839404A1B5C6D7E8F9293 /* StorageMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2839404A1B5C6D7E8F929394 /* StorageMigration.swift */; };
 		15552BB9DA20A949BB01CD56 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0E00466B5860507CB216E6 /* Models.swift */; };
 		1D831D8C8E97EEBC9578AEF3 /* AddSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E2F445EF5E719C926A5E96 /* AddSourceView.swift */; };
+		29D48A3F31278EA97CBE6371 /* StorageMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA151E47FA34E4D70C3359E /* StorageMigration.swift */; };
 		30CA92F0603EA2D7158F76CD /* FastReadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2F0D4E6952343248C33C18 /* FastReadApp.swift */; };
 		3B1504118F1AFCC69395E166 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAA2C730EF5DD241AE55DE84 /* DesignSystem.swift */; };
 		3D3B0890055733A303BB1DB2 /* Inter.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ED6EAAB592FF15BD1E01314B /* Inter.ttf */; };
 		577F4392A5CBDB6AE414E217 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E876C05B5261D9849302AA /* ContentView.swift */; };
+		603CF5D1008EEA8601708385 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 9507EE5907DB0863D9648E4E /* ZIPFoundation */; };
+		7CB49841C59032CB5F913F25 /* EpubImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79F590968E0568FC2894518 /* EpubImporter.swift */; };
+		8364EF87A840310DC649D51D /* UrlIngest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7824B9896AB1602B9EEBD45E /* UrlIngest.swift */; };
 		95D09B32C7D345423240EBC0 /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD8F34083BFBDE1B7AE4876 /* ReaderView.swift */; };
 		9C3A110D9B4B17450C51270E /* JetBrainsMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CABEBE25C323EE596FDDC42A /* JetBrainsMono.ttf */; };
 		9FE51353B9131D0A8F8118F2 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED61BDDD8732C345E85E72 /* LibraryView.swift */; };
+		BFF358F640B6F726A42D1D86 /* Importers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8530D677A6E5C8091F891F68 /* Importers.swift */; };
 		C4BF91D2F392F304783CF9B9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 34601800AA37205EEEB84674 /* Assets.xcassets */; };
 		E06CA5AB72831174EEB11CA6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C0A24C05104D4F78878634 /* SettingsView.swift */; };
 		F1E31B2FBA1E18E04C340372 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE2A1F36E0B2E2A8AF8F22F7 /* StatsView.swift */; };
@@ -37,22 +39,34 @@
 		34601800AA37205EEEB84674 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		38B1E41A59263BDDBD274708 /* ReadingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingStore.swift; sourceTree = "<group>"; };
 		52F41E8DAF83EC046777FBAA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7824B9896AB1602B9EEBD45E /* UrlIngest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlIngest.swift; sourceTree = "<group>"; };
 		7ECE7A05ED2A054D3E4A9BE3 /* FastRead.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FastRead.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8530D677A6E5C8091F891F68 /* Importers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Importers.swift; sourceTree = "<group>"; };
+		98798242F669C12BF85C749E /* ReadingArticle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingArticle.swift; sourceTree = "<group>"; };
+		9ADE6B2CF9774E32ADEF766C /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
+		9BA151E47FA34E4D70C3359E /* StorageMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageMigration.swift; sourceTree = "<group>"; };
 		AC2F0D4E6952343248C33C18 /* FastReadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastReadApp.swift; sourceTree = "<group>"; };
 		CABEBE25C323EE596FDDC42A /* JetBrainsMono.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = JetBrainsMono.ttf; sourceTree = "<group>"; };
+		D79F590968E0568FC2894518 /* EpubImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpubImporter.swift; sourceTree = "<group>"; };
 		DAA2C730EF5DD241AE55DE84 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		ED6EAAB592FF15BD1E01314B /* Inter.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Inter.ttf; sourceTree = "<group>"; };
 		EE2A1F36E0B2E2A8AF8F22F7 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		F01674E5AD04A666B0ACBAD9 /* Fraunces.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces.ttf; sourceTree = "<group>"; };
 		FA4B7F5A93890ABF14673F1C /* RSVPEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSVPEngine.swift; sourceTree = "<group>"; };
-		B1C2D3E4F50617283940414B /* UrlIngest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlIngest.swift; sourceTree = "<group>"; };
-		D3E4F506172839404A1B5C6D /* ReadingArticle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingArticle.swift; sourceTree = "<group>"; };
-		F506172839404A1B5C6D7E8F /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
-		06172839404A1B5C6D7E8F92 /* Importers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Importers.swift; sourceTree = "<group>"; };
-		2839404A1B5C6D7E8F929394 /* StorageMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageMigration.swift; sourceTree = "<group>"; };
 		FDD8F34083BFBDE1B7AE4876 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		FEED61BDDD8732C345E85E72 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AB7ADD72228E751457FD3AB6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				603CF5D1008EEA8601708385 /* ZIPFoundation in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		315FF420744A85168C29BC26 = {
@@ -97,12 +111,13 @@
 		A2ED4045465152577B9281CD /* FastReadCore */ = {
 			isa = PBXGroup;
 			children = (
+				9ADE6B2CF9774E32ADEF766C /* Document.swift */,
+				D79F590968E0568FC2894518 /* EpubImporter.swift */,
+				8530D677A6E5C8091F891F68 /* Importers.swift */,
+				98798242F669C12BF85C749E /* ReadingArticle.swift */,
 				FA4B7F5A93890ABF14673F1C /* RSVPEngine.swift */,
-				D3E4F506172839404A1B5C6D /* ReadingArticle.swift */,
-				F506172839404A1B5C6D7E8F /* Document.swift */,
-				06172839404A1B5C6D7E8F92 /* Importers.swift */,
-				2839404A1B5C6D7E8F929394 /* StorageMigration.swift */,
-				B1C2D3E4F50617283940414B /* UrlIngest.swift */,
+				9BA151E47FA34E4D70C3359E /* StorageMigration.swift */,
+				7824B9896AB1602B9EEBD45E /* UrlIngest.swift */,
 			);
 			name = FastReadCore;
 			path = Sources/FastReadCore;
@@ -133,6 +148,7 @@
 			buildPhases = (
 				6936CDBF7133A32D7AAB59E8 /* Sources */,
 				3C70E89F81B16B36D3B8BAAB /* Resources */,
+				AB7ADD72228E751457FD3AB6 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -140,6 +156,7 @@
 			);
 			name = FastRead;
 			packageProductDependencies = (
+				9507EE5907DB0863D9648E4E /* ZIPFoundation */,
 			);
 			productName = FastRead;
 			productReference = 7ECE7A05ED2A054D3E4A9BE3 /* FastRead.app */;
@@ -165,6 +182,9 @@
 			);
 			mainGroup = 315FF420744A85168C29BC26;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FE0775AE49FB34477A4A72F2 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A8399E4903D1C05FA7C2C6D5 /* Products */;
 			projectDirPath = "";
@@ -197,19 +217,20 @@
 				1D831D8C8E97EEBC9578AEF3 /* AddSourceView.swift in Sources */,
 				577F4392A5CBDB6AE414E217 /* ContentView.swift in Sources */,
 				3B1504118F1AFCC69395E166 /* DesignSystem.swift in Sources */,
+				0C265CD8831A4E689904BAC3 /* Document.swift in Sources */,
+				7CB49841C59032CB5F913F25 /* EpubImporter.swift in Sources */,
 				30CA92F0603EA2D7158F76CD /* FastReadApp.swift in Sources */,
+				BFF358F640B6F726A42D1D86 /* Importers.swift in Sources */,
 				9FE51353B9131D0A8F8118F2 /* LibraryView.swift in Sources */,
 				15552BB9DA20A949BB01CD56 /* Models.swift in Sources */,
 				0D60DE15C487A9CE6E5EDE59 /* RSVPEngine.swift in Sources */,
-				C2D3E4F506172839404A1B5C /* ReadingArticle.swift in Sources */,
-				E4F506172839404A1B5C6D7E /* Document.swift in Sources */,
-				F506172839404A1B5C6D7E91 /* Importers.swift in Sources */,
-				172839404A1B5C6D7E8F9293 /* StorageMigration.swift in Sources */,
-				A0B1C2D3E4F506172839404A /* UrlIngest.swift in Sources */,
 				95D09B32C7D345423240EBC0 /* ReaderView.swift in Sources */,
+				09AD17DA1A143CDDE10A3F10 /* ReadingArticle.swift in Sources */,
 				056374111C5ECA1B6ABAD815 /* ReadingStore.swift in Sources */,
 				E06CA5AB72831174EEB11CA6 /* SettingsView.swift in Sources */,
 				F1E31B2FBA1E18E04C340372 /* StatsView.swift in Sources */,
+				29D48A3F31278EA97CBE6371 /* StorageMigration.swift in Sources */,
+				8364EF87A840310DC649D51D /* UrlIngest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,6 +418,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FE0775AE49FB34477A4A72F2 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.19;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9507EE5907DB0863D9648E4E /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE0775AE49FB34477A4A72F2 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FD1369B0C1E933E06FC48A08 /* Project object */;
 }

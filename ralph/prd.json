@@ -251,7 +251,7 @@
         "swift test passes; the iOS app builds (npm run verify:ios-performance or xcodebuild build for the simulator); manual on-device verification is noted in progress.txt rather than required"
       ],
       "priority": 17,
-      "passes": false,
+      "passes": true,
       "notes": ""
     }
   ]

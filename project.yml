@@ -9,6 +9,10 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    from: 0.9.19
 targets:
   FastRead:
     type: application
@@ -16,6 +20,8 @@ targets:
     sources:
       - path: FastReadApp
       - path: Sources/FastReadCore
+    dependencies:
+      - package: ZIPFoundation
     resources:
       - path: FastReadApp/Assets.xcassets
       - path: FastReadApp/Resources
