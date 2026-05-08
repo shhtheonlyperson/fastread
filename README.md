@@ -51,15 +51,19 @@ Default run is fast (~2s, 57 tests). Coverage:
 
 ## Optional gated suites
 
-Both default to `~/Library/Mobile Documents/com~apple~CloudDocs/books/` (iCloud Drive). Reading anything under `~/Library/Mobile Documents/` requires the test runner's process to have **Files-and-Folders access for iCloud Drive** — System Settings → Privacy & Security → Files and Folders → enable for Terminal/iTerm/Xcode (whatever you run `swift test` from). Without the grant, the suites skip with a hint.
+`EpubE2ETests` resolves its EPUB in this order: `FASTREAD_E2E_EPUB` env var → `<repoRoot>/test.epub` (gitignored convenience copy) → iCloud Drive `~/Library/Mobile Documents/com~apple~CloudDocs/books/房思琪的初戀樂園.epub`.
+
+`EpubCorpusTests` defaults to `~/Library/Mobile Documents/com~apple~CloudDocs/books/`, override with `FASTREAD_EPUB_CORPUS_DIR`.
+
+iCloud Drive paths require the test runner's process to have **Files-and-Folders access for iCloud Drive** (System Settings → Privacy & Security → Files and Folders). Without it, suites skip with a hint instead of failing.
 
 ```bash
-# E2E test against a specific EPUB (default: 房思琪的初戀樂園.epub in iCloud Drive/books):
-FASTREAD_E2E_EPUB=/path/to/book.epub swift test --filter EpubE2ETests
+# Quick path: drop any EPUB at the repo root as test.epub
+cp ~/some-book.epub test.epub
+swift test --filter EpubE2ETests   # 6 tests run
 
 # Walk every *.epub under a directory:
 FASTREAD_RUN_EPUB_CORPUS=1 swift test --filter EpubCorpusTests
-# Override directory:
 FASTREAD_RUN_EPUB_CORPUS=1 FASTREAD_EPUB_CORPUS_DIR=~/EPUBs swift test --filter EpubCorpusTests
 ```
 

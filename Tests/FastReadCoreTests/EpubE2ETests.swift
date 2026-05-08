@@ -11,19 +11,32 @@ import XCTest
 // Skipped if the EPUB is not present so CI and other machines stay green.
 // Override the path via FASTREAD_E2E_EPUB.
 final class EpubE2ETests: XCTestCase {
-    // Default location is the iCloud Drive "books" folder. Reading anything
-    // under ~/Library/Mobile Documents/ requires the test runner's process
-    // (Terminal, Xcode, etc.) to have Files-and-Folders access for iCloud
-    // Drive — System Settings → Privacy & Security → Files and Folders.
-    // Without the grant, FileManager returns "operation not permitted" and
-    // the e2e suite skips with a hint.
-    private static let defaultPath: String = {
+    // Resolution order:
+    //   1. FASTREAD_E2E_EPUB (absolute or ~ expanded)
+    //   2. <repoRoot>/test.epub (gitignored convenience copy)
+    //   3. ~/Library/Mobile Documents/com~apple~CloudDocs/books/房思琪的初戀樂園.epub
+    //      (iCloud Drive requires Files-and-Folders TCC access)
+    // Skips with a hint if none of the above is readable.
+    private static let defaultPath: String = resolveDefaultPath()
+
+    private static func repoRoot(file: StaticString = #filePath) -> URL {
+        URL(fileURLWithPath: String(describing: file))
+            .deletingLastPathComponent() // FastReadCoreTests
+            .deletingLastPathComponent() // Tests
+            .deletingLastPathComponent() // <repo>
+    }
+
+    private static func resolveDefaultPath() -> String {
         if let override = ProcessInfo.processInfo.environment["FASTREAD_E2E_EPUB"], !override.isEmpty {
             return (override as NSString).expandingTildeInPath
         }
+        let local = repoRoot().appendingPathComponent("test.epub").path
+        if FileManager.default.isReadableFile(atPath: local) {
+            return local
+        }
         return (NSHomeDirectory() as NSString)
             .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/books/房思琪的初戀樂園.epub")
-    }()
+    }
 
     private static let epubAvailable: Bool = FileManager.default.isReadableFile(atPath: defaultPath)
 
@@ -38,8 +51,9 @@ final class EpubE2ETests: XCTestCase {
             Self.epubAvailable,
             """
             EPUB not readable at \(Self.defaultPath).
-            • If the path looks right but the file is unreadable, the test runner is missing Files-and-Folders access for iCloud Drive — grant it in System Settings → Privacy & Security → Files and Folders.
-            • Override the default with FASTREAD_E2E_EPUB=/absolute/path/to/book.epub.
+            • Drop a copy at <repoRoot>/test.epub — gitignored, picked up automatically.
+            • Or grant Files-and-Folders access for iCloud Drive in System Settings → Privacy & Security → Files and Folders.
+            • Or override the default with FASTREAD_E2E_EPUB=/absolute/path/to/book.epub.
             """
         )
     }

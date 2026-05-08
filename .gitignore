@@ -8,3 +8,7 @@ DerivedData/
 xcuserdata/
 *.xcuserdatad/
 *.zip
+
+# Convenience copy for EpubE2ETests — see Tests/FastReadCoreTests/EpubE2ETests.swift.
+# Real EPUBs are typically copyrighted; never commit them.
+/test.epub
