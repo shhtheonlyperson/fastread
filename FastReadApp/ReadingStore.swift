@@ -24,7 +24,6 @@ final class ReadingStore: ObservableObject {
 
     private var playbackTask: Task<Void, Never>?
     private var tokenCache: [String: TokenCacheEntry] = [:]
-    private(set) var documentsByArticleID: [String: Document] = [:]
     private let defaults: UserDefaults
 
     var currentArticle: ReadingArticle? {
@@ -86,7 +85,6 @@ final class ReadingStore: ObservableObject {
 
         let loadedArticles = Self.loadArticles(from: defaults)
         self.articles = loadedArticles
-        self.documentsByArticleID = StorageMigration.migrateLegacyArticles(loadedArticles)
         self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle)
         self.stats = Self.loadStats(from: defaults)
         self.wpm = settings.wpm
@@ -193,38 +191,55 @@ final class ReadingStore: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
+        guard let document = try? ImporterRegistry.shared.importDocument(
+            kind: .text,
+            input: trimmed,
+            options: ImportOptions(sourceUrl: sourceURL ?? "", title: title, author: "You")
+        ) else {
+            return
+        }
+
+        addArticle(document: document, source: source, sourceURL: sourceURL)
+    }
+
+    func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
+        addDraftArticle(text: text, title: title, source: source, sourceURL: url)
+    }
+
+    func addArticle(document: Document, source: String, sourceURL: String? = nil) {
+        let flattened = Document.flattenText(document)
+        let trimmed = flattened.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
         pause()
-        let tokens = RSVPEngine.tokenize(trimmed)
+        let tokens = RSVPEngine.tokenize(flattened)
         let now = Date()
+        let title = document.title.isEmpty ? "Pasted text" : document.title
+        let author = document.author.isEmpty ? "You" : document.author
         let article = ReadingArticle(
             id: "draft-\(UUID().uuidString)",
             title: title,
             source: source,
             sourceURL: sourceURL,
-            author: "You",
+            author: author,
             date: Self.displayDate(for: now),
             createdAt: now,
             lastOpenedAt: now,
             finishedAt: nil,
             readTime: "\(max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: tokens.count, wpm: wpm))))) min",
-            lede: Self.makeLede(from: trimmed, tokens: tokens),
+            lede: Self.makeLede(from: flattened, tokens: tokens),
             tag: "Reading now",
-            text: trimmed,
+            document: document,
             progress: 0,
             wordIndex: 0,
             timesOpened: 1,
             isFinished: false
         )
-        tokenCache[article.id] = TokenCacheEntry(text: trimmed, tokens: tokens)
-        documentsByArticleID[article.id] = StorageMigration.documentFromLegacy(article: article)
+        tokenCache[article.id] = TokenCacheEntry(text: flattened, tokens: tokens)
         articles.insert(article, at: 0)
         selectedArticleID = article.id
         persistSelectedArticleID()
         persistArticles()
-    }
-
-    func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
-        addDraftArticle(text: text, title: title, source: source, sourceURL: url)
     }
 
     func deleteArticle(_ id: ReadingArticle.ID) {
@@ -237,7 +252,6 @@ final class ReadingStore: ObservableObject {
 
         articles.remove(at: deletedIndex)
         tokenCache.removeValue(forKey: id)
-        documentsByArticleID.removeValue(forKey: id)
 
         if deletedSelectedArticle {
             selectedArticleID = articles.indices.contains(deletedIndex)

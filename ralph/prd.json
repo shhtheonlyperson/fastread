@@ -176,7 +176,7 @@
         "swift test passes; the iOS app still builds (npm run verify:ios-performance build step or equivalent xcodebuild)"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
