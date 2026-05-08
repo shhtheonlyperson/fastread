@@ -38,8 +38,10 @@ Default run is fast (~2s, 57 tests). Coverage:
 | `DocumentTests` | sections, boundaries, `detectFrontMatter` |
 | `ImportersTests` | PlainText + Html adapters via the registry |
 | `EpubImporterTests` | OPF / spine / nav.xhtml / NCX parsing |
+| `EpubErrorPathsTests` | non-zip / no-container / no-OPF / empty-spine refusals |
 | `EpubRegistryFlowTests` | registry → Document round trip |
 | `HtmlGoldenTests` | 6 frozen HTML/text fixtures, regression-locked |
+| `ReadingStoreTests` | library lifecycle, jump/scrub/play/pause, settings + article persistence |
 | `EpubE2ETests` | end-to-end on `~/proj/readmoo/exports/all/房思琪的初戀樂園.epub` |
 | `UrlIngestTests` | stubbed `URLProtocol` for fetch errors |
 | `StorageMigrationTests` | v1 (text-only) → v2 (Document) round trip |
@@ -59,7 +61,15 @@ FASTREAD_EPUB_CORPUS_DIR=~/proj/readmoo/exports/all \
 swift test --filter EpubCorpusTests
 ```
 
-## Pre-push gate
+## Hooks
+
+```bash
+scripts/install-hooks.sh
+```
+
+Wires `core.hooksPath = .githooks` so the tracked `pre-commit` (guardrails + `swift test`) and `pre-push` (the full verifier) hooks fire automatically. Re-run after a fresh clone.
+
+## Pre-push gate (manual)
 
 ```bash
 scripts/verify-ios-performance.sh
