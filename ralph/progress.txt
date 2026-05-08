@@ -16,6 +16,7 @@ Started: Thu May  7 22:42:30 PDT 2026
 - The JS persisted root shape (see `setItemAsync`/`getItemAsync` in `components/fast-read-screen.jsx`) is `{ library, articleId, wordIndex, wpm, ... }`: `wordIndex` and `isFinished`-equivalents live on the wrapper, not on each library item. Each library item itself uses `tagKey` (not `tag`).
 - `src/document.js` exports `createDocument`, `createSection`, `flattenText`, `tokenizeDocument`, `sectionBoundaries`. `flattenText` joins sections with `"\n\n"`. Section kinds: `body`|`chapter`|`page`. Use these factories instead of constructing object literals so the validation (id non-empty, kind enum) stays centralized.
 - `Sources/FastReadCore/Document.swift` mirrors `src/document.js`: public `Document`/`Section` structs (Codable, Equatable, Sendable) and `SectionKind` enum (raw String "body"/"chapter"/"page"). Static helpers `Document.flattenText(_:)` and `Document.sectionBoundaries(_:)`. JSON shape matches JS exactly — JS-produced fixtures decode directly via `JSONDecoder().decode(Document.self, ...)`.
+- `src/importers/index.js` is the JS adapter registry. Adapter shape: `{ kind, canHandle(input), import(input, opts) -> Document }`. Built-ins: `PlainTextAdapter` (kind "text", normalizes plaintext to a single body section), `HtmlAdapter` (kind "html", wraps `extractArticle` into a single body section with `id: "body"`). Use `importDocument({ kind, input, sourceUrl })` to dispatch; unknown kinds throw `UnknownImporterKind`. Keep `extractArticle` itself untouched — adapters wrap it.
 ---
 
 ## 2026-05-07 - US-001
@@ -124,4 +125,17 @@ Started: Thu May  7 22:42:30 PDT 2026
   - `Document.sectionBoundaries(_:)` mirrors the JS approach exactly: re-tokenize the running joined text after each section rather than summing per-section token counts. Keeps Swift behavior parity-safe with JS for future tokenizer tweaks (CJK seams etc.).
   - To produce a JS-equivalent fixture from Node, an inline `node -e "import('./src/document.js').then(...)"` call against `createDocument`/`createSection` is the easiest path; commit the printed JSON verbatim. The Swift test then decodes and compares to a hand-built `Document` via `==` — this is a stronger check than re-encode equality (which can diverge in key order / whitespace).
   - The JS-produced sample is committed at `Tests/Fixtures/document-sample.json`. Future Document changes that alter the JS shape MUST regenerate this fixture and update the Swift expected struct in `DocumentTests.testDocumentSampleFixtureMatchesJSProducedShape`.
+---
+
+## 2026-05-07 - US-008
+- Implemented Phase 1 SourceAdapter registry in JS with PlainTextAdapter and HtmlAdapter producing Document.
+- Files added/changed:
+  - `src/importers/index.js` (new): exports `importDocument({ kind, input, sourceUrl })`, `PlainTextAdapter`, `HtmlAdapter`, `registerAdapter`, `getAdapter`, `listAdapters`, `UnknownImporterKind`. Both adapters emit a single body Section with id "body". `HtmlAdapter` wraps `extractArticle` (left untouched in `src/article-extract.js`).
+  - `test/importers.test.mjs` (new): replays the 5 HTML golden fixtures via `importDocument({kind:'html'})` asserting `flattenText(doc) === extractArticle(html).text` AND head/tail match the committed `.expected.json`. Also covers PlainTextAdapter normalize + plaintext fixture replay, unknown-kind error, registry lookup, custom adapter registration, and sourceUrl propagation.
+- `npm test` passes (54 tests; 9 new).
+- **Learnings for future iterations:**
+  - The adapter registry is a simple `Map` keyed by `kind`. Built-ins self-register at module load. Future adapters (US-014 EpubAdapter) just call `registerAdapter({ kind, canHandle, import })` from their own module — no central wiring needed.
+  - For HTML, the resulting `Document` has `sourceKind: "html"`, `title` from `extractArticle().title`, and one section (`id: "body"`, `kind: "body"`). `flattenText(doc)` is byte-equal to the legacy `extractArticle(html).text`, which is exactly what the US-001 golden corpus pins down. Future migrations (US-010) can rely on this equivalence.
+  - For plaintext, the adapter calls `normalizeText` from `article-extract.js` (already exported) — keeping the same whitespace rules as the inline plaintext path tests use.
+  - `importDocument` accepts `{ kind, input, sourceUrl, ...rest }`; extra opts are forwarded to the adapter's `import(input, opts)`. Callers wiring the UI (US-011) can pass through future fields like `title`/`author` without touching the registry.
 ---
