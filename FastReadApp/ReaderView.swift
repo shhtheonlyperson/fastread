@@ -2,8 +2,18 @@ import SwiftUI
 
 struct ReaderView: View {
     @EnvironmentObject private var store: ReadingStore
+    @State private var isTocOpen = false
     let onBack: () -> Void
     let onFocus: () -> Void
+
+    private var frontMatter: Document.FrontMatterDetection? {
+        store.currentFrontMatterDetection()
+    }
+
+    private var inFrontMatter: Bool {
+        guard let fm = frontMatter, fm.hasSkippableFrontMatter else { return false }
+        return store.currentIndex < fm.firstChapterTokenIndex
+    }
 
     var body: some View {
         Group {
@@ -13,6 +23,11 @@ struct ReaderView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         header
+                        if inFrontMatter, let fm = frontMatter {
+                            skipIntroBanner(fm: fm)
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, 12)
+                        }
                         stageCard
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
@@ -24,11 +39,62 @@ struct ReaderView: View {
             }
         }
         .background(JRColor.paper)
+        .sheet(isPresented: $isTocOpen) {
+            TocDrawerView(
+                isOpen: $isTocOpen,
+                sections: store.currentArticle?.document.sections ?? [],
+                boundaries: store.currentSectionBoundaries(),
+                frontMatter: frontMatter,
+                wordIndex: store.currentIndex,
+                onSelect: { tokenIndex in
+                    store.jumpToToken(tokenIndex)
+                    isTocOpen = false
+                },
+                onSkipFrontMatter: {
+                    if let fm = frontMatter, fm.hasSkippableFrontMatter {
+                        store.jumpToToken(fm.firstChapterTokenIndex)
+                    }
+                    isTocOpen = false
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .onDisappear {
             if store.currentTokens.isEmpty {
                 store.pause()
             }
         }
+    }
+
+    private func skipIntroBanner(fm: Document.FrontMatterDetection) -> some View {
+        let count = fm.frontMatterSectionIds.count
+        return HStack(spacing: 12) {
+            Circle()
+                .fill(JRColor.terracotta)
+                .frame(width: 8, height: 8)
+            Text("You're in front matter · \(count) section\(count == 1 ? "" : "s") look like cover, copyright, foreword.")
+                .font(JRFont.sans(13))
+                .foregroundStyle(JRColor.inkMid)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: {
+                store.jumpToToken(fm.firstChapterTokenIndex)
+            }) {
+                Text("SKIP →")
+                    .font(JRFont.mono(11, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundStyle(JRColor.terracotta)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .background(JRColor.terracotta.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(JRColor.terracotta.opacity(0.22), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var emptyReader: some View {
@@ -61,14 +127,31 @@ struct ReaderView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button(action: onBack) {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 9, weight: .bold))
-                    SectionLabel(text: "Library")
+            HStack {
+                Button(action: onBack) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 9, weight: .bold))
+                        SectionLabel(text: "Library")
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                if let document = store.currentArticle?.document, document.sections.count > 1 {
+                    Button(action: { isTocOpen = true }) {
+                        HStack(spacing: 6) {
+                            SectionLabel(text: "Contents")
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(JRColor.inkMid)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open contents")
                 }
             }
-            .buttonStyle(.plain)
 
             Text(store.currentArticle?.title ?? "Untitled")
                 .font(JRFont.serif(22, weight: .medium))
@@ -462,5 +545,184 @@ private struct DarkTransportButton<Content: View>: View {
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct TocDrawerView: View {
+    @Binding var isOpen: Bool
+    let sections: [Section]
+    let boundaries: [Document.SectionBoundary]
+    let frontMatter: Document.FrontMatterDetection?
+    let wordIndex: Int
+    let onSelect: (Int) -> Void
+    let onSkipFrontMatter: () -> Void
+
+    private var totalTokens: Int {
+        boundaries.last?.tokenEnd ?? 0
+    }
+
+    private var progressPct: Int {
+        guard totalTokens > 0 else { return 0 }
+        return Int((Double(wordIndex) / Double(totalTokens)) * 100.0)
+    }
+
+    private var skipCount: Int {
+        frontMatter?.frontMatterSectionIds.count ?? 0
+    }
+
+    private var currentIndex: Int {
+        for (i, b) in boundaries.enumerated() {
+            if wordIndex >= b.tokenStart && wordIndex < b.tokenEnd {
+                return i
+            }
+        }
+        return max(boundaries.count - 1, 0)
+    }
+
+    private var canSkipFrontMatter: Bool {
+        guard let fm = frontMatter, fm.hasSkippableFrontMatter else { return false }
+        return wordIndex < fm.firstChapterTokenIndex
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom) {
+                Text("Contents")
+                    .font(JRFont.serif(22, weight: .bold))
+                    .foregroundStyle(JRColor.ink)
+                Spacer()
+                Button("Close") { isOpen = false }
+                    .font(JRFont.mono(11))
+                    .tracking(1.4)
+                    .foregroundStyle(JRColor.inkMid)
+                    .textCase(.uppercase)
+            }
+            .padding(.top, 18)
+            .padding(.horizontal, 22)
+            .padding(.bottom, 14)
+            .overlay(
+                Rectangle()
+                    .fill(JRColor.rule)
+                    .frame(height: 1)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            )
+
+            Text("\(progressPct)% · \(wordIndex.formatted()) of \(totalTokens.formatted()) words")
+                .font(JRFont.mono(11))
+                .tracking(1.4)
+                .textCase(.uppercase)
+                .foregroundStyle(JRColor.inkQuiet)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 22)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(sections.enumerated()), id: \.element.id) { i, section in
+                        let b = i < boundaries.count ? boundaries[i] : Document.SectionBoundary(sectionId: section.id, tokenStart: 0, tokenEnd: 0)
+                        let units = b.tokenEnd - b.tokenStart
+                        let isFront = (frontMatter?.frontMatterSectionIds ?? []).contains(section.id)
+                        let isCurrent = i == currentIndex
+                        let isRead = !isCurrent && wordIndex >= b.tokenEnd && b.tokenEnd > 0
+                        let display = labelForSection(
+                            index: i,
+                            isFront: isFront,
+                            isCurrent: isCurrent,
+                            isRead: isRead,
+                            units: units,
+                            boundary: b
+                        )
+
+                        Button(action: { onSelect(b.tokenStart) }) {
+                            HStack(spacing: 10) {
+                                Text(display.number)
+                                    .font(JRFont.mono(11))
+                                    .foregroundStyle(isCurrent ? JRColor.terracotta : JRColor.inkQuiet)
+                                    .frame(width: 30, alignment: .leading)
+                                Text(section.title.isEmpty ? "Untitled section" : section.title)
+                                    .font(JRFont.serif(15, weight: isCurrent ? .semibold : .regular))
+                                    .foregroundStyle(isCurrent ? JRColor.terracotta : (isFront ? JRColor.inkQuiet : JRColor.ink))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .lineLimit(2)
+                                Text(display.pct)
+                                    .font(JRFont.mono(10.5, weight: isCurrent ? .bold : .regular))
+                                    .foregroundStyle(isCurrent ? JRColor.terracotta : JRColor.inkQuiet)
+                            }
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 12)
+                            .background(isCurrent ? JRColor.terracotta.opacity(0.08) : .clear)
+                            .overlay(
+                                Rectangle()
+                                    .fill(JRColor.rule)
+                                    .frame(height: 1)
+                                    .frame(maxHeight: .infinity, alignment: .bottom)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.bottom, 24)
+            }
+
+            if canSkipFrontMatter {
+                Button(action: onSkipFrontMatter) {
+                    Text("SKIP FRONT MATTER →")
+                        .font(JRFont.mono(11, weight: .bold))
+                        .tracking(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(JRColor.terracotta)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
+                .background(JRColor.paper)
+                .overlay(
+                    Rectangle()
+                        .fill(JRColor.rule)
+                        .frame(height: 1)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(JRColor.paper)
+    }
+
+    private func labelForSection(
+        index: Int,
+        isFront: Bool,
+        isCurrent: Bool,
+        isRead: Bool,
+        units: Int,
+        boundary: Document.SectionBoundary
+    ) -> (number: String, pct: String) {
+        let number: String
+        if isFront {
+            number = "—"
+        } else {
+            let chapterOrdinal = max(index - skipCount + 1, 1)
+            number = String(format: "%02d", chapterOrdinal)
+        }
+        let pct: String
+        if units == 0 {
+            pct = "—"
+        } else if isFront && wordIndex >= boundary.tokenEnd {
+            pct = "✓"
+        } else if isCurrent {
+            let local = max(wordIndex - boundary.tokenStart, 0)
+            let pctValue = Int((Double(local) / Double(max(units, 1))) * 100.0)
+            pct = "\(pctValue)%"
+        } else if isRead {
+            pct = "100%"
+        } else {
+            pct = "—"
+        }
+        return (number, pct)
     }
 }
