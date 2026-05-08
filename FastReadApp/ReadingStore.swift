@@ -206,6 +206,28 @@ final class ReadingStore: ObservableObject {
         addDraftArticle(text: text, title: title, source: source, sourceURL: url)
     }
 
+    @discardableResult
+    func addEpubArticle(data: Data, filename: String? = nil) throws -> ReadingArticle? {
+        let document = try ImporterRegistry.shared.importEpub(
+            data: data,
+            options: ImportOptions(sourceUrl: "", title: "", author: "")
+        )
+        let flattened = Document.flattenText(document)
+        let trimmed = flattened.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let source: String
+        if let filename, !filename.isEmpty {
+            source = filename
+        } else if !document.title.isEmpty {
+            source = document.title
+        } else {
+            source = "EPUB"
+        }
+        addArticle(document: document, source: source, sourceURL: nil)
+        return articles.first
+    }
+
     func addArticle(document: Document, source: String, sourceURL: String? = nil) {
         let flattened = Document.flattenText(document)
         let trimmed = flattened.trimmingCharacters(in: .whitespacesAndNewlines)
