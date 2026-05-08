@@ -18,11 +18,16 @@ import XCTest
 final class EpubCorpusTests: XCTestCase {
     private static let env = ProcessInfo.processInfo.environment
     private static let enabled = env["FASTREAD_RUN_EPUB_CORPUS"] == "1"
+    // Default location is the iCloud Drive "books" folder. The test
+    // runner's process must have Files-and-Folders access for iCloud
+    // Drive (System Settings → Privacy & Security → Files and Folders);
+    // without it the path is unreadable and the test skips with a hint.
     private static let corpusDir: String = {
         if let override = env["FASTREAD_EPUB_CORPUS_DIR"], !override.isEmpty {
             return (override as NSString).expandingTildeInPath
         }
-        return (NSHomeDirectory() as NSString).appendingPathComponent("proj/local-epub/exports/all")
+        return (NSHomeDirectory() as NSString)
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/books")
     }()
     private static let limit: Int = {
         if let raw = env["FASTREAD_EPUB_CORPUS_LIMIT"], let n = Int(raw), n > 0 {
@@ -39,16 +44,33 @@ final class EpubCorpusTests: XCTestCase {
     func testEveryEpubImportsAsNonEmptyDocument() throws {
         try XCTSkipUnless(Self.enabled, "Set FASTREAD_RUN_EPUB_CORPUS=1 to run.")
         let fileManager = FileManager.default
-        var isDir: ObjCBool = false
-        try XCTSkipUnless(
-            fileManager.fileExists(atPath: Self.corpusDir, isDirectory: &isDir) && isDir.boolValue,
-            "Corpus directory not found at \(Self.corpusDir)"
-        )
-
         let dirURL = URL(fileURLWithPath: Self.corpusDir)
-        let allFiles = try fileManager.contentsOfDirectory(at: dirURL, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension.lowercased() == "epub" }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+        let allFiles: [URL]
+        do {
+            allFiles = try fileManager.contentsOfDirectory(at: dirURL, includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension.lowercased() == "epub" }
+                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        } catch let error as NSError {
+            // POSIX EPERM (1) under iCloud Drive means the test runner is
+            // missing Files-and-Folders TCC access. Skip rather than fail.
+            let posixCode = (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.code ?? error.code
+            let permissionDenied = error.code == NSFileReadNoPermissionError || posixCode == 1 || error.code == 257
+            try XCTSkipIf(
+                permissionDenied,
+                """
+                Corpus directory unreadable at \(Self.corpusDir):
+                  \(error.localizedDescription)
+                • iCloud Drive paths require Files-and-Folders access for the test runner — System Settings → Privacy & Security → Files and Folders.
+                • Override the default with FASTREAD_EPUB_CORPUS_DIR=/absolute/path/to/dir.
+                """
+            )
+            try XCTSkipIf(
+                error.code == NSFileReadNoSuchFileError || error.code == 260,
+                "Corpus directory not found at \(Self.corpusDir). Override with FASTREAD_EPUB_CORPUS_DIR."
+            )
+            throw error
+        }
         XCTAssertGreaterThan(allFiles.count, 0, "expected at least one .epub under \(Self.corpusDir)")
 
         let files = Array(allFiles.prefix(Self.limit))

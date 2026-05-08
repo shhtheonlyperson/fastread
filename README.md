@@ -51,14 +51,16 @@ Default run is fast (~2s, 57 tests). Coverage:
 
 ## Optional gated suites
 
+Both default to `~/Library/Mobile Documents/com~apple~CloudDocs/books/` (iCloud Drive). Reading anything under `~/Library/Mobile Documents/` requires the test runner's process to have **Files-and-Folders access for iCloud Drive** — System Settings → Privacy & Security → Files and Folders → enable for Terminal/iTerm/Xcode (whatever you run `swift test` from). Without the grant, the suites skip with a hint.
+
 ```bash
-# E2E test against a specific EPUB (override path):
+# E2E test against a specific EPUB (default: local-test-book.epub in iCloud Drive/books):
 FASTREAD_E2E_EPUB=/path/to/book.epub swift test --filter EpubE2ETests
 
-# Walk every *.epub under a directory and assert each one imports:
-FASTREAD_RUN_EPUB_CORPUS=1 \
-FASTREAD_EPUB_CORPUS_DIR=~/proj/local-epub/exports/all \
-swift test --filter EpubCorpusTests
+# Walk every *.epub under a directory:
+FASTREAD_RUN_EPUB_CORPUS=1 swift test --filter EpubCorpusTests
+# Override directory:
+FASTREAD_RUN_EPUB_CORPUS=1 FASTREAD_EPUB_CORPUS_DIR=~/EPUBs swift test --filter EpubCorpusTests
 ```
 
 ## Hooks
