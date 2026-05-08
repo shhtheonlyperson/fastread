@@ -27,7 +27,12 @@ let package = Package(
         ),
         .testTarget(
             name: "FastReadCoreTests",
-            dependencies: ["FastReadCore"]
+            dependencies: ["FastReadCore"],
+            path: "Tests",
+            sources: ["FastReadCoreTests"],
+            resources: [
+                .copy("Fixtures"),
+            ]
         ),
     ]
 )

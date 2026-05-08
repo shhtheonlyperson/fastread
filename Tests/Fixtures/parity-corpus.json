@@ -1,0 +1,471 @@
+{
+  "generatedBy": "test/generate-parity-fixture.mjs",
+  "source": "src/reader-core.js",
+  "wpm": 450,
+  "punctuationPause": true,
+  "entries": [
+    {
+      "id": "ascii-simple",
+      "description": "Plain ASCII sentence",
+      "input": "Read fast and stay focused.",
+      "tokens": [
+        "Read",
+        "fast",
+        "and",
+        "stay",
+        "focused."
+      ],
+      "focusSplits": [
+        {
+          "before": "R",
+          "focus": "e",
+          "after": "ad"
+        },
+        {
+          "before": "f",
+          "focus": "a",
+          "after": "st"
+        },
+        {
+          "before": "a",
+          "focus": "n",
+          "after": "d"
+        },
+        {
+          "before": "s",
+          "focus": "t",
+          "after": "ay"
+        },
+        {
+          "before": "fo",
+          "focus": "c",
+          "after": "used."
+        }
+      ],
+      "durations": [
+        133,
+        133,
+        133,
+        133,
+        220
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "cjk-zh-hant",
+      "description": "Traditional Chinese with full-width punctuation",
+      "input": "快速閱讀，眼睛更輕鬆。",
+      "tokens": [
+        "快速",
+        "閱讀，",
+        "眼睛",
+        "更輕",
+        "鬆。"
+      ],
+      "focusSplits": [
+        {
+          "before": "快",
+          "focus": "速",
+          "after": ""
+        },
+        {
+          "before": "閱",
+          "focus": "讀",
+          "after": "，"
+        },
+        {
+          "before": "眼",
+          "focus": "睛",
+          "after": ""
+        },
+        {
+          "before": "更",
+          "focus": "輕",
+          "after": ""
+        },
+        {
+          "before": "",
+          "focus": "鬆",
+          "after": "。"
+        }
+      ],
+      "durations": [
+        200,
+        330,
+        200,
+        200,
+        330
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "cjk-mixed-latin",
+      "description": "CJK mixed with latin",
+      "input": "JustRead 支援中文。",
+      "tokens": [
+        "JustRead",
+        "支援",
+        "中文。"
+      ],
+      "focusSplits": [
+        {
+          "before": "Ju",
+          "focus": "s",
+          "after": "tRead"
+        },
+        {
+          "before": "支",
+          "focus": "援",
+          "after": ""
+        },
+        {
+          "before": "中",
+          "focus": "文",
+          "after": "。"
+        }
+      ],
+      "durations": [
+        133,
+        200,
+        330
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "punctuation-runs",
+      "description": "Runs of ASCII punctuation",
+      "input": "Wait... really?! Yes; absolutely: done.",
+      "tokens": [
+        "Wait...",
+        "really?!",
+        "Yes;",
+        "absolutely:",
+        "done."
+      ],
+      "focusSplits": [
+        {
+          "before": "W",
+          "focus": "a",
+          "after": "it..."
+        },
+        {
+          "before": "re",
+          "focus": "a",
+          "after": "lly?!"
+        },
+        {
+          "before": "Y",
+          "focus": "e",
+          "after": "s;"
+        },
+        {
+          "before": "abs",
+          "focus": "o",
+          "after": "lutely:"
+        },
+        {
+          "before": "d",
+          "focus": "o",
+          "after": "ne."
+        }
+      ],
+      "durations": [
+        220,
+        220,
+        220,
+        235,
+        220
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "hyphens",
+      "description": "Hyphenated tokens",
+      "input": "state-of-the-art well-known co-author",
+      "tokens": [
+        "state-of-the-art",
+        "well-known",
+        "co-author"
+      ],
+      "focusSplits": [
+        {
+          "before": "sta",
+          "focus": "t",
+          "after": "e-of-the-art"
+        },
+        {
+          "before": "we",
+          "focus": "l",
+          "after": "l-known"
+        },
+        {
+          "before": "co-",
+          "focus": "a",
+          "after": "uthor"
+        }
+      ],
+      "durations": [
+        171,
+        133,
+        133
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "em-dash",
+      "description": "Em-dash and en-dash separators",
+      "input": "Reading—fast—is fun – really.",
+      "tokens": [
+        "Reading—fast—is",
+        "fun",
+        "–",
+        "really."
+      ],
+      "focusSplits": [
+        {
+          "before": "Rea",
+          "focus": "d",
+          "after": "ing—fast—is"
+        },
+        {
+          "before": "f",
+          "focus": "u",
+          "after": "n"
+        },
+        {
+          "before": "",
+          "focus": "–",
+          "after": ""
+        },
+        {
+          "before": "re",
+          "focus": "a",
+          "after": "lly."
+        }
+      ],
+      "durations": [
+        171,
+        133,
+        133,
+        220
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "nbsp",
+      "description": "Non-breaking space normalized to space",
+      "input": "Read fast now",
+      "tokens": [
+        "Read",
+        "fast",
+        "now"
+      ],
+      "focusSplits": [
+        {
+          "before": "R",
+          "focus": "e",
+          "after": "ad"
+        },
+        {
+          "before": "f",
+          "focus": "a",
+          "after": "st"
+        },
+        {
+          "before": "n",
+          "focus": "o",
+          "after": "w"
+        }
+      ],
+      "durations": [
+        133,
+        133,
+        133
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "very-long-token",
+      "description": "Very long single token",
+      "input": "supercalifragilisticexpialidocious",
+      "tokens": [
+        "supercalifragilisticexpialidocious"
+      ],
+      "focusSplits": [
+        {
+          "before": "supe",
+          "focus": "r",
+          "after": "califragilisticexpialidocious"
+        }
+      ],
+      "durations": [
+        213
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "single-token",
+      "description": "One short word",
+      "input": "Hi",
+      "tokens": [
+        "Hi"
+      ],
+      "focusSplits": [
+        {
+          "before": "H",
+          "focus": "i",
+          "after": ""
+        }
+      ],
+      "durations": [
+        133
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "empty",
+      "description": "Empty string",
+      "input": "",
+      "tokens": [],
+      "focusSplits": [],
+      "durations": [],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "whitespace-only",
+      "description": "Whitespace-only string",
+      "input": "   \t\n  ",
+      "tokens": [],
+      "focusSplits": [],
+      "durations": [],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "rtl-arabic",
+      "description": "Arabic RTL text",
+      "input": "اقرأ بسرعة وركز.",
+      "tokens": [
+        "اقرأ",
+        "بسرعة",
+        "وركز."
+      ],
+      "focusSplits": [
+        {
+          "before": "ا",
+          "focus": "ق",
+          "after": "رأ"
+        },
+        {
+          "before": "ب",
+          "focus": "س",
+          "after": "رعة"
+        },
+        {
+          "before": "و",
+          "focus": "ر",
+          "after": "كز."
+        }
+      ],
+      "durations": [
+        133,
+        133,
+        220
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "cjk-japanese",
+      "description": "Japanese hiragana and kanji",
+      "input": "速読で集中力が上がる。",
+      "tokens": [
+        "速読",
+        "で集",
+        "中力",
+        "が上",
+        "がる。"
+      ],
+      "focusSplits": [
+        {
+          "before": "速",
+          "focus": "読",
+          "after": ""
+        },
+        {
+          "before": "で",
+          "focus": "集",
+          "after": ""
+        },
+        {
+          "before": "中",
+          "focus": "力",
+          "after": ""
+        },
+        {
+          "before": "が",
+          "focus": "上",
+          "after": ""
+        },
+        {
+          "before": "が",
+          "focus": "る",
+          "after": "。"
+        }
+      ],
+      "durations": [
+        200,
+        200,
+        200,
+        200,
+        330
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    },
+    {
+      "id": "trailing-quote",
+      "description": "Token ending with punctuation followed by closing quote",
+      "input": "He said \"done.\"",
+      "tokens": [
+        "He",
+        "said",
+        "\"done.\""
+      ],
+      "focusSplits": [
+        {
+          "before": "H",
+          "focus": "e",
+          "after": ""
+        },
+        {
+          "before": "s",
+          "focus": "a",
+          "after": "id"
+        },
+        {
+          "before": "\"d",
+          "focus": "o",
+          "after": "ne.\""
+        }
+      ],
+      "durations": [
+        133,
+        133,
+        220
+      ],
+      "wpm": 450,
+      "punctuationPause": true
+    }
+  ]
+}
