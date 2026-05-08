@@ -24,6 +24,7 @@ final class ReadingStore: ObservableObject {
 
     private var playbackTask: Task<Void, Never>?
     private var tokenCache: [String: TokenCacheEntry] = [:]
+    private(set) var documentsByArticleID: [String: Document] = [:]
     private let defaults: UserDefaults
 
     var currentArticle: ReadingArticle? {
@@ -83,7 +84,9 @@ final class ReadingStore: ObservableObject {
         self.defaults = defaults
         let settings = Self.loadSettings(from: defaults)
 
-        self.articles = Self.loadArticles(from: defaults)
+        let loadedArticles = Self.loadArticles(from: defaults)
+        self.articles = loadedArticles
+        self.documentsByArticleID = StorageMigration.migrateLegacyArticles(loadedArticles)
         self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle)
         self.stats = Self.loadStats(from: defaults)
         self.wpm = settings.wpm
@@ -213,6 +216,7 @@ final class ReadingStore: ObservableObject {
             isFinished: false
         )
         tokenCache[article.id] = TokenCacheEntry(text: trimmed, tokens: tokens)
+        documentsByArticleID[article.id] = StorageMigration.documentFromLegacy(article: article)
         articles.insert(article, at: 0)
         selectedArticleID = article.id
         persistSelectedArticleID()
@@ -233,6 +237,7 @@ final class ReadingStore: ObservableObject {
 
         articles.remove(at: deletedIndex)
         tokenCache.removeValue(forKey: id)
+        documentsByArticleID.removeValue(forKey: id)
 
         if deletedSelectedArticle {
             selectedArticleID = articles.indices.contains(deletedIndex)
