@@ -19,8 +19,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { extractArticle } from "../src/article-extract.js";
-import { fetchAndExtract } from "../src/url-ingest.js";
+import { fetchHtml } from "../src/url-ingest.js";
+import { importDocument } from "../src/importers/index.js";
+import { flattenText } from "../src/document.js";
 import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, rangeValueFromPageX, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
@@ -258,10 +259,13 @@ export default function FastReadScreen() {
   }, []);
 
   const addArticle = useCallback(
-    (text, title = "Pasted text", source = "Clipboard", sourceURL = null) => {
+    (text, title = "Pasted text", source = "Clipboard", sourceURL = null, opts = {}) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const readingUnits = tokenize(trimmed);
+      const document = opts.document
+        || importDocument({ kind: "text", input: trimmed, sourceUrl: sourceURL || "", title });
+      const flatText = flattenText(document);
+      const readingUnits = tokenize(flatText);
       const now = new Date().toISOString();
       const item = {
         id: `article-${Date.now()}`,
@@ -275,9 +279,10 @@ export default function FastReadScreen() {
         finishedAt: null,
         readTime: `${Math.max(1, Math.ceil(estimateMinutes(readingUnits.length, wpm)))} min`,
         progress: 0,
-        lede: makeLede(trimmed, readingUnits),
+        lede: makeLede(flatText, readingUnits),
         tagKey: "readingNow",
-        text: trimmed,
+        text: flatText,
+        document,
         timesOpened: 1,
       };
       setLibrary((items) => [item, ...items]);
@@ -540,15 +545,18 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const { article, finalUrl } = await fetchAndExtract({
+      const { html, finalUrl } = await fetchHtml({
         url: trimmed,
         fetcher: fetch,
         maxBytes: MAX_HTML_BYTES,
         signal: controller.signal,
       });
-      if (!article.text || article.wordCount < 20) throw new Error("Could not find enough readable text on that page.");
+      const document = importDocument({ kind: "html", input: html, sourceUrl: finalUrl });
+      const flatText = flattenText(document);
+      const wordCount = tokenize(flatText).length;
+      if (!flatText || wordCount < 20) throw new Error("Could not find enough readable text on that page.");
       const finalParsed = new URL(finalUrl);
-      onAddArticle(article.text, article.title || finalParsed.host, finalParsed.host, finalUrl);
+      onAddArticle(flatText, document.title || finalParsed.host, finalParsed.host, finalUrl, { document });
     } catch (error) {
       const friendly =
         error?.name === "TimeoutError" || error?.name === "AbortError"
