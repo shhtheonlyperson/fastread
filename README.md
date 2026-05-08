@@ -49,6 +49,23 @@ Default run is fast (~2s, 57 tests). Coverage:
 | `ParityTests` | parity corpus (kept for fixture stability) |
 | `EpubCorpusTests` | gated walker over a real EPUB library |
 
+A separate XCUITest target lives outside the SwiftPM package and runs against the simulator:
+
+| Target | Scheme | What it checks |
+| --- | --- | --- |
+| `FastReadUITests` | `FastReadUITests` (or the bundled `FastRead` test action) | Single happy-path XCUITest: launches the app reset, picks `test.epub` from the system Files picker, asserts the reader opens on local-test-book, taps `SKIP →`, opens `CONTENTS`, jumps to a chapter, and confirms the playhead moves. |
+
+Run the UI test directly:
+
+```bash
+xcodebuild test \
+  -scheme FastReadUITests \
+  -destination "platform=iOS Simulator,id=0CC71FC3-7C33-4707-A627-554BCB569549" \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+The test seeds `test.epub` (from `FASTREAD_E2E_EPUB` or the repo-root copy) into the simulator's app sandbox at launch via the debug-only `-FASTREAD_RESET_LIBRARY` / `-FASTREAD_SEED_EPUB` launch arguments handled in `FastReadApp.swift`. It is automatically skipped by `scripts/verify-ios-performance.sh` when no fixture is available.
+
 ## Optional gated suites
 
 `EpubE2ETests` resolves its EPUB in this order: `FASTREAD_E2E_EPUB` env var → `<repoRoot>/test.epub` (gitignored convenience copy) → iCloud Drive `~/Library/Mobile Documents/com~apple~CloudDocs/books/local-test-book.epub`.
