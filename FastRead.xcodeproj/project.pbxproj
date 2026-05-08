@@ -23,6 +23,7 @@
 		70E54D5C4C0F47A8B4E7B6ED /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7CF4167B359970DDB28258 /* SplashView.swift */; };
 		7CB49841C59032CB5F913F25 /* EpubImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79F590968E0568FC2894518 /* EpubImporter.swift */; };
 		8364EF87A840310DC649D51D /* UrlIngest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7824B9896AB1602B9EEBD45E /* UrlIngest.swift */; };
+		AA10000000000000000000A2 /* FastReadHappyPathUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* FastReadHappyPathUITests.swift */; };
 		95D09B32C7D345423240EBC0 /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD8F34083BFBDE1B7AE4876 /* ReaderView.swift */; };
 		9C3A110D9B4B17450C51270E /* JetBrainsMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CABEBE25C323EE596FDDC42A /* JetBrainsMono.ttf */; };
 		9FE51353B9131D0A8F8118F2 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED61BDDD8732C345E85E72 /* LibraryView.swift */; };
@@ -33,6 +34,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AA10000000000000000000A1 /* FastReadHappyPathUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastReadHappyPathUITests.swift; sourceTree = "<group>"; };
+		AA10000000000000000000A3 /* FastReadUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FastReadUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		00C0A24C05104D4F78878634 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		1C0E00466B5860507CB216E6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		23E876C05B5261D9849302AA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -76,8 +79,17 @@
 			children = (
 				7BC1A05AA69622832275F8E8 /* FastReadApp */,
 				A2ED4045465152577B9281CD /* FastReadCore */,
+				AA10000000000000000000A4 /* FastReadUITests */,
 				A8399E4903D1C05FA7C2C6D5 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		AA10000000000000000000A4 /* FastReadUITests */ = {
+			isa = PBXGroup;
+			children = (
+				AA10000000000000000000A1 /* FastReadHappyPathUITests.swift */,
+			);
+			path = FastReadUITests;
 			sourceTree = "<group>";
 		};
 		6FFDBC64E1BA1B99F2475441 /* Fonts */ = {
@@ -130,6 +142,7 @@
 			isa = PBXGroup;
 			children = (
 				7ECE7A05ED2A054D3E4A9BE3 /* FastRead.app */,
+				AA10000000000000000000A3 /* FastReadUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -165,6 +178,22 @@
 			productReference = 7ECE7A05ED2A054D3E4A9BE3 /* FastRead.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA10000000000000000000A6 /* FastReadUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA10000000000000000000AB /* Build configuration list for PBXNativeTarget "FastReadUITests" */;
+			buildPhases = (
+				AA10000000000000000000A5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA10000000000000000000A7 /* PBXTargetDependency */,
+			);
+			name = FastReadUITests;
+			productName = FastReadUITests;
+			productReference = AA10000000000000000000A3 /* FastReadUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -174,6 +203,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					AA10000000000000000000A6 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = EB5F4BABBDBAA878DFCB72C2;
+					};
 				};
 			};
 			buildConfigurationList = 1DEDB595585593795187A2EE /* Build configuration list for PBXProject "FastRead" */;
@@ -194,6 +227,7 @@
 			projectRoot = "";
 			targets = (
 				EB5F4BABBDBAA878DFCB72C2 /* FastRead */,
+				AA10000000000000000000A6 /* FastReadUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -238,9 +272,75 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA10000000000000000000A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA10000000000000000000A2 /* FastReadHappyPathUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AA10000000000000000000A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EB5F4BABBDBAA878DFCB72C2 /* FastRead */;
+			targetProxy = AA10000000000000000000A8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXContainerItemProxy section */
+		AA10000000000000000000A8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FD1369B0C1E933E06FC48A08 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EB5F4BABBDBAA878DFCB72C2;
+			remoteInfo = FastRead;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin XCBuildConfiguration section */
+		AA10000000000000000000A9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shh.fastread.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FastRead;
+			};
+			name = Debug;
+		};
+		AA10000000000000000000AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shh.fastread.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FastRead;
+			};
+			name = Release;
+		};
 		4605C47CA93A19BCDECEF560 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -417,6 +517,15 @@
 			buildConfigurations = (
 				8D65450EDE12BA3FFE29E4CD /* Debug */,
 				4605C47CA93A19BCDECEF560 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AA10000000000000000000AB /* Build configuration list for PBXNativeTarget "FastReadUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA10000000000000000000A9 /* Debug */,
+				AA10000000000000000000AA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
