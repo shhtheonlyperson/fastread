@@ -29,7 +29,7 @@
         "swift test and npm test both pass; running the generator produces no diff against the committed fixture"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
