@@ -5,8 +5,10 @@ play-store-service-account*.json
 *.jks
 *.keystore
 node_modules/
+.claude/
 .build/
 .expo/
 dist/
 coverage/
 *.log
+*.zip

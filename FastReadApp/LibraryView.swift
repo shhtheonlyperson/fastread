@@ -201,30 +201,22 @@ struct LibraryView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(store.articles.enumerated()), id: \.element.id) { index, article in
-                        HStack(spacing: 0) {
-                            Button {
-                                onOpenArticle(article)
-                            } label: {
-                                ArticleRow(article: article)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 14)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-
+                        Button {
+                            onOpenArticle(article)
+                        } label: {
+                            ArticleRow(article: article)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 articlePendingDeletion = article
                             } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(JRColor.inkQuiet)
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(Rectangle())
+                                Label("Delete", systemImage: "trash")
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Delete \(article.title)")
-                            .padding(.trailing, 8)
                         }
                         .overlay(alignment: .top) {
                             if index != 0 {

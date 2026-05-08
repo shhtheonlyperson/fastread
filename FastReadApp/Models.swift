@@ -36,22 +36,6 @@ enum FocusIndicatorStyle: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum WordTypeface: String, CaseIterable, Identifiable, Codable {
-    case serif
-    case sans
-    case mono
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .serif: "Serif"
-        case .sans: "Sans"
-        case .mono: "Mono"
-        }
-    }
-}
-
 struct ReadingArticle: Identifiable, Codable, Equatable {
     let id: String
     var title: String

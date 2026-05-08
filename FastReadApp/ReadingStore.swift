@@ -16,9 +16,6 @@ final class ReadingStore: ObservableObject {
     @Published var focusIndicator: FocusIndicatorStyle {
         didSet { persistSettings() }
     }
-    @Published var wordTypeface: WordTypeface {
-        didSet { persistSettings() }
-    }
     @Published private(set) var isPlaying = false
     @Published var sourceStatus = ""
 
@@ -89,7 +86,6 @@ final class ReadingStore: ObservableObject {
         self.wpm = settings.wpm
         self.punctuationPause = settings.punctuationPause
         self.focusIndicator = settings.focusIndicator
-        self.wordTypeface = settings.wordTypeface
 
         ensureSelectedArticle()
         rollStatsIfNeeded()
@@ -372,8 +368,7 @@ final class ReadingStore: ObservableObject {
         let payload = SettingsPayload(
             wpm: wpm,
             punctuationPause: punctuationPause,
-            focusIndicator: focusIndicator,
-            wordTypeface: wordTypeface
+            focusIndicator: focusIndicator
         )
         encode(payload, forKey: StorageKey.settings)
     }
@@ -399,8 +394,7 @@ final class ReadingStore: ObservableObject {
             return SettingsPayload(
                 wpm: 540,
                 punctuationPause: true,
-                focusIndicator: .dot,
-                wordTypeface: .serif
+                focusIndicator: .dot
             )
         }
         return payload
@@ -543,7 +537,6 @@ private struct SettingsPayload: Codable {
     var wpm: Double
     var punctuationPause: Bool
     var focusIndicator: FocusIndicatorStyle
-    var wordTypeface: WordTypeface
 }
 
 private struct TokenCacheEntry {
