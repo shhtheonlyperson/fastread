@@ -25,6 +25,7 @@ Started: Thu May  7 22:42:30 PDT 2026
 - The web `loadUrl` path uses a server-side `/api/raw` proxy endpoint that returns the raw HTML body with an `X-Final-URL` header (so `response.url` reflects the followed-redirect URL after the proxy hop). The browser-side fetcher wraps the proxy response in a Proxy that overrides `.url`. SSRF protections (private-IP/localhost block) are shared with `/api/extract`.
 - JS RN library items now carry both `text` (flattened text, kept for back-compat with existing UI like `tokenize(article?.text)` and `library.filter((item) => item?.text)`) AND `document` (the imported Document). `addArticle(text, title, source, sourceURL, opts)` accepts an optional `opts.document` so `fetchURL` can pass through the already-imported HTML Document instead of re-running the text adapter.
 - Swift `ReadingArticle` now has a stored `document: Document` and a computed `var text: String { Document.flattenText(document) }`. Two inits exist: text-based (back-compat for tests/UI that supply a flat text field — wraps it into a one-body Section) and document-based (used by the importer-driven path). Custom `Codable`: encodes both `document` and `text` fields; on decode, prefers `document`, falls back to constructing one-body Section from `text`. Custom `Equatable` enumerates all stored properties + document. Old in-memory `documentsByArticleID` map on ReadingStore is removed — the document lives on the article.
+- `fflate` (^0.8.2) is the zip dep used by EPUB importer code (`src/importers/epub-zip.js`, `src/importers/epub-parse.js`). Installed via Bun (`bun add fflate`), but it is plain ESM and works under Node's `node --test` runner without bundling. EPUB fixtures live under `test/fixtures/epub/` and are reproducible via `node test/fixtures/epub/generate-fixtures.mjs` (uses fflate's `zipSync`). Per-file zip options use the tuple form `name: [Uint8Array, opts]` — the `{ data, level }` object form is silently treated as a nested directory by fflate and produces a broken archive.
 ---
 
 ## 2026-05-07 - US-001
@@ -217,4 +218,24 @@ Started: Thu May  7 22:42:30 PDT 2026
   - SwiftPM test target only depends on `FastReadCore`, so `ReadingStore` (in the FastReadApp Xcode target) is not directly importable. `ReadingStoreImportTests` reproduces the registry+article flow at the FastReadCore level — when adding any future store-level test, mirror the same harness pattern (`makeArticle(from: document, ...)`) rather than trying to instantiate `ReadingStore` from SwiftPM.
   - The `URLProtocol` stub in `ReadingStoreImportTests` mirrors `UrlIngestTests`: `nonisolated(unsafe)` static state + `NSLock` to satisfy Swift 6 concurrency, plus an ephemeral `URLSession` invalidated in `defer`.
   - The on-disk JSON shape now includes BOTH `document` and `text` keys (text is encoded for backward read-compat with older app versions). Stored size ~doubles per article. If/when v3 lands, drop the `text` key — but only after the in-flight migration window is closed.
+---
+
+## 2026-05-07 - US-013
+- Phase 2 (P1): EPUB OPF/spine parser + zip reader (JS) with fixture tests.
+- Files added/changed:
+  - `package.json` / `bun.lock` / `package-lock.json`: added `fflate@^0.8.2` (installed via `bun add fflate`).
+  - `src/importers/epub-zip.js` (new): `readEpubEntries(arrayBuffer)` returns a `Map<path, Uint8Array>` via fflate's `unzipSync`.
+  - `src/importers/epub-parse.js` (new): `parseEpub(arrayBuffer)` returning `{ metadata: {title, author?, language?}, spine: [{ id, href, mediaType, navTitle? }] }`. Reads `META-INF/container.xml` to find the OPF rootfile, parses metadata + manifest + spine via regex, and resolves nav titles from EPUB3 `<nav epub:type="toc">` (preferred — manifest item with `properties="nav"`) or EPUB2 `toc.ncx` (referenced by `<spine toc="...">`).
+  - `test/fixtures/epub/generate-fixtures.mjs` (new): reproducible generator that writes two small public-domain EPUBs.
+  - `test/fixtures/epub/pride-and-prejudice.epub` (EPUB3 with nav.xhtml; English; 2 chapters).
+  - `test/fixtures/epub/tao-te-ching.epub` (EPUB2 with toc.ncx; zh-Hant; 3 chapters).
+  - `test/epub-parse.test.mjs` (new): 4 tests — `readEpubEntries` smoke, EPUB3 nav metadata + spine + navTitle, EPUB2 NCX zh-Hant metadata + spine + navTitle, and a "missing container.xml" error path.
+- `npm test` passes (67 tests; 4 new).
+- **Learnings for future iterations:**
+  - fflate's `zipSync` per-file options use the TUPLE form: `name: [Uint8Array, { level: 0 }]`. Passing `{ data, level }` instead is silently treated as a nested directory and produces a broken zip with entries like `mimetype/data` and `mimetype/level/`. The unit test that asserts `entries.get("mimetype") instanceof Uint8Array` catches this immediately.
+  - EPUB OPF parsing tolerates both prefixed and unprefixed element names (`<dc:title>` vs `<title>`). `findFirstTagText` matches either via `(?:[a-zA-Z][\w.-]*:)?localName`. Future EpubAdapter work (US-014) can rely on this rather than re-parsing.
+  - Nav title resolution must round-trip paths: nav.xhtml/toc.ncx hrefs are nav-relative; manifest hrefs are OPF-relative. Resolve nav hrefs to absolute via `joinPath(navPath, href)`, then strip the OPF directory prefix back off so the lookup against `manifest.href` works. Both forms are exercised by the two fixtures.
+  - When a spine item has a `#fragment` href, strip the fragment before nav-title lookup (`item.href.replace(/#.*$/, "")`) so the nav-title still resolves. None of the fixtures use this yet, but the code is in place for real Gutenberg EPUBs that often anchor TOC entries at fragment ids.
+  - The fixture generator commits both fixtures and the script so future regeneration is reproducible (no Gutenberg HTTP fetch required at test time). Use `node test/fixtures/epub/generate-fixtures.mjs` to refresh after metadata/structure changes.
+  - Fixtures are tiny (~2KB each) so committing the binaries is fine; alternative approaches (build at test setup) would slow `npm test` and add a hidden zipSync dependency to the fixture corpus.
 ---
