@@ -17,10 +17,11 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { extractArticle } from "../src/article-extract.js";
-import { clamp, containsCjk, contextWindow, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, rangeValueFromPageX, shouldRestartPlayback, splitForFocus, tokenSeparator, tokenize } from "../src/reader-core.js";
+import { clamp, containsCjk, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, rangeValueFromPageX, shouldRestartPlayback, splitForFocus, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "0.2.0";
@@ -54,6 +55,62 @@ const localeData = {
       readingNow: "Reading now",
       saved: "Saved",
       finished: "Finished",
+      startReading: "Start reading",
+      addFirstArticle: "Add your first article.",
+      libraryEmptyHint: "Paste text or fetch a URL to build a real library. Nothing is preloaded.",
+      noSavedArticles: "No saved articles yet.",
+      addFromAdd: "Use Add to paste text or fetch a webpage.",
+      delete: "Delete",
+      tabs: {
+        home: "Library",
+        source: "Add",
+        reader: "Read",
+        stats: "Stats",
+        settings: "Settings",
+      },
+      source: {
+        label: "New reading",
+        title: "Capture\nyour next read.",
+        sub: "One tap opens clipboard text or fetches a copied URL.",
+        clipboard: "Clipboard",
+        paste: "Paste from clipboard",
+        working: "Working",
+        urlOrText: "URL or text",
+        fetching: "Fetching readable text",
+        reading: "Reading clipboard",
+        recentSources: "Recent sources",
+        noSources: "No web sources yet",
+        fetchUrl: "Fetch a URL",
+      },
+      reader: {
+        library: "Library",
+        secondsLeft: (seconds) => `${seconds}s left`,
+        minutesLeft: (minutes) => `${minutes.toFixed(1)}m left`,
+        emptyLabel: "Reader",
+        emptyTitle: "Nothing\nqueued.",
+        emptySub: "Add text or fetch a URL first. JustRead will preserve your real library and progress locally.",
+        emptyAction: "Add something to read",
+        pace: "Pace",
+      },
+      settings: {
+        label: "Settings",
+        title: "The shape\nof your read.",
+        pace: "Pace",
+        wordsPerMinute: "Words per minute",
+        slow: "Slow / 150",
+        comfortable: "Comfortable / 500",
+        sprint: "Sprint / 1000",
+        punctuationPause: "Pause on punctuation",
+        punctuationHint: "Slows down at periods, commas, and semicolons.",
+        focusIndicator: "Focus indicator",
+        focusOptions: [["dot", "Dots"], ["line", "Line"], ["crosshair", "Crosshair"]],
+        language: "Language",
+        about: "About",
+        version: "Version",
+        privacy: "Privacy",
+        privacyValue: "Local only",
+        sendFeedback: "Send feedback",
+      },
     },
   },
   "zh-Hant": {
@@ -70,6 +127,62 @@ const localeData = {
       readingNow: "閱讀中",
       saved: "已儲存",
       finished: "已讀完",
+      startReading: "開始閱讀",
+      addFirstArticle: "加入第一篇文章。",
+      libraryEmptyHint: "貼上文字或擷取網址,建立你的真實書架。不預載範例。",
+      noSavedArticles: "還沒有儲存文章。",
+      addFromAdd: "到「新增」貼上文字或擷取網頁。",
+      delete: "刪除",
+      tabs: {
+        home: "書架",
+        source: "新增",
+        reader: "閱讀",
+        stats: "統計",
+        settings: "設定",
+      },
+      source: {
+        label: "新增閱讀",
+        title: "捕捉\n下一篇文章。",
+        sub: "一鍵開啟剪貼簿文字,或擷取複製的網址。",
+        clipboard: "剪貼簿",
+        paste: "從剪貼簿貼上",
+        working: "處理中",
+        urlOrText: "網址或文字",
+        fetching: "正在擷取可讀文字",
+        reading: "正在讀取剪貼簿",
+        recentSources: "最近來源",
+        noSources: "還沒有網頁來源",
+        fetchUrl: "擷取網址",
+      },
+      reader: {
+        library: "書架",
+        secondsLeft: (seconds) => `剩 ${seconds} 秒`,
+        minutesLeft: (minutes) => `剩 ${minutes.toFixed(1)} 分`,
+        emptyLabel: "閱讀",
+        emptyTitle: "尚未\n排入文章。",
+        emptySub: "先加入文字或擷取網址。JustRead 會在本機保留你的書架與進度。",
+        emptyAction: "加入閱讀內容",
+        pace: "速度",
+      },
+      settings: {
+        label: "設定",
+        title: "調整\n閱讀節奏。",
+        pace: "速度",
+        wordsPerMinute: "每分鐘字數",
+        slow: "慢速 / 150",
+        comfortable: "舒適 / 500",
+        sprint: "衝刺 / 1000",
+        punctuationPause: "標點停頓",
+        punctuationHint: "在句號、逗號與分號時放慢。",
+        focusIndicator: "焦點提示",
+        focusOptions: [["dot", "點"], ["line", "線"], ["crosshair", "準星"]],
+        language: "語言",
+        about: "關於",
+        version: "版本",
+        privacy: "隱私",
+        privacyValue: "僅限本機",
+        sendFeedback: "意見回饋",
+      },
     },
   },
 };
@@ -104,7 +217,6 @@ export default function FastReadScreen() {
   const [wpm, setWpm] = useState(540);
   const [punctuationPause, setPunctuationPause] = useState(true);
   const [focusStyle, setFocusStyle] = useState("dot");
-  const [wordFont, setWordFont] = useState("serif");
   const [readingStats, setReadingStats] = useState(() => createEmptyStats());
 
   const article = useMemo(() => library.find((item) => item.id === articleId) || library[0] || null, [articleId, library]);
@@ -119,6 +231,7 @@ export default function FastReadScreen() {
   const isWide = width >= 700;
   const activeArticleId = article?.id || null;
   const activeArticleFinishedAt = article?.finishedAt || null;
+  const tabItems = useMemo(() => tabs.map((tab) => ({ ...tab, label: ui.tabs?.[tab.id] || tab.label })), [ui]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,7 +252,6 @@ export default function FastReadScreen() {
         setWpm(clamp(Number(saved.wpm) || 540, 150, 1000));
         setPunctuationPause(saved.punctuationPause ?? true);
         setFocusStyle(["dot", "line", "crosshair"].includes(saved.focusStyle) ? saved.focusStyle : "dot");
-        setWordFont(["serif", "sans", "mono"].includes(saved.wordFont) ? saved.wordFont : "serif");
         setReadingStats(normalizeStatsForToday(saved.stats || createEmptyStats(), Number(saved.wpm) || 540));
       } catch (error) {
         console.warn("Unable to restore JustRead state.", error);
@@ -165,13 +277,12 @@ export default function FastReadScreen() {
       wpm,
       punctuationPause,
       focusStyle,
-      wordFont,
       stats,
     };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch((error) => {
       console.warn("Unable to persist JustRead state.", error);
     });
-  }, [article?.id, focusStyle, hasHydrated, library, locale, punctuationPause, stats, wordFont, wordIndex, wpm]);
+  }, [article?.id, focusStyle, hasHydrated, library, locale, punctuationPause, stats, wordIndex, wpm]);
 
   useEffect(() => {
     setWordIndex((current) => clamp(current, 0, Math.max(tokens.length - 1, 0)));
@@ -288,6 +399,23 @@ export default function FastReadScreen() {
     [wpm],
   );
 
+  const deleteArticle = useCallback(
+    (id) => {
+      const index = library.findIndex((item) => item.id === id);
+      if (index === -1) return;
+      const nextItems = library.filter((item) => item.id !== id);
+      setLibrary(nextItems);
+      if (articleId === id) {
+        const nextArticle = nextItems[index] || nextItems[index - 1] || nextItems[0] || null;
+        setArticleId(nextArticle?.id || null);
+        setWordIndex(0);
+        setIsPlaying(false);
+        setHasFinished(false);
+      }
+    },
+    [articleId, library],
+  );
+
   const move = useCallback(
     (delta) => {
       setIsPlaying(false);
@@ -353,13 +481,15 @@ export default function FastReadScreen() {
             library={library}
             onResume={() => (article ? openArticle(article, true) : setActiveTab("source"))}
             onOpen={openArticle}
+            onDelete={deleteArticle}
           />
         ) : null}
-        {activeTab === "source" ? <SourceScreen insets={insets} isLandscape={appIsLandscape} recentSources={recentSources} onAddArticle={addArticle} /> : null}
+        {activeTab === "source" ? <SourceScreen insets={insets} isLandscape={appIsLandscape} recentSources={recentSources} ui={ui} onAddArticle={addArticle} /> : null}
         {activeTab === "reader" && article ? (
           <ReaderScreen
             insets={insets}
             isLandscape={appIsLandscape}
+            ui={ui}
             article={article}
             token={token}
             tokens={tokens}
@@ -368,13 +498,12 @@ export default function FastReadScreen() {
             wpm={wpm}
             setWpm={setWpm}
             focusStyle={focusStyle}
-            wordFont={wordFont}
             onBack={() => setActiveTab("home")}
             onScrub={setProgress}
             onEnterFocus={enterFocusAndPlay}
           />
         ) : null}
-        {activeTab === "reader" && !article ? <ReaderEmptyScreen insets={insets} isLandscape={appIsLandscape} onAdd={() => setActiveTab("source")} /> : null}
+        {activeTab === "reader" && !article ? <ReaderEmptyScreen insets={insets} isLandscape={appIsLandscape} ui={ui} onAdd={() => setActiveTab("source")} /> : null}
         {activeTab === "stats" ? <StatsScreen insets={insets} isLandscape={appIsLandscape} library={library} stats={stats} ui={ui} /> : null}
         {activeTab === "settings" ? (
           <SettingsScreen
@@ -386,14 +515,13 @@ export default function FastReadScreen() {
             setPunctuationPause={setPunctuationPause}
             focusStyle={focusStyle}
             setFocusStyle={setFocusStyle}
-            wordFont={wordFont}
-            setWordFont={setWordFont}
             locale={locale}
             setLocale={setLocale}
+            ui={ui}
           />
         ) : null}
 
-        <TabBar activeTab={activeTab} onChange={setActiveTab} bottomInset={Math.max(insets.bottom, appIsLandscape ? 16 : 28)} />
+        <TabBar tabs={tabItems} activeTab={activeTab} onChange={setActiveTab} bottomInset={Math.max(insets.bottom, appIsLandscape ? 16 : 28)} />
       </View>
 
       <FocusMode
@@ -407,7 +535,6 @@ export default function FastReadScreen() {
         isPlaying={isPlaying}
         wpm={wpm}
         focusStyle={focusStyle}
-        wordFont={wordFont}
         onClose={() => setFocusMode(false)}
         onMove={move}
         onPlayPause={togglePlayback}
@@ -416,11 +543,13 @@ export default function FastReadScreen() {
   );
 }
 
-function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOpen }) {
+function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOpen, onDelete }) {
   const current = library.find((item) => item.progress > 0 && item.progress < 1) || library[0] || null;
   const currentCount = current ? tokenize(current.text).length : 0;
   const topPad = topPadding(insets, isLandscape);
   const bottomPad = bottomPadding(isLandscape);
+  const hasCjkHero = containsCjk(`${ui.todayPrefix}${ui.todaySuffix}`);
+  const heroTextStyle = [s.heroLine, isLandscape && s.heroLineLandscape, hasCjkHero && (isLandscape ? s.heroLineCjkLandscape : s.heroLineCjk)];
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
@@ -432,8 +561,8 @@ function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOp
           </View>
           <SectionLabel>{formatShortDate(new Date())}</SectionLabel>
         </View>
-        <Text style={[s.heroLine, isLandscape && s.heroLineLandscape]}>{ui.todayPrefix}</Text>
-        <Text style={[s.heroLine, isLandscape && s.heroLineLandscape]}>
+        <Text style={heroTextStyle}>{ui.todayPrefix}</Text>
+        <Text style={heroTextStyle}>
           <Text style={{ color: color.terracotta }}>{stats.today.words.toLocaleString()}</Text> {ui.todaySuffix}
         </Text>
         <Text style={s.heroMeta}>{ui.todayMeta({ minutes: stats.today.minutes, articles: stats.today.articles, streak: stats.streak })}</Text>
@@ -463,9 +592,9 @@ function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOp
             </Card>
           ) : (
             <Card>
-              <SectionLabel>Start reading</SectionLabel>
-              <Text style={s.continueTitle}>Add your first article.</Text>
-              <Text style={s.metaText}>Paste text or fetch a URL to build a real library. Nothing is preloaded.</Text>
+              <SectionLabel>{ui.startReading}</SectionLabel>
+              <Text style={s.continueTitle}>{ui.addFirstArticle}</Text>
+              <Text style={s.metaText}>{ui.libraryEmptyHint}</Text>
             </Card>
           )}
         </Pressable>
@@ -478,24 +607,26 @@ function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOp
           <View style={s.listCard}>
             {library.length ? (
               library.map((item, index) => (
-                <Pressable key={item.id} onPress={() => onOpen(item)} style={[s.articleRow, index > 0 && s.topRule]}>
-                  <View style={s.articleRowMain}>
-                    <View style={s.articleTitleBlock}>
-                      <Text numberOfLines={1} style={s.articleTitle}>
-                        {item.title}
-                      </Text>
-                      <Text style={s.articleSubline}>
-                        {item.source} · {item.readTime}
-                      </Text>
+                <Swipeable key={item.id} overshootRight={false} rightThreshold={42} renderRightActions={() => <SwipeDeleteAction label={ui.delete} onPress={() => onDelete(item.id)} />}>
+                  <Pressable onPress={() => onOpen(item)} style={[s.articleRow, index > 0 && s.topRule]}>
+                    <View style={s.articleRowMain}>
+                      <View style={s.articleTitleBlock}>
+                        <Text numberOfLines={1} style={s.articleTitle}>
+                          {item.title}
+                        </Text>
+                        <Text style={s.articleSubline}>
+                          {item.source} · {item.readTime}
+                        </Text>
+                      </View>
+                      <TagPill item={item} ui={ui} />
                     </View>
-                    <TagPill item={item} ui={ui} />
-                  </View>
-                </Pressable>
+                  </Pressable>
+                </Swipeable>
               ))
             ) : (
               <View style={s.articleRow}>
-                <Text style={s.articleTitle}>No saved articles yet.</Text>
-                <Text style={s.articleSubline}>Use Add to paste text or fetch a webpage.</Text>
+                <Text style={s.articleTitle}>{ui.noSavedArticles}</Text>
+                <Text style={s.articleSubline}>{ui.addFromAdd}</Text>
               </View>
             )}
           </View>
@@ -505,7 +636,7 @@ function LibraryScreen({ insets, isLandscape, ui, stats, library, onResume, onOp
   );
 }
 
-function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
+function SourceScreen({ insets, isLandscape, recentSources, ui, onAddArticle }) {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPasteActive, setIsPasteActive] = useState(false);
@@ -612,10 +743,10 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-      <PageTitle insets={insets} isLandscape={isLandscape} label="New reading" title={"Capture\nyour next read."} sub={"One tap opens clipboard text or fetches a copied URL."} />
+      <PageTitle insets={insets} isLandscape={isLandscape} label={ui.source.label} title={ui.source.title} sub={ui.source.sub} />
       <View style={{ paddingHorizontal: 24, gap: 28 }}>
         <View>
-          <SectionLabel>Clipboard</SectionLabel>
+          <SectionLabel>{ui.source.clipboard}</SectionLabel>
           <Animated.View
             style={[
               s.clipboardBeam,
@@ -627,13 +758,13 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
               },
             ]}
           >
-            <Pressable accessibilityRole="button" accessibilityLabel={loading ? "Fetching clipboard content" : "Paste from clipboard"} disabled={isBeamActive} onPress={handlePaste} style={[s.clipboardButton, isBeamActive && s.clipboardButtonActive]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={loading ? ui.source.fetching : ui.source.paste} disabled={isBeamActive} onPress={handlePaste} style={[s.clipboardButton, isBeamActive && s.clipboardButtonActive]}>
               <View style={[s.clipboardIcon, isBeamActive && s.clipboardIconActive]}>
                 <Text style={[s.clipboardIconText, isBeamActive && s.clipboardIconTextActive]}>{isBeamActive ? "↻" : "⌘"}</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.clipboardTitle}>{isBeamActive ? "Working" : "Paste from clipboard"}</Text>
-                <Text style={s.clipboardSub}>{loading ? "Fetching readable text" : isPasteActive ? "Reading clipboard" : "URL or text"}</Text>
+                <Text style={s.clipboardTitle}>{isBeamActive ? ui.source.working : ui.source.paste}</Text>
+                <Text style={s.clipboardSub}>{loading ? ui.source.fetching : isPasteActive ? ui.source.reading : ui.source.urlOrText}</Text>
               </View>
               {isBeamActive ? <ActivityIndicator color={color.terracotta} size="small" /> : <Text style={s.clipboardArrow}>{"->"}</Text>}
             </Pressable>
@@ -643,7 +774,7 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
         {status ? <Text style={[s.status, { color: color.terracotta }]}>{status.toUpperCase()}</Text> : null}
 
         <View>
-          <SectionLabel>Recent sources</SectionLabel>
+          <SectionLabel>{ui.source.recentSources}</SectionLabel>
           {recentSources.length ? (
             recentSources.map((item, index) => (
               <Pressable key={item.id} disabled={loading || !item.url} onPress={() => item.url && fetchURL(item.url)} style={[s.recentRow, index === 0 && { marginTop: 12 }, loading && { opacity: 0.55 }]}>
@@ -653,8 +784,8 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
             ))
           ) : (
             <View style={[s.recentRow, { marginTop: 12 }]}>
-              <Text style={s.recentLabel}>No web sources yet</Text>
-              <Text style={s.recentDate}>Fetch a URL</Text>
+              <Text style={s.recentLabel}>{ui.source.noSources}</Text>
+              <Text style={s.recentDate}>{ui.source.fetchUrl}</Text>
             </View>
           )}
         </View>
@@ -666,6 +797,7 @@ function SourceScreen({ insets, isLandscape, recentSources, onAddArticle }) {
 function ReaderScreen({
   insets,
   isLandscape,
+  ui,
   article,
   token,
   tokens,
@@ -674,7 +806,6 @@ function ReaderScreen({
   wpm,
   setWpm,
   focusStyle,
-  wordFont,
   onBack,
   onScrub,
   onEnterFocus,
@@ -690,7 +821,7 @@ function ReaderScreen({
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} scrollEnabled={!isRangeScrubbing} showsVerticalScrollIndicator={false}>
       <View style={[s.readerHeader, { paddingTop: topPad }, isLandscape && s.readerHeaderLandscape]}>
         <Pressable onPress={onBack}>
-          <SectionLabel>{"< Library"}</SectionLabel>
+          <SectionLabel>{`< ${ui.reader.library}`}</SectionLabel>
         </Pressable>
         <Text style={s.readerTitle}>{article.title}</Text>
         <Text style={s.readerMeta}>
@@ -702,7 +833,7 @@ function ReaderScreen({
         <View style={[s.readerControls, isLandscape && s.readerControlsLandscape]}>
           <Card padding={0}>
             <View style={[s.readerStageShell, { paddingHorizontal: 16, paddingTop: isLandscape ? 12 : 20, paddingBottom: 8 }]}>
-              <RSVPStage token={token} focusStyle={focusStyle} wordFont={wordFont} compact={isLandscape} />
+              <RSVPStage token={token} focusStyle={focusStyle} compact={isLandscape} />
               <EnterFocusButton compact={isLandscape} onPress={onEnterFocus} />
             </View>
             <View style={{ paddingHorizontal: 16, paddingBottom: isLandscape ? 14 : 20, gap: 8 }}>
@@ -711,59 +842,25 @@ function ReaderScreen({
                 <Text style={s.percent}>
                   {wordIndex + 1} / {tokens.length}
                 </Text>
-                <Text style={s.percent}>{minutesLeft < 1 ? `${Math.ceil(minutesLeft * 60)}s left` : `${minutesLeft.toFixed(1)}m left`}</Text>
+                <Text style={s.percent}>{minutesLeft < 1 ? ui.reader.secondsLeft(Math.ceil(minutesLeft * 60)) : ui.reader.minutesLeft(minutesLeft)}</Text>
               </View>
             </View>
           </Card>
 
-          <PaceControl wpm={wpm} setWpm={setWpm} compact={isLandscape} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
-        </View>
-
-        <View style={[s.readerContextWrap, isLandscape && s.readerContextWrapLandscape]}>
-          <SectionLabel>Context</SectionLabel>
-          <ReaderContextPreview tokens={tokens} wordIndex={wordIndex} />
+          <PaceControl label={ui.reader.pace} wpm={wpm} setWpm={setWpm} compact={isLandscape} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
         </View>
       </View>
     </ScrollView>
   );
 }
 
-function ReaderContextPreview({ tokens, wordIndex }) {
-  if (!tokens.length) {
-    return <Text style={s.readerContextText}>No readable text available.</Text>;
-  }
-
-  const window = contextWindow(tokens.length, wordIndex, 6, 12);
-  const visibleTokens = tokens.slice(window.lowerBound, window.upperBound);
-
-  return (
-    <Text numberOfLines={4} style={s.readerContextText}>
-      {window.hasLeadingOverflow ? <Text style={{ color: color.inkQuiet }}>... </Text> : null}
-      {visibleTokens.map((item, offset) => {
-        const index = window.lowerBound + offset;
-        const parts = splitForFocus(item);
-        const baseColor = index < wordIndex ? color.inkQuiet : index === wordIndex ? color.ink : color.inkMid;
-        return (
-          <Text key={`${item}-${index}`} style={{ color: baseColor, fontWeight: index === wordIndex ? "600" : "400" }}>
-            {parts.before}
-            <Text style={{ color: color.terracotta, fontWeight: "700" }}>{parts.focus}</Text>
-            {parts.after}
-            {tokenSeparator(item, tokens[index + 1])}
-          </Text>
-        );
-      })}
-      {window.hasTrailingOverflow ? <Text style={{ color: color.inkQuiet }}> ...</Text> : null}
-    </Text>
-  );
-}
-
-function ReaderEmptyScreen({ insets, isLandscape, onAdd }) {
+function ReaderEmptyScreen({ insets, isLandscape, ui, onAdd }) {
   return (
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPadding(isLandscape) }} showsVerticalScrollIndicator={false}>
-      <PageTitle insets={insets} isLandscape={isLandscape} label="Reader" title={"Nothing\nqueued."} sub={"Add text or fetch a URL first. JustRead will preserve your real library and progress locally."} />
+      <PageTitle insets={insets} isLandscape={isLandscape} label={ui.reader.emptyLabel} title={ui.reader.emptyTitle} sub={ui.reader.emptySub} />
       <View style={{ paddingHorizontal: 24 }}>
         <Pressable onPress={onAdd} style={s.primaryButton}>
-          <Text style={s.primaryButtonText}>Add something to read</Text>
+          <Text style={s.primaryButtonText}>{ui.reader.emptyAction}</Text>
           <Text style={s.primaryArrow}>{"->"}</Text>
         </Pressable>
       </View>
@@ -771,7 +868,7 @@ function ReaderEmptyScreen({ insets, isLandscape, onAdd }) {
   );
 }
 
-function FocusMode({ visible, isLandscape, token, article, progress, wordIndex, total, isPlaying, wpm, focusStyle, wordFont, onClose, onMove, onPlayPause }) {
+function FocusMode({ visible, isLandscape, token, article, progress, wordIndex, total, isPlaying, wpm, focusStyle, onClose, onMove, onPlayPause }) {
   const insets = useSafeAreaInsets();
 
   if (!visible) return null;
@@ -791,7 +888,7 @@ function FocusMode({ visible, isLandscape, token, article, progress, wordIndex, 
         </Pressable>
       </View>
       <View style={{ flex: 1, justifyContent: "center" }}>
-        <RSVPStage token={token} focusStyle={focusStyle} wordFont={wordFont} dark big compact={isLandscape} />
+        <RSVPStage token={token} focusStyle={focusStyle} dark big compact={isLandscape} />
       </View>
       <View style={{ paddingHorizontal: 24, gap: 18 }}>
         <View style={{ gap: 6 }}>
@@ -876,7 +973,7 @@ function StatsScreen({ insets, isLandscape, library, stats, ui }) {
   );
 }
 
-function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, setPunctuationPause, focusStyle, setFocusStyle, wordFont, setWordFont, locale, setLocale }) {
+function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, setPunctuationPause, focusStyle, setFocusStyle, locale, setLocale, ui }) {
   const bottomPad = bottomPadding(isLandscape);
   const [isRangeScrubbing, setIsRangeScrubbing] = useState(false);
   const lockRangeScroll = useCallback(() => setIsRangeScrubbing(true), []);
@@ -884,50 +981,46 @@ function SettingsScreen({ insets, isLandscape, wpm, setWpm, punctuationPause, se
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: bottomPad }} scrollEnabled={!isRangeScrubbing} showsVerticalScrollIndicator={false}>
-      <PageTitle insets={insets} isLandscape={isLandscape} label="Settings" title={"The shape\nof your read."} />
+      <PageTitle insets={insets} isLandscape={isLandscape} label={ui.settings.label} title={ui.settings.title} />
       <View style={{ paddingHorizontal: 16, gap: 22 }}>
-        <SettingsGroup label="Pace">
-          <SettingsRow label="Words per minute" value={wpm} />
+        <SettingsGroup label={ui.settings.pace}>
+          <SettingsRow label={ui.settings.wordsPerMinute} value={wpm} />
           <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 4 }}>
             <Scrubber value={(wpm - 150) / 850} onChange={(value) => setWpm(Math.round((150 + value * 850) / 25) * 25)} onScrubStart={lockRangeScroll} onScrubEnd={unlockRangeScroll} />
             <View style={s.rowBetween}>
-              <Text style={s.tinyMono}>Slow / 150</Text>
-              <Text style={s.tinyMono}>Comfortable / 500</Text>
-              <Text style={s.tinyMono}>Sprint / 1000</Text>
+              <Text style={s.tinyMono}>{ui.settings.slow}</Text>
+              <Text style={s.tinyMono}>{ui.settings.comfortable}</Text>
+              <Text style={s.tinyMono}>{ui.settings.sprint}</Text>
             </View>
           </View>
           <View style={s.settingsRow}>
             <View style={{ flex: 1 }}>
-              <Text style={s.settingsLabel}>Pause on punctuation</Text>
-              <Text style={s.settingsHint}>Slows down at periods, commas, and semicolons.</Text>
+              <Text style={s.settingsLabel}>{ui.settings.punctuationPause}</Text>
+              <Text style={s.settingsHint}>{ui.settings.punctuationHint}</Text>
             </View>
             <Switch value={punctuationPause} onValueChange={setPunctuationPause} trackColor={{ true: color.terracotta, false: color.ruleStrong }} thumbColor="#fff" />
           </View>
         </SettingsGroup>
-        <SettingsGroup label="Focus indicator">
-          <Segmented value={focusStyle} onChange={setFocusStyle} options={[["dot", "Dots"], ["line", "Line"], ["crosshair", "Crosshair"]]} />
+        <SettingsGroup label={ui.settings.focusIndicator}>
+          <Segmented value={focusStyle} onChange={setFocusStyle} options={ui.settings.focusOptions} />
         </SettingsGroup>
-        <SettingsGroup label="Word typeface">
-          <Segmented value={wordFont} onChange={setWordFont} options={[["serif", "Serif"], ["sans", "Sans"], ["mono", "Mono"]]} />
-        </SettingsGroup>
-        <SettingsGroup label="Language">
+        <SettingsGroup label={ui.settings.language}>
           <Segmented value={locale} onChange={setLocale} options={[["en", "English"], ["zh-Hant", "繁體"]]} />
         </SettingsGroup>
-        <SettingsGroup label="About">
-          <SettingsRow label="Version" value={APP_VERSION} />
-          <SettingsRow label="Privacy" value="Local only" />
-          <SettingsRow label="Send feedback" value="huge.huang@gmail.com" last />
+        <SettingsGroup label={ui.settings.about}>
+          <SettingsRow label={ui.settings.version} value={APP_VERSION} />
+          <SettingsRow label={ui.settings.privacy} value={ui.settings.privacyValue} />
+          <SettingsRow label={ui.settings.sendFeedback} value="huge.huang@gmail.com" last />
         </SettingsGroup>
       </View>
     </ScrollView>
   );
 }
 
-function RSVPStage({ token, focusStyle, wordFont, dark = false, big = false, compact = false }) {
+function RSVPStage({ token, focusStyle, dark = false, big = false, compact = false }) {
   const parts = splitForFocus(token);
   const size = big ? (compact ? 58 : 76) : compact ? 44 : 54;
-  const family = wordFont === "mono" ? "JetBrainsMono" : wordFont === "sans" ? "Inter" : "Fraunces";
-  const fontStyle = containsCjk(token) ? null : { fontFamily: family };
+  const fontStyle = containsCjk(token) ? null : { fontFamily: "Fraunces" };
   const ink = dark ? color.paper : color.ink;
 
   return (
@@ -991,11 +1084,11 @@ function Transport({ isPlaying, onPlayPause, onMove, onFocus, dark = false, comp
   );
 }
 
-function PaceControl({ wpm, setWpm, compact = false, onScrubStart, onScrubEnd }) {
+function PaceControl({ label = "Pace", wpm, setWpm, compact = false, onScrubStart, onScrubEnd }) {
   return (
     <View style={[s.pace, compact && s.paceCompact]}>
       <View style={s.rowBetween}>
-        <SectionLabel>Pace</SectionLabel>
+        <SectionLabel>{label}</SectionLabel>
         <Text style={s.paceValue}>
           {wpm} <Text style={s.paceUnit}>wpm</Text>
         </Text>
@@ -1043,7 +1136,9 @@ function Scrubber({ value, onChange, onScrubStart, onScrubEnd }) {
   }, []);
   const apply = useCallback(
     (event, gestureState) => {
-      const pageX = Number.isFinite(gestureState?.moveX) ? gestureState.moveX : event?.nativeEvent?.pageX;
+      const eventPageX = event?.nativeEvent?.pageX;
+      const gesturePageX = Number.isFinite(gestureState?.moveX) && gestureState.moveX > 0 ? gestureState.moveX : undefined;
+      const pageX = Number.isFinite(eventPageX) ? eventPageX : gesturePageX;
       const trackPageX = trackPageXRef.current;
       if (Number.isFinite(pageX) && Number.isFinite(trackPageX)) {
         onChangeRef.current(rangeValueFromPageX(pageX, trackPageX, widthRef.current));
@@ -1127,7 +1222,15 @@ function Scrubber({ value, onChange, onScrubStart, onScrubEnd }) {
   );
 }
 
-function TabBar({ activeTab, onChange, bottomInset }) {
+function SwipeDeleteAction({ label, onPress }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={s.swipeDelete}>
+      <Text style={s.swipeDeleteText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function TabBar({ tabs, activeTab, onChange, bottomInset }) {
   return (
     <View style={[s.tabBar, { paddingBottom: bottomInset }]}>
       {tabs.map((tab) => {
@@ -1199,10 +1302,13 @@ function BrandMark({ size = 56 }) {
 }
 
 function PageTitle({ insets, isLandscape, label, title, sub }) {
+  const hasCjkHeading = containsCjk(title);
+  const headingStyle = [s.pageHeading, isLandscape && s.pageHeadingLandscape, hasCjkHeading && (isLandscape ? s.pageHeadingCjkLandscape : s.pageHeadingCjk)];
+
   return (
     <View style={[s.pageTitle, { paddingTop: topPadding(insets, isLandscape) }, isLandscape && s.pageTitleLandscape]}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={[s.pageHeading, isLandscape && s.pageHeadingLandscape]}>{title}</Text>
+      <Text style={headingStyle}>{title}</Text>
       {sub ? <Text style={s.pageSub}>{sub}</Text> : null}
     </View>
   );
@@ -1495,7 +1601,9 @@ const s = {
   brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   wordmark: { fontFamily: "Fraunces", fontSize: 19, fontWeight: "600", color: color.ink, letterSpacing: -0.3 },
   heroLine: { fontFamily: "Fraunces", fontSize: 38, lineHeight: 39, fontWeight: "500", letterSpacing: -1, color: color.ink },
+  heroLineCjk: { lineHeight: 47, paddingTop: 2 },
   heroLineLandscape: { fontSize: 31, lineHeight: 32 },
+  heroLineCjkLandscape: { lineHeight: 39, paddingTop: 2 },
   heroMeta: { marginTop: 10, fontFamily: "Inter", fontSize: 14, lineHeight: 21, color: color.inkQuiet },
   sectionLabel: { fontFamily: "JetBrainsMono", fontSize: 11, fontWeight: "500", letterSpacing: 1.54, color: color.inkQuiet },
   card: { backgroundColor: color.paperStrong, borderRadius: 4, borderWidth: 0.5, borderColor: color.rule, gap: 12 },
@@ -1516,6 +1624,8 @@ const s = {
   libraryListWrap: { paddingHorizontal: 16 },
   libraryListWrapLandscape: { flex: 0.58, paddingHorizontal: 0 },
   articleRow: { paddingHorizontal: 16, paddingVertical: 14 },
+  swipeDelete: { width: 86, alignSelf: "stretch", alignItems: "center", justifyContent: "center", backgroundColor: color.terracotta },
+  swipeDeleteText: { fontFamily: "Inter", fontSize: 12, fontWeight: "800", letterSpacing: 0.7, color: "#fff", textTransform: "uppercase" },
   topRule: { borderTopWidth: 0.5, borderTopColor: color.rule },
   articleRowMain: { flexDirection: "row", alignItems: "center", gap: 12 },
   articleTitleBlock: { flex: 1, minWidth: 0, gap: 4 },
@@ -1532,7 +1642,9 @@ const s = {
   pageTitle: { paddingHorizontal: 24, paddingBottom: 18, gap: 8 },
   pageTitleLandscape: { paddingBottom: 12 },
   pageHeading: { fontFamily: "Fraunces", fontSize: 36, lineHeight: 38, fontWeight: "500", letterSpacing: -0.9, color: color.ink },
+  pageHeadingCjk: { lineHeight: 44, paddingTop: 2 },
   pageHeadingLandscape: { fontSize: 30, lineHeight: 32 },
+  pageHeadingCjkLandscape: { lineHeight: 38, paddingTop: 2 },
   pageSub: { fontFamily: "Inter", fontSize: 14, lineHeight: 21, color: color.inkMid },
   clipboardBeam: { marginTop: 10, borderRadius: 6, borderWidth: 1.2, backgroundColor: color.paperStrong, shadowColor: color.terracotta, shadowOffset: { width: 0, height: 8 }, shadowRadius: 18 },
   clipboardBeamActive: { borderWidth: 2.4, backgroundColor: "#fff8eb", shadowRadius: 30 },
@@ -1560,8 +1672,6 @@ const s = {
   readerBodyLandscape: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingHorizontal: 16 },
   readerControls: { gap: 0 },
   readerControlsLandscape: { flex: 0.48 },
-  readerContextWrap: { paddingHorizontal: 24, paddingTop: 24 },
-  readerContextWrapLandscape: { flex: 0.52, paddingHorizontal: 0, paddingTop: 0 },
   readerStageShell: { position: "relative" },
   stage: { position: "relative", width: "100%", justifyContent: "center" },
   stageWord: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", width: "100%" },
@@ -1591,7 +1701,6 @@ const s = {
   paceValue: { fontFamily: "Fraunces", fontSize: 22, fontWeight: "700", color: color.ink },
   paceUnit: { fontFamily: "JetBrainsMono", fontSize: 11, color: color.inkQuiet, letterSpacing: 1.54 },
   tinyMono: { fontFamily: "JetBrainsMono", fontSize: 10, letterSpacing: 0.6, color: color.inkQuiet },
-  readerContextText: { marginTop: 10, fontFamily: "Fraunces", fontSize: 15.5, lineHeight: 24, color: color.inkMid },
   focusScreen: { flex: 1, backgroundColor: color.focusDark },
   focusOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
   focusTop: { flexDirection: "row", alignItems: "center", paddingHorizontal: 24, gap: 12 },

@@ -14,9 +14,6 @@ struct SettingsView: View {
                     SettingsGroup(label: "Focus indicator") {
                         SegmentedControl(selection: $store.focusIndicator, options: FocusIndicatorStyle.allCases)
                     }
-                    SettingsGroup(label: "Word typeface") {
-                        SegmentedControl(selection: $store.wordTypeface, options: WordTypeface.allCases)
-                    }
                     aboutGroup
                 }
                 .padding(.horizontal, 16)
@@ -177,7 +174,6 @@ private protocol SegmentedOption: Identifiable, Hashable {
 }
 
 extension FocusIndicatorStyle: SegmentedOption {}
-extension WordTypeface: SegmentedOption {}
 
 private struct SegmentedControl<Option: SegmentedOption>: View {
     @Binding var selection: Option

@@ -26,13 +26,17 @@ reject_pattern() {
   fi
 }
 
-require_pattern "RSVPEngine\\.contextWindow" \
-  "ReaderView must use RSVPEngine.contextWindow so READ context stays bounded." \
-  FastReadApp/ReaderView.swift
+reject_pattern "ReaderContextPreview|ContextTextPreview|SectionLabel\\(text: \"Context\"\\)|<SectionLabel>Context</SectionLabel>|readerContext" \
+  "READ context previews must stay removed from native and Expo reader surfaces." \
+  FastReadApp/ReaderView.swift components/fast-read-screen.jsx
 
 reject_pattern "FullTextPreview|The full text|fullText|step:" \
   "Found a known perf-regression pattern in reader/settings UI." \
   FastReadApp/ReaderView.swift FastReadApp/SettingsView.swift components/fast-read-screen.jsx
+
+reject_pattern "Word typeface|WordTypeface|wordTypeface|wordFont|setWordFont" \
+  "Word typeface settings must stay removed from native and Expo reader surfaces." \
+  FastReadApp components/fast-read-screen.jsx
 
 reject_pattern "TextInput|smartInput|Paste or type" \
   "Expo Add screen must stay clipboard-only for the shipped TestFlight surface." \
@@ -49,6 +53,22 @@ require_pattern "scrollEnabled=\\{!isRangeScrubbing\\}" \
 require_pattern "onStartShouldSetPanResponderCapture: \\(\\) => true" \
   "Expo range controls must capture scrubber touches before the parent ScrollView can steal the gesture." \
   components/fast-read-screen.jsx
+
+require_pattern "gestureState\\?\\.moveX\\) && gestureState\\.moveX > 0" \
+  "Expo scrubbers must ignore invalid initial PanResponder moveX=0 values so sliders do not snap while dragging." \
+  components/fast-read-screen.jsx
+
+require_pattern "GestureHandlerRootView" \
+  "Expo root layout must wrap the app with GestureHandlerRootView so swipe actions work reliably." \
+  app/_layout.jsx
+
+require_pattern "<Swipeable" \
+  "Expo Library rows must support trailing swipe-to-delete." \
+  components/fast-read-screen.jsx
+
+require_pattern "\\.swipeActions\\(edge: \\.trailing" \
+  "Native SwiftUI Library rows must support trailing swipe-to-delete." \
+  FastReadApp/LibraryView.swift
 
 require_pattern "clipboardBeamActive" \
   "Expo paste button must keep a visibly stronger active beam while reading/fetching clipboard content." \
@@ -68,6 +88,18 @@ require_pattern "rangeValueFromPageX" \
 
 require_pattern "measureInWindow" \
   "Range inputs must measure the track bounds before mapping absolute touch coordinates." \
+  components/fast-read-screen.jsx
+
+require_pattern "ui\\.tabs\\?\\.\\[tab\\.id\\]" \
+  "Tab labels must derive from the active locale so language changes update UI immediately." \
+  components/fast-read-screen.jsx
+
+require_pattern "pageHeadingCjk" \
+  "Page titles must define CJK-specific metrics so Chinese ADD/Settings titles do not clip." \
+  components/fast-read-screen.jsx
+
+require_pattern "heroLineCjk" \
+  "Library masthead must define CJK-specific metrics so Chinese headings do not clip." \
   components/fast-read-screen.jsx
 
 require_pattern "nextArticleProgressState" \

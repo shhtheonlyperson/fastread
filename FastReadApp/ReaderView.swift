@@ -18,8 +18,6 @@ struct ReaderView: View {
                             .padding(.top, 8)
                         paceControl
                             .padding(.top, 22)
-                        readingContext
-                            .padding(.top, 24)
                     }
                     .padding(.bottom, 112)
                 }
@@ -97,8 +95,7 @@ struct ReaderView: View {
                 ZStack {
                     RSVPStage(
                         token: store.currentToken,
-                        focusStyle: store.focusIndicator,
-                        wordTypeface: store.wordTypeface
+                        focusStyle: store.focusIndicator
                     )
                     .frame(minHeight: 180)
 
@@ -208,18 +205,6 @@ struct ReaderView: View {
         .padding(.horizontal, 24)
     }
 
-    private var readingContext: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Context")
-            ContextTextPreview(tokens: store.currentTokens, currentIndex: store.currentIndex)
-                .font(JRFont.serif(15.5))
-                .lineSpacing(5)
-                .foregroundStyle(JRColor.inkMid)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
-    }
-
     private var minutesLeftLabel: String {
         let minutes = store.minutesRemaining
         return minutes < 1 ? "\(Int(ceil(minutes * 60)))s left" : "\(String(format: "%.1f", minutes))m left"
@@ -272,7 +257,6 @@ struct FocusModeView: View {
                 RSVPStage(
                     token: store.currentToken,
                     focusStyle: store.focusIndicator,
-                    wordTypeface: store.wordTypeface,
                     isBig: true,
                     isDark: true
                 )
@@ -360,7 +344,6 @@ private extension View {
 struct RSVPStage: View {
     let token: String
     let focusStyle: FocusIndicatorStyle
-    let wordTypeface: WordTypeface
     var isBig = false
     var isDark = false
 
@@ -401,14 +384,7 @@ struct RSVPStage: View {
 
     private var stageFont: Font {
         let size: CGFloat = isBig ? 76 : 54
-        switch wordTypeface {
-        case .serif:
-            return JRFont.serif(size, weight: .medium)
-        case .sans:
-            return JRFont.sans(size, weight: .medium)
-        case .mono:
-            return JRFont.mono(size, weight: .medium)
-        }
+        return JRFont.serif(size, weight: .medium)
     }
 }
 
@@ -486,51 +462,5 @@ private struct DarkTransportButton<Content: View>: View {
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct ContextTextPreview: View {
-    let tokens: [String]
-    let currentIndex: Int
-
-    private let beforeCount = 6
-    private let afterCount = 12
-
-    var body: some View {
-        if tokens.isEmpty {
-            Text("No readable text available.")
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            previewText
-                .lineLimit(4)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var previewText: Text {
-        let window = RSVPEngine.contextWindow(
-            tokenCount: tokens.count,
-            currentIndex: currentIndex,
-            before: beforeCount,
-            after: afterCount
-        )
-        let visibleTokens = Array(tokens[window.range])
-        let leading = window.hasLeadingOverflow ? Text("... ").foregroundColor(JRColor.inkQuiet) : Text("")
-        let trailing = window.hasTrailingOverflow ? Text(" ...").foregroundColor(JRColor.inkQuiet) : Text("")
-
-        return visibleTokens.enumerated().reduce(leading) { partial, item in
-            let index = window.lowerBound + item.offset
-            let token = item.element
-            let split = RSVPEngine.splitForFocus(token)
-            let isCurrent = index == currentIndex
-            let isRead = index < currentIndex
-            let baseColor = isRead ? JRColor.inkQuiet : isCurrent ? JRColor.ink : JRColor.inkMid
-            return partial
-                + Text(split.before).foregroundColor(baseColor).fontWeight(isCurrent ? .semibold : .regular)
-                + Text(split.focus).foregroundColor(JRColor.terracotta).fontWeight(.semibold)
-                + Text(split.after + " ").foregroundColor(baseColor).fontWeight(isCurrent ? .semibold : .regular)
-        } + trailing
     }
 }
