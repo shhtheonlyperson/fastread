@@ -1,0 +1,316 @@
+# Ralph Progress Log
+Started: Thu May  7 22:42:30 PDT 2026
+
+## Codebase Patterns
+- Tests use `node --test` with `node:test` and `node:assert/strict` (.test.mjs files in `test/`).
+- `src/article-extract.js` exports `extractArticle(html, sourceUrl)` returning `{ title, url, text, wordCount, source }`.
+- `extractArticle` candidate `source` values: `entry-content`, `main`, `article`, `main-element`, `json-ld`, `body`, `none`. Plain-text input is not an HTML path; tests treat `.txt` separately and produce a synthetic `source: "plaintext"`.
+- `countReadingUnits` (from `src/reader-core.js`) is the canonical word/CJK-unit counter. Use it for any token-count assertion.
+- Class-based selectors recognized: `entry-content`, `wp-block-post-content`, `post-content`, `article-content`, `article__content`, `article-body`, `story-body` (priority 80, beats `<article>`/`<main>`).
+- `src/url-ingest.js` exports `fetchAndExtract({ url, fetcher, maxBytes, signal })` plus typed error classes `InvalidURL`, `HttpError`, `OversizedError`, `UnsupportedContentType`, `TimeoutError`. Inject `fetcher` (defaults to `globalThis.fetch`) for unit testability — never call real network in tests.
+- The Swift port (US-004) must mirror the same error taxonomy: invalidURL, httpError(Int), oversized, unsupportedContentType(String), timeout.
+- Swift `ArticleLoader.fetch(urlString:session:maxBytes:)` lives in `Sources/FastReadCore/UrlIngest.swift` and accepts a `URLDataFetching`-conforming session (URLSession by default). Tests inject `URLSession(configuration: ephemeral)` with a `URLProtocol` stub.
+- `Sources/FastReadCore/*.swift` files are compiled into both the SwiftPM `FastReadCore` library AND the FastReadApp Xcode target directly (not as a module dependency). When adding a new file under `Sources/FastReadCore/`, also add it to `FastRead.xcodeproj/project.pbxproj` in 4 places: PBXBuildFile, PBXFileReference, the FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase files list.
+- Swift 6 strict concurrency: static mutable shared state in tests (e.g. URLProtocol stub handler) needs `nonisolated(unsafe)` plus an `NSLock` guard, since the test target compiles with concurrency checks on.
+- `ReadingArticle` (Swift) lives in `Sources/FastReadCore/ReadingArticle.swift` as a `public` Codable struct with an explicit `public init`. The Xcode app target compiles it directly via pbxproj; FastReadApp call sites do NOT need `import FastReadCore`. Required (non-optional) fields: id, title, source, author, date, readTime, lede, tag, text, progress, wordIndex, timesOpened, isFinished. Optional date fields: sourceURL, createdAt, lastOpenedAt, finishedAt — older v0 JSON omits these.
+- The JS persisted root shape (see `setItemAsync`/`getItemAsync` in `components/fast-read-screen.jsx`) is `{ library, articleId, wordIndex, wpm, ... }`: `wordIndex` and `isFinished`-equivalents live on the wrapper, not on each library item. Each library item itself uses `tagKey` (not `tag`).
+- `src/document.js` exports `createDocument`, `createSection`, `flattenText`, `tokenizeDocument`, `sectionBoundaries`. `flattenText` joins sections with `"\n\n"`. Section kinds: `body`|`chapter`|`page`. Use these factories instead of constructing object literals so the validation (id non-empty, kind enum) stays centralized.
+- `Sources/FastReadCore/Document.swift` mirrors `src/document.js`: public `Document`/`Section` structs (Codable, Equatable, Sendable) and `SectionKind` enum (raw String "body"/"chapter"/"page"). Static helpers `Document.flattenText(_:)` and `Document.sectionBoundaries(_:)`. JSON shape matches JS exactly — JS-produced fixtures decode directly via `JSONDecoder().decode(Document.self, ...)`.
+- `src/importers/index.js` is the JS adapter registry. Adapter shape: `{ kind, canHandle(input), import(input, opts) -> Document }`. Built-ins: `PlainTextAdapter` (kind "text", normalizes plaintext to a single body section), `HtmlAdapter` (kind "html", wraps `extractArticle` into a single body section with `id: "body"`). Use `importDocument({ kind, input, sourceUrl })` to dispatch; unknown kinds throw `UnknownImporterKind`. Keep `extractArticle` itself untouched — adapters wrap it.
+- `Sources/FastReadCore/Importers.swift` is the Swift adapter registry, mirroring the JS shape. Public `SourceAdapter` protocol (`kind: SourceKind`, `canHandle(_: String) -> Bool`, `import(_: String, options: ImportOptions) throws -> Document`). `SourceKind` is a public enum (`text`/`html`/`epub`). Built-ins `PlainTextAdapter` (wraps `ArticleTextExtractor.normalize`) and `HtmlAdapter` (wraps `ArticleTextExtractor.readableText` + `extractTitle`); both emit one body Section with `id: "body"`. `ImporterRegistry.shared` self-registers built-ins; unknown kinds throw `ImporterError.unknownKind(String)`. Future EPUB importer (US-015) registers under `.epub`.
+- The Swift HtmlAdapter cannot produce byte-equal output to the JS HtmlAdapter — Swift's `ArticleTextExtractor` is a regex tag-stripper, while JS's `extractArticle` runs Readability-style scoring. Cross-platform parity for HTML imports is loose: both produce a single body Section with `flattenText(doc)` non-empty; do NOT assert byte equality across runtimes. EPUB parity (US-015) is the first place exact-text/section parity matters across the two ports.
+- `src/storage-migration.js` exports `LEGACY_STORAGE_KEY` ("fastread-state-v1"), `STORAGE_KEY` ("fastread-state-v2"), `migrateLibraryItem`, `migratePayload`, `loadAndMigrate(storage)`. Migration drops the legacy per-item `text` and adds `document` (one body Section). On Swift, `Sources/FastReadCore/StorageMigration.swift` wraps each `ReadingArticle.text` into an in-memory `Document` (on-disk article shape is unchanged); `ReadingStore.documentsByArticleID` holds the map and is kept in sync by `addDraftArticle`/`deleteArticle`.
+- `src/url-ingest.js` now exports both `fetchHtml` (returns raw `{ html, finalUrl }`) and `fetchAndExtract` (thin wrapper that runs `extractArticle`). Use `fetchHtml` when the caller wants to route through `importDocument({kind:'html'})`; keep `fetchAndExtract` only for legacy callers.
+- `src/web-flow.js` exports `loadUrlDocument({ url, fetcher, maxBytes, signal })` (uses `fetchHtml` + `importDocument({kind:'html'})`) plus `getWebFlowState`/`resetWebFlowState`. This is the canonical web (`src/app.js`) entry point for URL imports — RN uses `fetchHtml` + `importDocument` inline because it needs to feed the result into `onAddArticle`.
+- The web `loadUrl` path uses a server-side `/api/raw` proxy endpoint that returns the raw HTML body with an `X-Final-URL` header (so `response.url` reflects the followed-redirect URL after the proxy hop). The browser-side fetcher wraps the proxy response in a Proxy that overrides `.url`. SSRF protections (private-IP/localhost block) are shared with `/api/extract`.
+- JS RN library items now carry both `text` (flattened text, kept for back-compat with existing UI like `tokenize(article?.text)` and `library.filter((item) => item?.text)`) AND `document` (the imported Document). `addArticle(text, title, source, sourceURL, opts)` accepts an optional `opts.document` so `fetchURL` can pass through the already-imported HTML Document instead of re-running the text adapter.
+- Swift `ReadingArticle` now has a stored `document: Document` and a computed `var text: String { Document.flattenText(document) }`. Two inits exist: text-based (back-compat for tests/UI that supply a flat text field — wraps it into a one-body Section) and document-based (used by the importer-driven path). Custom `Codable`: encodes both `document` and `text` fields; on decode, prefers `document`, falls back to constructing one-body Section from `text`. Custom `Equatable` enumerates all stored properties + document. Old in-memory `documentsByArticleID` map on ReadingStore is removed — the document lives on the article.
+- `fflate` (^0.8.2) is the zip dep used by EPUB importer code (`src/importers/epub-zip.js`, `src/importers/epub-parse.js`). Installed via Bun (`bun add fflate`), but it is plain ESM and works under Node's `node --test` runner without bundling. EPUB fixtures live under `test/fixtures/epub/` and are reproducible via `node test/fixtures/epub/generate-fixtures.mjs` (uses fflate's `zipSync`). Per-file zip options use the tuple form `name: [Uint8Array, opts]` — the `{ data, level }` object form is silently treated as a nested directory by fflate and produces a broken archive.
+- `parseEpub(arrayBuffer)` returns `{ metadata, spine, opfPath, entries }` — `opfPath` and the raw `entries` map are exposed so adapters can resolve spine hrefs against the OPF directory and read chapter bytes without re-unzipping.
+- `src/importers/epub-adapter.js` exports `EpubAdapter` (kind "epub"). It does NOT self-register — `src/importers/index.js` imports and calls `registerAdapter(EpubAdapter)` to avoid a circular import (epub-adapter ← index). Future adapters that need to be in the default registry should follow the same pattern.
+- `Sources/FastReadCore/EpubImporter.swift` provides Swift EPUB import via ZIPFoundation (SwiftPM dep `https://github.com/weichsel/ZIPFoundation.git`, from 0.9.19). Public types: `EpubImporter` (struct), `EpubParser`, `EpubMetadata`, `EpubSpineItem`, `EpubError`, `EpubHtmlText`. Reads zip via `Archive(data:accessMode:.read)`, parses OPF/manifest/spine via NSRegularExpression, resolves nav titles from EPUB3 nav.xhtml or EPUB2 toc.ncx (matches JS path-resolution exactly: nav-rel → abs → opf-rel). `EpubHtmlText.htmlToText` is a Swift port of JS `htmlToText` from `src/article-extract.js` (NOT `ArticleTextExtractor.readableText`, which strips `<head>` and would diverge from JS by ~10%). Cross-platform token-count parity holds within +/-2% for both Pride (44) and Tao (41) fixtures.
+- EpubImporter is intentionally NOT added to `FastRead.xcodeproj/project.pbxproj` (the SwiftPM-only files pattern from prior `FastReadCore` source files). The iOS app target doesn't link ZIPFoundation; US-017 will be the first story to wire EPUB into AddSourceView and at that point the file (plus ZIPFoundation linkage) joins the xcodeproj.
+- ZIPFoundation API: enumerate `Archive` directly (`for entry in archive`), then `archive.extract(entry, skipCRC32: true) { chunk in ... }` collects bytes via a closure (the only extract overload that does not require a destination URL). Each entry has `.path` and `.type` (.file/.directory/.symlink).
+- `FastRead.xcodeproj` is regenerated from `project.yml` via `xcodegen generate`. To add a new SPM dep, edit `project.yml` (top-level `packages:` map + per-target `dependencies: - package: Name`) then run `xcodegen`. xcodegen auto-discovers all `.swift` files under each `sources:` path, so adding a new file under `Sources/FastReadCore/` no longer requires hand-editing four pbxproj sections — just regenerate. The previous "register in pbxproj 4 places" pattern (US-004/US-005/US-007/US-009/US-010) is now obsolete.
+---
+
+## 2026-05-07 - US-001
+- Implemented Phase 0 HTML/text golden-fixture corpus and JS snapshot test.
+- Files added:
+  - `test/fixtures/articles/01-clean-article.html` + `.expected.json` (clean `<article>`)
+  - `test/fixtures/articles/02-jsonld-article.html` + `.expected.json` (JSON-LD articleBody)
+  - `test/fixtures/articles/03-cjk-article.html` + `.expected.json` (Traditional Chinese, `entry-content`)
+  - `test/fixtures/articles/04-paywalled-chrome.html` + `.expected.json` (heavy nav/aside/footer, `<article>`)
+  - `test/fixtures/articles/05-plaintext.txt` + `.expected.json` (plain text path)
+  - `test/fixtures/articles/06-no-semantic-tags.html` + `.expected.json` (no `<article>`/`<main>`, uses `article-body` class)
+  - `test/article-extract.golden.test.mjs`
+- `npm test` passes (27 tests, including 6 new golden tests).
+- **Learnings for future iterations:**
+  - `extractArticle` already handles class-based selectors before falling back to `<article>`/`<main>`. Fixture #6 (no semantic tags) still works via the `article-body` class match — keep this in mind when planning HtmlAdapter (US-008).
+  - The fixture format is `{ title, source, wordCount, head: first 200 chars, tail: last 200 chars }`. Future Document-shape work (US-008) should keep `flattenText(document)` byte-equal to today's `extractArticle(...).text` so these fixtures keep passing.
+  - To regenerate baselines after intentional changes, run a small inline script that reads each `.html`/`.txt` and writes the sibling `.expected.json` (see commit for the one-off script pattern).
+  - Golden test file iterates `test/fixtures/articles/` at module load and emits one `test()` per fixture; failures attach a JSON diff to the assertion error message.
+---
+
+## 2026-05-07 - US-002
+- Added JS<->Swift tokenizer parity fixture + Swift parity test.
+- Files added/changed:
+  - `test/generate-parity-fixture.mjs` (regenerator; JS reader-core.js is source of truth)
+  - `Tests/Fixtures/parity-corpus.json` (14 entries: ASCII, CJK zh-Hant + Japanese, mixed CJK+latin, punctuation runs, hyphens, em-dash, NBSP, very long token, single token, empty, whitespace-only, RTL Arabic, trailing-quote)
+  - `Tests/FastReadCoreTests/ParityTests.swift` (decodes corpus, asserts tokens / focusSplits / durations match RSVPEngine)
+  - `Package.swift` (test target now rooted at `Tests/`, copies `Fixtures` as a resource bundle)
+- `swift test` and `npm test` both pass; rerunning the generator yields no diff.
+- **Learnings for future iterations:**
+  - SwiftPM test target was previously rooted at `Tests/FastReadCoreTests/`. To bundle `Tests/Fixtures/*` (outside the default sources dir) without symlinks or duplication, set `path: "Tests"`, `sources: ["FastReadCoreTests"]`, `resources: [.copy("Fixtures")]`. Future Phase 0/1 stories (US-005, US-007, US-009, US-010) that also reference `Tests/Fixtures/...` can rely on this layout — load via `Bundle.module.url(forResource:withExtension:subdirectory: "Fixtures")`.
+  - `RSVPEngine` (Swift) and `reader-core.js` are already byte-parity for the 14 cases above. Future refactors of either side must rerun `node test/generate-parity-fixture.mjs` and ensure no diff before committing — the generator commit and the Swift assertion are the regression gate.
+  - `tokenize` collapses NBSP (U+00A0) to space on both sides; emit JSON fixtures with literal NBSP characters and they survive JSON.stringify round-trip.
+  - For Arabic/RTL input the tokenizer falls through the non-CJK branch (whitespace split) — durations use the non-CJK 1.0× multiplier.
+---
+
+## 2026-05-07 - US-003
+- Extracted pure `fetchAndExtract` from the inline `fetchURL` callback in `components/fast-read-screen.jsx`.
+- Files added/changed:
+  - `src/url-ingest.js` (new): exports `fetchAndExtract({ url, fetcher, maxBytes, signal })` and typed error classes `InvalidURL`, `HttpError`, `OversizedError`, `UnsupportedContentType`, `TimeoutError`.
+  - `test/url-ingest.test.mjs` (new): 8 tests covering happy path, 404, content-length oversize, post-read oversize, application/pdf rejection, abort -> TimeoutError, non-http(s) URL (ftp/javascript), and ISO-8859-1 charset decoding fallback.
+  - `components/fast-read-screen.jsx`: `fetchURL` callback now delegates to `fetchAndExtract` with global `fetch` as the injected fetcher; status-string mapping converts typed errors to user-facing strings.
+- `npm test` passes (36 tests; 8 new).
+- **Learnings for future iterations:**
+  - URL parsing must guard against schemes other than http(s) BEFORE the auto-prepend `https://`. A naïve `startsWith("http")` check lets `ftp://...` slip through and become `https://ftp://...`. Detect a leading scheme via `/^[a-z][a-z0-9+.-]*:/i` and only prepend when there is no scheme.
+  - For decoding pages with non-utf-8 charset declarations, prefer reading via `arrayBuffer()` and using `TextDecoder(charset)` rather than `response.text()`. We fall back to ISO-8859-1 only when utf-8 decoding produces a U+FFFD replacement char.
+  - The accept header / supported content-type regex is duplicated in JS and Swift. Keep them in sync when touching either side (US-004 will mirror this taxonomy in Swift).
+  - Tests construct fake Response objects with `headers.get(name)` (case-insensitive), `ok`, `status`, `url`, `text()`, `arrayBuffer()`. Reuse this `makeResponse` helper pattern for any future ingest tests rather than pulling in `undici`/`msw`.
+---
+
+## 2026-05-07 - US-004
+- Extracted Swift URL fetch into pure `ArticleLoader.fetch(urlString:session:maxBytes:)` in `Sources/FastReadCore/UrlIngest.swift` with the JS-parity error taxonomy: `invalidURL`, `httpError(Int)`, `oversized`, `unsupportedContentType(String)`, `timeout`.
+- Files added/changed:
+  - `Sources/FastReadCore/UrlIngest.swift` (new): public `ArticleFetchError` (LocalizedError, Equatable), `ArticleFetchResult`, `URLDataFetching` protocol (URLSession conforms), and `ArticleLoader.fetch(...)`.
+  - `Tests/FastReadCoreTests/UrlIngestTests.swift` (new): 7 tests using a `URLProtocol` stub mounted via `URLSession(configuration: .ephemeral)` — happy path, 404, oversized via Content-Length, oversized via streamed body, application/pdf, timeout (URLError.timedOut), ftp scheme.
+  - `FastReadApp/ReadingStore.swift`: deleted the old in-line `ArticleFetchError`/`ArticleFetchResult`/`ArticleLoader` (now provided by FastReadCore).
+  - `FastReadApp/AddSourceView.swift`: post-fetch guard for `result.wordCount >= 20` preserves the previous "not enough readable text" status string (the new fetcher does not enforce minWords, matching JS parity).
+  - `FastRead.xcodeproj/project.pbxproj`: added `UrlIngest.swift` to PBXBuildFile, PBXFileReference, FastReadCore PBXGroup, and the FastRead PBXSourcesBuildPhase.
+- `swift test` (16 tests passing), `npm test` (36 passing), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - Inject sessions via a tiny `URLDataFetching` protocol with `func data(for: URLRequest) async throws -> (Data, URLResponse)`. Don't take `URLSession` directly — it makes test fakes painful. URLSession already conforms naturally.
+  - To test URLProtocol stubs against `URLSession`, use `URLSessionConfiguration.ephemeral` (NOT `.shared`/`.default`) and set `config.protocolClasses = [Stub.self]`. The session must be created fresh per test and `invalidateAndCancel`-ed in tearDown.
+  - `URLError(.timedOut)` thrown from a stub's `startLoading` propagates back through `URLSession.data(for:)` as a thrown `URLError` — map both `.timedOut` and `.cancelled` URLError codes to `ArticleFetchError.timeout`.
+  - Both content-length and post-read body size checks are needed: tests cover both "Content-Length declares > maxBytes with tiny body" (header pre-check) and "Content-Length absent/wrong but body itself > maxBytes" (post-check).
+  - Removed `unreadable`/minWords from the fetcher to match JS taxonomy. The UI-level minWords check (20) lives in `AddSourceView.fetchURL` so behavior stays identical from the user's POV.
+---
+
+## 2026-05-07 - US-005
+- Storage round-trip tests for ReadingArticle (Swift) and library item (JS).
+- Files added/changed:
+  - `Sources/FastReadCore/ReadingArticle.swift` (new): public Codable struct moved out of `FastReadApp/Models.swift` so the SwiftPM test target can import it via `@testable import FastReadCore`.
+  - `FastReadApp/Models.swift`: deleted the old internal `ReadingArticle` (now provided by FastReadCore, compiled into the app target via the existing pbxproj wiring).
+  - `FastRead.xcodeproj/project.pbxproj`: registered `ReadingArticle.swift` in PBXBuildFile, PBXFileReference, FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase.
+  - `Tests/Fixtures/legacy-article-v0.json` (new): v0 snapshot of a saved article omitting optional date fields (sourceURL, createdAt, lastOpenedAt, finishedAt all absent).
+  - `Tests/FastReadCoreTests/ReadingArticleCodableTests.swift` (new): 3 tests — full round-trip preserving every field, nil-optional round-trip, and v0 fixture decode.
+  - `test/library-storage.test.mjs` (new): 3 tests — full library item round-trip via `JSON.parse(JSON.stringify(...))`, finished-item edge fields, and a multi-item wrapper that mirrors the persisted shape (`{ library, articleId, wordIndex, wpm }`).
+- `swift test` (22 tests passing), `npm test` (42 passing), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - `ReadingArticle` now lives in `Sources/FastReadCore/ReadingArticle.swift` as a `public` Codable struct. The Xcode app target compiles the same file directly (via pbxproj), so app code keeps referencing `ReadingArticle` without an `import FastReadCore`. Future Document/Section types (US-007) should follow the same pattern: define in FastReadCore as `public`, register in pbxproj 4 places, and skip imports inside the app.
+  - Required (non-optional) fields on `ReadingArticle` — `tag`, `isFinished`, `progress`, `wordIndex`, `timesOpened`, `text`, `lede`, `readTime`, `date`, `author`, `source`, `id`, `title` — must all be present in any persisted JSON or `JSONDecoder` will throw. Optional date fields (`sourceURL`, `createdAt`, `lastOpenedAt`, `finishedAt`) may be omitted. Keep this in mind when changing the schema in Phase 1 (Document migration): adding a new non-optional field would break v0 fixture decoding.
+  - The JS library item shape uses `tagKey` (not `tag`), and `addArticle` does not set a top-level `wordIndex` or `isFinished` — those live on the wrapper alongside `library` (e.g. `{ library, articleId, wordIndex, wpm, ... }`). Mirror this when writing migration code: Swift has `wordIndex`/`isFinished` on the article; JS has them on the persisted root.
+  - `Bundle.module.url(forResource:withExtension:subdirectory:)` with `subdirectory: "Fixtures"` (matching the SwiftPM `.copy("Fixtures")` resource) is the canonical way to load fixtures from `Tests/Fixtures/` — already used by `ParityTests`; reused here for the v0 fixture.
+---
+
+## 2026-05-07 - US-006
+- Defined the format-agnostic Document schema in JS with pure factories and helpers.
+- Files added/changed:
+  - `src/document.js` (new): JSDoc typedefs for Document/Section + `createDocument`, `createSection`, `flattenText`, `tokenizeDocument`, `sectionBoundaries`. Validates `id` is non-empty and `kind ∈ {body, chapter, page}`.
+  - `test/document.test.mjs` (new): 4 tests — empty doc, single body section, multi-chapter doc with CJK titles + content (boundary math vs `tokenize(flattenText(...))`), and factory validation (bad kind / missing id).
+- `npm test` passes (47 tests; 4 new).
+- **Learnings for future iterations:**
+  - `sectionBoundaries` is implemented by re-tokenizing the cumulative joined text after each section rather than summing per-section tokenize counts. This is robust against any future tokenizer changes that might treat section seams differently (e.g. CJK punctuation joining across `\n\n`). It is O(N²) in section count, but EPUB chapter counts in practice are small enough that this stays cheap.
+  - `tokenize` from `reader-core.js` already collapses NBSP→space and flushes on whitespace, so joining sections with `"\n\n"` separates tokens cleanly across both ASCII and CJK paths. Future Swift port (US-007) can mirror the same join-then-tokenize approach.
+  - Section ids are caller-provided strings; we don't auto-generate them. EPUB importer (US-014) should use spine item ids; HtmlAdapter (US-008) should use a stable single-section id like `"body"` for backward-compat.
+---
+
+## 2026-05-07 - US-007
+- Defined the format-agnostic Document schema in Swift with Codable structs and parity helpers mirroring `src/document.js`.
+- Files added/changed:
+  - `Sources/FastReadCore/Document.swift` (new): public `SectionKind` (body|chapter|page), `Section`, and `Document` (Codable, Equatable, Sendable). Static `Document.flattenText(_:)` joins sections with "\n\n"; `Document.sectionBoundaries(_:)` returns `[SectionBoundary]` computed via re-tokenizing the cumulative joined text (mirrors JS implementation).
+  - `Tests/Fixtures/document-sample.json` (new): JS-produced sample (multi-chapter, CJK title) — generated via `node -e` against `src/document.js` and committed verbatim.
+  - `Tests/FastReadCoreTests/DocumentTests.swift` (new): 5 tests — empty doc flatten/boundaries, body-only doc, multi-chapter CJK boundaries match `RSVPEngine.tokenize`, Codable round-trip, and decode of `document-sample.json` matches a hand-built expected `Document`.
+  - `FastRead.xcodeproj/project.pbxproj`: registered `Document.swift` in PBXBuildFile, PBXFileReference, FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase (4 places, per existing pattern).
+- `swift test` (24 tests passing, 5 new), `npm test` (43 passing), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - `Document` and `Section` are `public Codable, Equatable, Sendable`. JSON keys produced by Swift `JSONEncoder` match the JS `createDocument`/`createSection` shape exactly: `title`, `author`, `sourceUrl`, `sourceKind`, `sections[]` and `id`, `title`, `kind`, `text`. `SectionKind` derives `Codable` from `String` raw values, so JS lowercase strings ("body"/"chapter"/"page") decode directly. Future importers (US-009, US-014, US-015) can rely on this without custom CodingKeys.
+  - `Document.sectionBoundaries(_:)` mirrors the JS approach exactly: re-tokenize the running joined text after each section rather than summing per-section token counts. Keeps Swift behavior parity-safe with JS for future tokenizer tweaks (CJK seams etc.).
+  - To produce a JS-equivalent fixture from Node, an inline `node -e "import('./src/document.js').then(...)"` call against `createDocument`/`createSection` is the easiest path; commit the printed JSON verbatim. The Swift test then decodes and compares to a hand-built `Document` via `==` — this is a stronger check than re-encode equality (which can diverge in key order / whitespace).
+  - The JS-produced sample is committed at `Tests/Fixtures/document-sample.json`. Future Document changes that alter the JS shape MUST regenerate this fixture and update the Swift expected struct in `DocumentTests.testDocumentSampleFixtureMatchesJSProducedShape`.
+---
+
+## 2026-05-07 - US-008
+- Implemented Phase 1 SourceAdapter registry in JS with PlainTextAdapter and HtmlAdapter producing Document.
+- Files added/changed:
+  - `src/importers/index.js` (new): exports `importDocument({ kind, input, sourceUrl })`, `PlainTextAdapter`, `HtmlAdapter`, `registerAdapter`, `getAdapter`, `listAdapters`, `UnknownImporterKind`. Both adapters emit a single body Section with id "body". `HtmlAdapter` wraps `extractArticle` (left untouched in `src/article-extract.js`).
+  - `test/importers.test.mjs` (new): replays the 5 HTML golden fixtures via `importDocument({kind:'html'})` asserting `flattenText(doc) === extractArticle(html).text` AND head/tail match the committed `.expected.json`. Also covers PlainTextAdapter normalize + plaintext fixture replay, unknown-kind error, registry lookup, custom adapter registration, and sourceUrl propagation.
+- `npm test` passes (54 tests; 9 new).
+- **Learnings for future iterations:**
+  - The adapter registry is a simple `Map` keyed by `kind`. Built-ins self-register at module load. Future adapters (US-014 EpubAdapter) just call `registerAdapter({ kind, canHandle, import })` from their own module — no central wiring needed.
+  - For HTML, the resulting `Document` has `sourceKind: "html"`, `title` from `extractArticle().title`, and one section (`id: "body"`, `kind: "body"`). `flattenText(doc)` is byte-equal to the legacy `extractArticle(html).text`, which is exactly what the US-001 golden corpus pins down. Future migrations (US-010) can rely on this equivalence.
+  - For plaintext, the adapter calls `normalizeText` from `article-extract.js` (already exported) — keeping the same whitespace rules as the inline plaintext path tests use.
+  - `importDocument` accepts `{ kind, input, sourceUrl, ...rest }`; extra opts are forwarded to the adapter's `import(input, opts)`. Callers wiring the UI (US-011) can pass through future fields like `title`/`author` without touching the registry.
+---
+
+## 2026-05-07 - US-009
+- Implemented Phase 1 SourceAdapter abstraction in Swift with PlainTextAdapter, HtmlAdapter, and ImporterRegistry mirroring the JS US-008 shape.
+- Files added/changed:
+  - `Sources/FastReadCore/Importers.swift` (new): public `SourceKind` enum (text/html/epub), `ImportOptions`, `ImporterError`, `SourceAdapter` protocol, `PlainTextAdapter` (normalizes via `ArticleTextExtractor.normalize`), `HtmlAdapter` (wraps `ArticleTextExtractor.readableText` + `extractTitle`), and `ImporterRegistry` (with `.shared` pre-registered with both built-ins).
+  - `Tests/Fixtures/articles/` (new): copied 6 fixtures (5 .html + 1 .txt + .expected.json siblings) from `test/fixtures/articles/`, mirroring US-001 corpus.
+  - `Tests/FastReadCoreTests/ImportersTests.swift` (new): 5 tests — HtmlAdapter on the 5 HTML fixtures (asserts `flattenText` equals `ArticleTextExtractor.readableText(html)`, single body section, `sourceKind == "html"`, sourceUrl propagation), PlainTextAdapter on the plaintext fixture (flatten equals normalize), registry dispatch, unknown-kind throws, and `canHandle` HTML detection.
+  - `FastRead.xcodeproj/project.pbxproj`: registered `Importers.swift` in PBXBuildFile, PBXFileReference, FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase (4 places, per existing pattern).
+- `swift test` (29 tests passing, 5 new), `npm test` (54 passing), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - Tests/Fixtures/articles/ subdirectory is now bundled via the existing `.copy("Fixtures")` rule — load via `Bundle.module.url(forResource:withExtension:subdirectory:"Fixtures/articles")`. Same fixture corpus is referenced from US-001 (JS) and US-009 (Swift); future EPUB fixtures (US-013) will live under `Tests/Fixtures/epub/` with the same loader pattern.
+  - JS<->Swift HtmlAdapter output is NOT byte-equal: Swift's `ArticleTextExtractor.readableText` strips all tags via regex while JS's `extractArticle` runs Readability scoring + container selection. Tests assert each side is consistent with its own extractor; do not cross-compare flatten text across runtimes for HTML. (EPUB parity in US-015 will be the first place exact-text parity is enforced cross-platform.)
+  - `SourceKind` is now a typed enum — when adding an EPUB adapter (US-014/US-015) extend the enum and register under `.epub`. The JS `kind` is still a string; keep raw values aligned ("text"/"html"/"epub") so cross-platform PRD/storage discussion stays consistent.
+  - `ImporterRegistry.shared` is the canonical entry point for app code (US-012 will wire ReadingStore through it). Construct fresh `ImporterRegistry()` instances in tests when isolation matters (e.g. unknown-kind test registers only PlainTextAdapter).
+  - Static mutable shared state (`ImporterRegistry.shared`) is wrapped behind an internal `NSLock` and the class is `@unchecked Sendable`; this satisfies Swift 6 strict concurrency without forcing actor hops.
+---
+
+## 2026-05-07 - US-010
+- Implemented Phase 1 storage migration v1 -> v2 (JS + Swift) with tests.
+- Files added/changed:
+  - `src/storage-migration.js` (new): exports `LEGACY_STORAGE_KEY` ("fastread-state-v1"), `STORAGE_KEY` ("fastread-state-v2"), `SCHEMA_VERSION = 2`, plus pure helpers `migrateLibraryItem`, `migratePayload`, `detectVersion`, and `loadAndMigrate(storage)`. Each legacy library item's `text` is rewrapped into a `Document` with one body Section (id "body"); the legacy `text` field is dropped from the migrated item. `loadAndMigrate` reads from v2 first, falls back to v1, writes back v2, and removes the legacy key.
+  - `test/storage-migration.test.mjs` (new): 6 tests — single-item migration, idempotency, full payload migration, version detection, full v1->v2 round-trip via in-memory storage (asserts text preservation, v2 key written, legacy key removed, second read is a no-op), and empty-storage default.
+  - `Sources/FastReadCore/StorageMigration.swift` (new): public `enum StorageMigration` with `documentFromLegacy(article:)`, `migrateLegacyArticles(_:)`, and `loadAndMigrate(legacyData:)`. The Swift port keeps `ReadingArticle.text` on disk (preserves US-005 fixture decode) and constructs the Document in memory.
+  - `Tests/Fixtures/legacy-store-v1.json` (new): `[ReadingArticle]` snapshot with two entries (English + zh-Hant) representing pre-Document storage.
+  - `Tests/FastReadCoreTests/StorageMigrationTests.swift` (new): 5 tests — single-article wrap, missing sourceURL, fixture-based load+migrate (asserts each article gets a Document with one body Section whose text matches), idempotency, and unrelated-JSON returns nil.
+  - `FastReadApp/ReadingStore.swift`: `loadArticles` now also populates `documentsByArticleID: [String: Document]` via `StorageMigration.migrateLegacyArticles`. `addDraftArticle` and `deleteArticle` keep the map in sync. The on-disk article shape is unchanged — Document is reconstructed at load time.
+  - `FastRead.xcodeproj/project.pbxproj`: registered `StorageMigration.swift` in PBXBuildFile, PBXFileReference, FastReadCore PBXGroup children, and the FastRead PBXSourcesBuildPhase (4 places, per existing pattern).
+- `npm test` (60 passing, 6 new), `swift test` (34 passing, 5 new), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - The actual live JS storage key in `components/fast-read-screen.jsx` is `justread.expo.state.v2`, NOT the PRD-named `fastread-state-v1`. We chose to provide a self-contained `src/storage-migration.js` module with clearly named legacy/v2 keys and pure helpers, so the migration is unit-testable in isolation. Wiring the live RN screen through `loadAndMigrate` is a separate UI-level change (not required by US-010 acceptance criteria) — defer to US-011 (Wire JS callers through importer registry).
+  - Swift side keeps `ReadingArticle.text` as the on-disk source of truth and reconstructs the Document in memory (`documentsByArticleID` map on `ReadingStore`). This avoids touching the v0 fixture (`legacy-article-v0.json`) and the US-005 round-trip tests, while still satisfying "build a Document with one body Section" at load time. Future stories that need persistent Document storage (e.g. EPUB chapter-aware persistence) can add a `document: Document?` codable field on `ReadingArticle` then — but for plaintext+HTML imports the in-memory map is sufficient.
+  - `StorageMigration.migrateLegacyArticles(_:)` is keyed by `article.id`. When inserting/removing articles in `ReadingStore` (`addDraftArticle`, `deleteArticle`), update the map alongside `tokenCache` to keep them in sync. Future Phase 1 wiring (US-012) should call `documentFromLegacy(article:)` whenever a new article is created.
+  - Init-order gotcha: in `ReadingStore.init`, you cannot pass `self.articles` to a static helper before all stored properties are initialized. Bind a local `let loadedArticles = Self.loadArticles(...)` first, then assign both `self.articles` and `self.documentsByArticleID` from it.
+  - `migrateLibraryItem` (JS) drops the legacy `text` field from the migrated item but `migratePayload` is idempotent — re-running on a v2 payload returns it unchanged because the per-item helper short-circuits when `item.document.sections` is already an array.
+---
+
+## 2026-05-07 - US-011
+- Wired the JS web (`src/app.js`) and RN (`components/fast-read-screen.jsx`) URL/paste paths through the importer registry.
+- Files added/changed:
+  - `src/url-ingest.js`: split out `fetchHtml({ url, fetcher, maxBytes, signal })` returning `{ html, finalUrl }`. `fetchAndExtract` becomes a thin wrapper. All 8 existing url-ingest tests still pass.
+  - `src/web-flow.js` (new): `loadUrlDocument({ url, fetcher, ... })` + `getWebFlowState`/`resetWebFlowState`. Stores the imported Document and finalUrl in module-level state.
+  - `src/app.js`: `loadUrl` now calls `loadUrlDocument` (with a `/api/raw` proxy fetcher that wraps the response so `.url` returns the X-Final-URL header). Module-level `currentDocument` + `getCurrentDocument()` exposed for tests/devtools. Status string now uses `tokens.length` after refresh.
+  - `server.js`: new `/api/raw` endpoint that proxies the upstream URL (same SSRF guard as `/api/extract`) and returns raw HTML bytes plus an `X-Final-URL` header. Old `/api/extract` left in place for back-compat.
+  - `components/fast-read-screen.jsx`:
+    - `fetchURL` now uses `fetchHtml` + `importDocument({kind:'html'})` and passes the Document through to `addArticle` via `onAddArticle(text, title, source, finalUrl, { document })`.
+    - `addArticle` accepts optional `opts.document`; for plain pasted text it calls `importDocument({kind:'text', input})`. The created library item now carries both `text` (flattened) and `document` for the migrated v2 storage shape.
+    - Removed unused `extractArticle`/`fetchAndExtract` imports.
+  - `test/web-flow.test.mjs` (new): 2 tests — happy-path drives `loadUrlDocument` with a fake fetcher and asserts a Document with sourceKind "html" lands in `getWebFlowState()`; error path asserts HttpError propagates and prior state stays cleared.
+- `npm test` passes (62 tests; 2 new). Existing `test/article-extract.test.mjs` and `test/reader-core.test.mjs` are untouched and still pass.
+- **Learnings for future iterations:**
+  - The web `loadUrl` cannot call the user-supplied URL directly from the browser due to CORS; the existing `/api/extract` endpoint already proxied it server-side. To satisfy "loadUrl path goes through `importDocument({kind:'html'})`" we needed raw HTML on the client, so a sibling `/api/raw` endpoint was added rather than rewriting `/api/extract` (keeping any external callers of /api/extract unbroken). The `X-Final-URL` header is the canonical way to surface redirect targets through the proxy.
+  - `loadUrlDocument` keeps state at module scope so the smoke test can assert "a Document lands in in-memory state" without spinning up the DOM-bound `src/app.js`. Future RN parity work (Swift US-012) won't share this module — the analogous Swift state lives on `ReadingStore`.
+  - The RN `addArticle` signature was extended with a 5th `opts` argument (`{ document }`). All existing callers pass 1–4 args; the new fetchURL path is the only caller that supplies `opts.document`. Future EPUB UI work (US-016) will pass a multi-section document the same way.
+  - When wrapping a `Response` to override `.url`, use `new Proxy(response, { get })` and bind function properties — calling `.text()`/`.arrayBuffer()` on the bare wrapper without rebinding loses the original `this` and throws `Illegal invocation` in browsers.
+  - `fetchAndExtract` is now a 3-line wrapper; if a future story removes its sole remaining caller (server.js still uses extractArticle directly, but `fetchAndExtract` is no longer called by app code), it can be deleted along with its tests — verify with grep before doing so.
+---
+
+## 2026-05-07 - US-012
+- Wired Swift `ReadingStore` paste/fetch paths through `ImporterRegistry.shared` and persisted the `Document` directly on `ReadingArticle`.
+- Files added/changed:
+  - `Sources/FastReadCore/ReadingArticle.swift`: replaced stored `text: String` with stored `document: Document` and a computed `text` returning `Document.flattenText(document)`. Added a document-based primary init plus a back-compat text-based init that wraps the text into a one-body Section. Custom `Codable` (encodes `document` + `text`; decode prefers `document`, falls back to `text` → builds one-body Section) and custom `Equatable`. v0/v1 fixtures with no `document` field still decode.
+  - `FastReadApp/ReadingStore.swift`: `addDraftArticle` now calls `ImporterRegistry.shared.importDocument(kind: .text, ...)` and forwards to a new internal `addArticle(document:source:sourceURL:)` helper that builds the `ReadingArticle` from the imported Document. `addFetchedArticle` continues to delegate to `addDraftArticle` (text from `ArticleLoader.fetch`). Removed the now-redundant `documentsByArticleID` map (Document lives on the article).
+  - `Tests/FastReadCoreTests/ReadingStoreImportTests.swift` (new): two tests — paste-text route through the registry asserts `Document` shape (sourceKind "text", single body Section, content preserved) plus `ReadingArticle.text == flattenText(document)`; stubbed URL fetch via `URLProtocol` runs through `ArticleLoader.fetch` then `ImporterRegistry.shared.importDocument(kind:.text, ...)` and asserts the resulting article carries the imported Document, sourceURL, and flattened text.
+- `swift test` (36 tests, +2 new), `npm test` (62 passing, unchanged), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - Making `ReadingArticle.text` computed required custom `Codable` and custom `Equatable`. Synthesized `Equatable` would have ignored `document` if `text` were merely synthesized away — explicitly enumerate stored fields when changing the storage shape mid-flight to avoid a silent regression on the `==` operator (the US-005 round-trip test relies on it).
+  - Two inits keep call-site compatibility: existing test fixtures and `ReadingStore` callers can keep passing `text:`, while the new importer-driven path passes `document:`. The text-based init synthesizes a one-body Section using the article's `title`/`author`/`sourceURL` for Document metadata — keep this in sync if `Document` ever gains required fields.
+  - SwiftPM test target only depends on `FastReadCore`, so `ReadingStore` (in the FastReadApp Xcode target) is not directly importable. `ReadingStoreImportTests` reproduces the registry+article flow at the FastReadCore level — when adding any future store-level test, mirror the same harness pattern (`makeArticle(from: document, ...)`) rather than trying to instantiate `ReadingStore` from SwiftPM.
+  - The `URLProtocol` stub in `ReadingStoreImportTests` mirrors `UrlIngestTests`: `nonisolated(unsafe)` static state + `NSLock` to satisfy Swift 6 concurrency, plus an ephemeral `URLSession` invalidated in `defer`.
+  - The on-disk JSON shape now includes BOTH `document` and `text` keys (text is encoded for backward read-compat with older app versions). Stored size ~doubles per article. If/when v3 lands, drop the `text` key — but only after the in-flight migration window is closed.
+---
+
+## 2026-05-07 - US-013
+- Phase 2 (P1): EPUB OPF/spine parser + zip reader (JS) with fixture tests.
+- Files added/changed:
+  - `package.json` / `bun.lock` / `package-lock.json`: added `fflate@^0.8.2` (installed via `bun add fflate`).
+  - `src/importers/epub-zip.js` (new): `readEpubEntries(arrayBuffer)` returns a `Map<path, Uint8Array>` via fflate's `unzipSync`.
+  - `src/importers/epub-parse.js` (new): `parseEpub(arrayBuffer)` returning `{ metadata: {title, author?, language?}, spine: [{ id, href, mediaType, navTitle? }] }`. Reads `META-INF/container.xml` to find the OPF rootfile, parses metadata + manifest + spine via regex, and resolves nav titles from EPUB3 `<nav epub:type="toc">` (preferred — manifest item with `properties="nav"`) or EPUB2 `toc.ncx` (referenced by `<spine toc="...">`).
+  - `test/fixtures/epub/generate-fixtures.mjs` (new): reproducible generator that writes two small public-domain EPUBs.
+  - `test/fixtures/epub/pride-and-prejudice.epub` (EPUB3 with nav.xhtml; English; 2 chapters).
+  - `test/fixtures/epub/tao-te-ching.epub` (EPUB2 with toc.ncx; zh-Hant; 3 chapters).
+  - `test/epub-parse.test.mjs` (new): 4 tests — `readEpubEntries` smoke, EPUB3 nav metadata + spine + navTitle, EPUB2 NCX zh-Hant metadata + spine + navTitle, and a "missing container.xml" error path.
+- `npm test` passes (67 tests; 4 new).
+- **Learnings for future iterations:**
+  - fflate's `zipSync` per-file options use the TUPLE form: `name: [Uint8Array, { level: 0 }]`. Passing `{ data, level }` instead is silently treated as a nested directory and produces a broken zip with entries like `mimetype/data` and `mimetype/level/`. The unit test that asserts `entries.get("mimetype") instanceof Uint8Array` catches this immediately.
+  - EPUB OPF parsing tolerates both prefixed and unprefixed element names (`<dc:title>` vs `<title>`). `findFirstTagText` matches either via `(?:[a-zA-Z][\w.-]*:)?localName`. Future EpubAdapter work (US-014) can rely on this rather than re-parsing.
+  - Nav title resolution must round-trip paths: nav.xhtml/toc.ncx hrefs are nav-relative; manifest hrefs are OPF-relative. Resolve nav hrefs to absolute via `joinPath(navPath, href)`, then strip the OPF directory prefix back off so the lookup against `manifest.href` works. Both forms are exercised by the two fixtures.
+  - When a spine item has a `#fragment` href, strip the fragment before nav-title lookup (`item.href.replace(/#.*$/, "")`) so the nav-title still resolves. None of the fixtures use this yet, but the code is in place for real Gutenberg EPUBs that often anchor TOC entries at fragment ids.
+  - The fixture generator commits both fixtures and the script so future regeneration is reproducible (no Gutenberg HTTP fetch required at test time). Use `node test/fixtures/epub/generate-fixtures.mjs` to refresh after metadata/structure changes.
+  - Fixtures are tiny (~2KB each) so committing the binaries is fine; alternative approaches (build at test setup) would slow `npm test` and add a hidden zipSync dependency to the fixture corpus.
+---
+
+## 2026-05-07 - US-014
+- Phase 2 (P1): EpubAdapter (JS) producing Document with chapter sections.
+- Files added/changed:
+  - `src/importers/epub-parse.js`: `parseEpub` now also returns `opfPath` and the raw `entries` map so adapters can resolve chapter paths and read chapter bytes without re-unzipping. Backwards-compatible (existing tests destructure only `{metadata, spine}`).
+  - `src/importers/epub-adapter.js` (new): exports `EpubAdapter` ({kind: "epub"}). `canHandle` accepts ArrayBuffer/Uint8Array via zip magic 'PK\x03\x04' or filenames ending in `.epub`. `import(buf, opts)` parses the EPUB, resolves each spine item's href against `opfPath`, decodes the chapter as UTF-8, runs `htmlToText`, and emits a Section per non-empty chapter with `kind: "chapter"` and `title: navTitle`. `sourceKind` on the resulting Document is "epub"; metadata title/author come from the OPF.
+  - `src/importers/index.js`: imports `EpubAdapter` and calls `registerAdapter(EpubAdapter)` (alongside the built-in PlainText/Html). EpubAdapter does NOT self-register — registering here avoids a circular `epub-adapter ← index` import (which previously triggered `Cannot access 'REGISTRY' before initialization`).
+  - `test/importers.test.mjs`: the "unknown importer kind" test now uses `pdf` instead of `epub` (since `epub` is now a registered kind).
+  - `test/epub-adapter.test.mjs` (new): 4 tests — registry registration, canHandle (zip magic via ArrayBuffer copy + .epub filename + non-EPUB rejection), and importDocument({kind:"epub"}) for both Pride and Prejudice (EPUB3 nav, baseline 44 tokens, expects "It is a truth universally acknowledged…" in flatten) and 道德經 (EPUB2 NCX, zh-Hant, baseline 41 tokens, expects "道可道，非常道。名可名，非常名。" in flatten).
+- `npm test` passes (71 tests; 4 new).
+- **Learnings for future iterations:**
+  - Circular ESM imports between `index.js` and a sibling adapter module silently hoist all imports to the top, so registering inside the adapter module (which then imports `registerAdapter` from `index.js`) crashes with "Cannot access 'REGISTRY' before initialization". The fix: keep adapter modules pure (export only), and have `index.js` register them. New adapters (PDF in P2 phase 3) should follow the same pattern.
+  - Node's `readFileSync(path)` returns a Buffer that shares its underlying ArrayBuffer with a larger pool — `buf.buffer` does NOT start at the file's bytes. For zip-magic checks against ArrayBuffer, callers must slice: `buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)`. The adapter handles `Uint8Array`, `ArrayBuffer`, and other `ArrayBuffer.isView` inputs (preserving offsets) via a `toUint8Array` helper.
+  - Baseline token counts for the two fixtures are pre-computed and inlined in the test (44 for pride, 41 for tao). When fixture content changes (regenerating via `node test/fixtures/epub/generate-fixtures.mjs`), update the baselines or the +/-2% assertion will fail. Token count is computed via `tokenizeDocument(doc).length` from `src/document.js`.
+  - The Swift port (US-015) needs the same parity baseline: 44 tokens for pride, 41 for tao, joined by `\n\n` between chapters. Use `RSVPEngine.tokenize(Document.flattenText(doc)).count` and assert within +/-2% (1 token of slack on either fixture).
+---
+
+## 2026-05-07 - US-015
+- Phase 2 (P1): EpubImporter (Swift) with parity tests against the JS EPUB fixtures.
+- Files added/changed:
+  - `Package.swift`: added ZIPFoundation (`https://github.com/weichsel/ZIPFoundation.git`, from 0.9.19) as a SwiftPM dependency of `FastReadCore`.
+  - `Sources/FastReadCore/EpubImporter.swift` (new): `EpubImporter` (SourceKind.epub) plus `EpubParser`, `EpubMetadata`, `EpubSpineItem`, `EpubError`, and a parity-faithful `EpubHtmlText.htmlToText` Swift port of `src/article-extract.js`'s htmlToText (block-tag → newline, chrome tags removed, entities decoded, then normalize). Reads zip via ZIPFoundation `Archive(data:accessMode:.read)`. Parses container.xml → OPF (manifest+spine via NSRegularExpression), nav.xhtml (EPUB3 `<nav epub:type="toc">`) or toc.ncx (EPUB2). Resolves nav-rel → abs → opf-rel paths exactly like the JS port. `ImporterRegistry.importEpub(data:options:)` is the entry point; the existing String-only `SourceAdapter` protocol is left unchanged (EPUB is binary).
+  - `Tests/Fixtures/epub/pride-and-prejudice.epub` and `tao-te-ching.epub` (copied from `test/fixtures/epub/`).
+  - `Tests/FastReadCoreTests/EpubImporterTests.swift` (new): 3 tests — Pride (EPUB3 nav, 2 chapters, titles "Chapter 1"/"Chapter 2", baseline 44 tokens), Tao (EPUB2 NCX, 3 zh-Hant chapters with "第N章" titles, baseline 41 tokens), and `canHandle` data/filename detection. Token count parity is asserted within +/-2% (1 token) using `RSVPEngine.tokenize(Document.flattenText(doc)).count`.
+- `swift test` (39 tests, +3 new), `npm test` (71 passing, unchanged), and `xcodebuild ... build` for `generic/platform=iOS Simulator` all succeed.
+- **Learnings for future iterations:**
+  - The Swift `ArticleTextExtractor.readableText` strips `<head>...</head>` entirely and would drop the in-head `<title>Chapter 1</title>` text that JS `htmlToText` keeps. Use `EpubHtmlText.htmlToText` (the JS-parity port) for any cross-platform parity assertion. JS keeps `<title>` content because htmlToText doesn't strip head — only script/style/svg/noscript/template/iframe/nav/header/footer/aside/form.
+  - ZIPFoundation 0.9.20 supports in-memory archives via `Archive(data: Data, accessMode: .read)`. To collect entry bytes, iterate `for entry in archive` and call `archive.extract(entry, skipCRC32: true) { chunk in bytes.append(chunk) }`. There is no `data(for: entry)` convenience.
+  - The `SourceAdapter` protocol takes `String` input only, but EPUB is `Data`. Rather than weaken the protocol with `Any`, EpubImporter exposes a separate `import(data:options:)` method and the registry exposes `importEpub(data:options:)`. US-017 will plumb this from `AddSourceView.swift`'s `.fileImporter` flow. JS doesn't have this split because JS adapters' `import` is duck-typed (accepts ArrayBuffer/Uint8Array).
+  - Swift EPUB importer is NOT added to `FastRead.xcodeproj/project.pbxproj` yet (would force the iOS app target to link ZIPFoundation, which it doesn't need until UI lands). Defer pbxproj wiring + ZIPFoundation linkage to US-017.
+  - Path resolution requires the same dance as JS: nav.xhtml/toc.ncx hrefs are nav-relative; manifest hrefs are OPF-relative. Resolve `joinPath(navPath, href)` to absolute, then strip the OPF directory prefix to get an OPF-relative key for the lookup. Don't try to strip directory tokens manually with regex — the helper handles `..`/`.` segments correctly.
+  - Token-count parity for the two fixtures: Pride 43 (Swift) vs 44 (JS) and Tao 41 (Swift) vs 41 (JS) — both within +/-2%. If you change `htmlToText` regex order or normalize rules, rerun and update both sides; the JS baseline lives inline in `test/epub-adapter.test.mjs`.
+---
+
+## 2026-05-07 - US-016
+- Phase 2 (P1): EPUB file-picker UI on web + RN.
+- Files added/changed:
+  - `index.html`: added `.epub-row` with hidden `<input type="file" accept=".epub,application/epub+zip">` triggered via a `Pick EPUB` label, plus `#epub-status` for chapter/word feedback.
+  - `src/app.js`: imports `importDocument` from `src/importers/index.js`. New `loadEpubFile(event)` reads the picked file as ArrayBuffer, runs `importDocument({kind:'epub'})`, populates `currentDocument` + `els.textInput.value`, refreshes tokens, and reports `<title> | N chapters, M words.` (or a clear error). Hooked via `els.epubInput.addEventListener("change", ...)`.
+  - `styles.css`: added `.epub-row` flex layout with cursor:pointer for the file-picker label.
+  - `components/fast-read-screen.jsx`: imports `expo-document-picker`. New `handlePickEpub` callback opens `DocumentPicker.getDocumentAsync({type:["application/epub+zip"]})`, fetches the asset URI as ArrayBuffer, runs `importDocument({kind:'epub'})`, and calls `onAddArticle(flatText, document.title, document.author, null, { document })`. SourceScreen UI gains a `Pick EPUB` row above Recent sources; the existing beam loading state covers it.
+  - `package.json` / `bun.lock`: added `expo-document-picker@^55.0.13` (via `bun add expo-document-picker`).
+  - `test/epub-flow.test.mjs` (new): 3 tests — Pride and Prejudice fixture builds a library item with tokens > 0 and includes the chapter sentence; 道德經 fixture builds a 3-chapter zh-Hant library item; non-EPUB ArrayBuffer surfaces a typed error from `importDocument({kind:'epub'})`.
+- `npm test` passes (74 tests; 3 new).
+- Manual browser verification needed: dev-browser tooling for Expo web is not available in this worktree. The web flow is wired through `index.html` + `src/app.js` and exercised by the same `importDocument({kind:'epub'})` code path that `test/epub-flow.test.mjs` covers; manual verification of the file picker and status string in a real browser remains a TODO.
+- **Learnings for future iterations:**
+  - On RN, `expo-document-picker` returns assets with a `uri` (often a `file://` cache path); the simplest cross-platform read is `await fetch(uri).then(r => r.arrayBuffer())`. This works on iOS/Android/web inside Expo without pulling in `expo-file-system`.
+  - The hidden-file-input + label pattern (`<input id=".." hidden /><label for=".." class="text-button">Pick EPUB</label>`) is the cleanest way to style a file picker without losing native click-to-open semantics. Don't use a `<button>` that calls `.click()` — labels are accessible by default.
+  - `addArticle` in `components/fast-read-screen.jsx` already accepts an `opts.document`, so the EPUB path reuses it: `onAddArticle(flatText, title, source, null, { document })`. Future P2 importers (PDF) can follow the same call shape.
+  - `importDocument({kind:'epub'})` throws on garbage input (zip-magic check fails inside `readEpubEntries`), which the UI maps to a `Could not read that EPUB.` user-facing message. Future error states (chapter-extraction returns zero text) are covered by the explicit `flatText.trim()` check — both flows show a clear error.
+---
+
+## 2026-05-07 - US-017
+- Phase 2 (P1): iOS Swift Files / share-sheet entry for EPUB.
+- Files added/changed:
+  - `project.yml`: added top-level `packages:` map declaring ZIPFoundation (from 0.9.19) and a `dependencies: - package: ZIPFoundation` entry on the FastRead target.
+  - `FastRead.xcodeproj/project.pbxproj`: regenerated via `xcodegen generate` (replaces the hand-edited pbxproj). The new pbxproj auto-includes `EpubImporter.swift` and links ZIPFoundation into the iOS app target.
+  - `FastReadApp/Info.plist`: added `LSSupportsOpeningDocumentsInPlace=true` and a `CFBundleDocumentTypes` entry declaring `org.idpf.epub-container` so EPUB files can be opened in JustRead via Files / share sheet.
+  - `FastReadApp/ReadingStore.swift`: new `addEpubArticle(data:filename:)` that runs `ImporterRegistry.shared.importEpub` and inserts a chapter-bearing Document via the existing `addArticle(document:source:sourceURL:)` helper. Source label falls back filename → metadata title → "EPUB".
+  - `FastReadApp/AddSourceView.swift`: new `epubPicker` row with a `Pick EPUB` button that triggers SwiftUI `.fileImporter(allowedContentTypes:)` constrained to `org.idpf.epub-container` + `UTType.epub`. The picker reads the selected URL into Data (using a security-scoped resource scope for share-sheet inputs), forwards to `store.addEpubArticle`, and surfaces a `Loaded · N words` / `Could not read that EPUB.` status string consistent with the existing fetch flow.
+  - `Tests/FastReadCoreTests/EpubRegistryFlowTests.swift` (new): 3 tests — registry import produces a chapter Document with tokens > 0, garbage data throws via the registry, and `ImportOptions` overrides metadata (title/author/sourceUrl).
+- `swift test` (42 tests, +3 new), `npm test` (74 passing, unchanged), and `xcodebuild ... build` for both `generic/platform=iOS Simulator` (Debug) and `generic/platform=iOS` (Release) all succeed. Manual on-device verification (Files-app open-in / share sheet) is required separately — the simulator build link-test is sufficient for CI.
+- **Learnings for future iterations:**
+  - The Xcode project is regenerated from `project.yml` via xcodegen — do NOT hand-edit `FastRead.xcodeproj/project.pbxproj`. Add SPM deps in `project.yml`'s top-level `packages:` and reference them with `dependencies: - package: Name` per target. `sources: - path: Sources/FastReadCore` already auto-discovers all `.swift` files in the directory, so new core files no longer need pbxproj edits — they're picked up automatically on `xcodegen generate`.
+  - `org.idpf.epub-container` is the canonical exported UTI for EPUB. `UTType.epub` is also available iOS 14+; passing both to `.fileImporter(allowedContentTypes:)` is harmless and gives broader file-source coverage.
+  - When `.fileImporter` returns a URL from outside the app sandbox (Files app, share sheet), call `startAccessingSecurityScopedResource()` before reading and `stopAccessingSecurityScopedResource()` in `defer`. Without this, `Data(contentsOf:)` quietly fails on iOS for documents picked from iCloud Drive or other providers.
+  - `ReadingStore.addEpubArticle(data:filename:)` reuses `addArticle(document:source:sourceURL:)` so chapter sections survive into storage via the existing custom `Codable` on `ReadingArticle` (which encodes both `document` and flattened `text`). Future stories that need chapter-aware playback can read `currentArticle.document.sections` directly.
+  - Info.plist `CFBundleDocumentTypes` + `LSSupportsOpeningDocumentsInPlace=true` is the minimum for "Open in JustRead" from the share sheet. `UISupportsDocumentBrowser` is NOT needed (and would force a different app architecture).
+---

@@ -1,0 +1,33 @@
+[
+  {
+    "id": "article-1714000000000",
+    "title": "Legacy Article",
+    "source": "example.com",
+    "sourceURL": "https://example.com/legacy",
+    "author": "You",
+    "date": "Apr 25, 2024",
+    "readTime": "3 min",
+    "lede": "An older saved article from before the Document schema landed.",
+    "tag": "Reading now",
+    "text": "First paragraph of the legacy article.\n\nSecond paragraph with more body text.",
+    "progress": 0.25,
+    "wordIndex": 8,
+    "timesOpened": 2,
+    "isFinished": false
+  },
+  {
+    "id": "article-1714000000001",
+    "title": "中文文章",
+    "source": "Pasted text",
+    "author": "You",
+    "date": "May 1, 2026",
+    "readTime": "1 min",
+    "lede": "閱讀是一種技能。",
+    "tag": "Saved",
+    "text": "閱讀是一種技能。",
+    "progress": 0,
+    "wordIndex": 0,
+    "timesOpened": 1,
+    "isFinished": false
+  }
+]

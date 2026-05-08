@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
 import { StatusBar } from "expo-status-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useFonts } from "expo-font";
@@ -20,7 +21,9 @@ import {
 import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { extractArticle } from "../src/article-extract.js";
+import { fetchHtml } from "../src/url-ingest.js";
+import { importDocument } from "../src/importers/index.js";
+import { flattenText } from "../src/document.js";
 import { clamp, containsCjk, durationForToken, estimateMinutes, joinTokensForDisplay, nextArticleProgressState, rangeValueFromLocation, rangeValueFromPageX, shouldRestartPlayback, splitForFocus, tokenize } from "../src/reader-core.js";
 
 const STORAGE_KEY = "justread.expo.state.v2";
@@ -368,10 +371,13 @@ export default function FastReadScreen() {
   }, []);
 
   const addArticle = useCallback(
-    (text, title = "Pasted text", source = "Clipboard", sourceURL = null) => {
+    (text, title = "Pasted text", source = "Clipboard", sourceURL = null, opts = {}) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const readingUnits = tokenize(trimmed);
+      const document = opts.document
+        || importDocument({ kind: "text", input: trimmed, sourceUrl: sourceURL || "", title });
+      const flatText = flattenText(document);
+      const readingUnits = tokenize(flatText);
       const now = new Date().toISOString();
       const item = {
         id: `article-${Date.now()}`,
@@ -385,9 +391,10 @@ export default function FastReadScreen() {
         finishedAt: null,
         readTime: `${Math.max(1, Math.ceil(estimateMinutes(readingUnits.length, wpm)))} min`,
         progress: 0,
-        lede: makeLede(trimmed, readingUnits),
+        lede: makeLede(flatText, readingUnits),
         tagKey: "readingNow",
-        text: trimmed,
+        text: flatText,
+        document,
         timesOpened: 1,
       };
       setLibrary((items) => [item, ...items]);
@@ -670,26 +677,26 @@ function SourceScreen({ insets, isLandscape, recentSources, ui, onAddArticle }) 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
-      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only http and https URLs are supported.");
-      const response = await fetch(parsed.toString(), {
-        headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2" },
+      const { html, finalUrl } = await fetchHtml({
+        url: trimmed,
+        fetcher: fetch,
+        maxBytes: MAX_HTML_BYTES,
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`Fetch failed with HTTP ${response.status}.`);
-      const length = Number(response.headers.get("content-length") || 0);
-      if (length > MAX_HTML_BYTES) throw new Error("Page is too large to extract.");
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType && !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
-        throw new Error(`Unsupported content type: ${contentType}.`);
-      }
-      const html = await response.text();
-      if (html.length > MAX_HTML_BYTES) throw new Error("Page is too large to extract.");
-      const article = extractArticle(html, response.url || parsed.toString());
-      if (!article.text || article.wordCount < 20) throw new Error("Could not find enough readable text on that page.");
-      onAddArticle(article.text, article.title || parsed.host, parsed.host, response.url || parsed.toString());
+      const document = importDocument({ kind: "html", input: html, sourceUrl: finalUrl });
+      const flatText = flattenText(document);
+      const wordCount = tokenize(flatText).length;
+      if (!flatText || wordCount < 20) throw new Error("Could not find enough readable text on that page.");
+      const finalParsed = new URL(finalUrl);
+      onAddArticle(flatText, document.title || finalParsed.host, finalParsed.host, finalUrl, { document });
     } catch (error) {
-      setStatus(error.name === "AbortError" ? "Fetch timed out." : error.message || "Could not load that URL.");
+      const friendly =
+        error?.name === "TimeoutError" || error?.name === "AbortError"
+          ? "Fetch timed out."
+          : error?.name === "OversizedError"
+            ? "Page is too large to extract."
+            : error?.message || "Could not load that URL.";
+      setStatus(friendly);
     } finally {
       clearTimeout(timeout);
       setLoading(false);
@@ -711,6 +718,47 @@ function SourceScreen({ insets, isLandscape, recentSources, ui, onAddArticle }) 
     setStatus("Clipboard text loaded.");
     onAddArticle(trimmed);
   }, [fetchURL, onAddArticle]);
+
+  const handlePickEpub = useCallback(async () => {
+    if (loading) return;
+    setLoading(true);
+    setStatus("Opening file picker.");
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/epub+zip"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result?.canceled) {
+        setStatus("");
+        return;
+      }
+      const asset = result?.assets?.[0];
+      if (!asset?.uri) {
+        setStatus("No file selected.");
+        return;
+      }
+      setStatus("Reading EPUB.");
+      const response = await fetch(asset.uri);
+      const arrayBuffer = await response.arrayBuffer();
+      const buf = new Uint8Array(arrayBuffer);
+      const document = importDocument({ kind: "epub", input: buf });
+      const flatText = flattenText(document);
+      if (!flatText.trim()) {
+        throw new Error("EPUB has no readable text.");
+      }
+      const wordCount = tokenize(flatText).length;
+      const chapters = document.sections.length;
+      const title = document.title || asset.name || "EPUB";
+      const source = document.author || "EPUB";
+      onAddArticle(flatText, title, source, null, { document });
+      setStatus(`Loaded ${chapters} chapter${chapters === 1 ? "" : "s"}, ${wordCount} words.`);
+    } catch (error) {
+      setStatus(error?.message || "Could not read that EPUB.");
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, onAddArticle]);
 
   const handlePaste = useCallback(async () => {
     if (isBeamActive) return;
@@ -772,6 +820,20 @@ function SourceScreen({ insets, isLandscape, recentSources, ui, onAddArticle }) 
         </View>
 
         {status ? <Text style={[s.status, { color: color.terracotta }]}>{status.toUpperCase()}</Text> : null}
+
+        <View>
+          <SectionLabel>EPUB file</SectionLabel>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pick EPUB file"
+            disabled={isBeamActive}
+            onPress={handlePickEpub}
+            style={[s.recentRow, { marginTop: 12 }, isBeamActive && { opacity: 0.55 }]}
+          >
+            <Text style={s.recentLabel}>Pick EPUB</Text>
+            <Text style={s.recentDate}>.epub</Text>
+          </Pressable>
+        </View>
 
         <View>
           <SectionLabel>{ui.source.recentSources}</SectionLabel>

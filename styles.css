@@ -188,6 +188,18 @@ input[type="range"] {
   color: var(--accent-strong);
 }
 
+.epub-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.epub-row label {
+  cursor: pointer;
+}
+
 textarea {
   display: block;
   width: 100%;

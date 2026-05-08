@@ -1,0 +1,258 @@
+{
+  "project": "FastRead / JustRead",
+  "branchName": "claude/stoic-poincare-530ed9",
+  "description": "Refactor the dual-platform (JS web/RN + Swift iOS) reader codebase behind a format-agnostic Document + SourceAdapter seam, locked down by golden-fixture and JS<->Swift parity tests, so EPUB (P1) and PDF/HTML-upload (P2) importers can land without further core churn.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Phase 0: HTML/text golden-fixture corpus + JS snapshot test",
+      "description": "As a maintainer, I need a frozen baseline of extractArticle output so any future ingest refactor cannot silently regress real articles.",
+      "acceptanceCriteria": [
+        "Add at least 6 fixtures under test/fixtures/articles/ covering: a clean blog post with <article>, a page with JSON-LD articleBody, a CJK (zh-Hant or ja) article, a paywalled-style page with heavy nav/footer chrome, a plain-text .txt input, and an article without <article>/<main> tags",
+        "Each fixture is a .html/.txt file plus a sibling .expected.json with title, source, wordCount, and the first 200 + last 200 chars of normalized text",
+        "New test/article-extract.golden.test.mjs iterates the corpus and asserts extractArticle output matches each .expected.json exactly",
+        "Test failures print which fixture diverged and the diff",
+        "npm test passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Phase 0: JS<->Swift tokenizer parity fixture + Swift parity test",
+      "description": "As a maintainer, I need an automated parity check so the JS reader-core and Swift RSVPEngine cannot drift on tokenize / splitForFocus / durationForToken.",
+      "acceptanceCriteria": [
+        "Commit Tests/Fixtures/parity-corpus.json containing at least 12 inputs (ASCII, CJK, mixed CJK+latin, punctuation runs, hyphens, em-dash, NBSP, very long token, single token, empty, whitespace-only, RTL/Arabic) with the expected JS outputs (tokens, focus splits, durationForToken at 450 wpm with punctuationPause=true)",
+        "A node script test/generate-parity-fixture.mjs regenerates the file from reader-core.js so the JS side is the source of truth",
+        "New Tests/FastReadCoreTests/ParityTests.swift loads parity-corpus.json and asserts RSVPEngine matches every entry",
+        "swift test and npm test both pass; running the generator produces no diff against the committed fixture"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Phase 0: Extract pure fetchAndExtract (JS) with fake-fetcher tests",
+      "description": "As a maintainer, I need URL ingest to be a pure function I can unit test without network access.",
+      "acceptanceCriteria": [
+        "New src/url-ingest.js exports fetchAndExtract({ url, fetcher, maxBytes, signal }) that returns { article, finalUrl } or throws typed errors (InvalidURL, HttpError, OversizedError, UnsupportedContentType, TimeoutError)",
+        "Replace the inline fetcher in components/fast-read-screen.jsx (around the fetchURL useCallback) so it calls fetchAndExtract with global fetch",
+        "Add test/url-ingest.test.mjs covering: 200 OK happy path, 404 -> HttpError, content-length over maxBytes -> OversizedError, body bigger than maxBytes after read -> OversizedError, content-type 'application/pdf' -> UnsupportedContentType, AbortSignal -> TimeoutError, non-http(s) url -> InvalidURL, latin-1 body decoded as utf-8 fallback path",
+        "No real network calls in tests (fetcher is injected)",
+        "npm test passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Phase 0: Extract pure fetchArticle (Swift) with stubbed URLProtocol tests",
+      "description": "As a maintainer, I need the Swift URL ingest path to be testable without network access and to mirror the JS error taxonomy.",
+      "acceptanceCriteria": [
+        "Move ArticleLoader.fetch out of FastReadApp/ReadingStore.swift into a new FastReadApp/UrlIngest.swift (or Sources/FastReadCore if it can stay framework-free) that takes an injectable URLSession",
+        "Define ArticleFetchError cases matching the JS taxonomy: invalidURL, httpError(Int), oversized, unsupportedContentType(String), timeout",
+        "Add Tests/FastReadCoreTests/UrlIngestTests.swift using URLProtocol stubs covering: 200 OK, 404, oversized via Content-Length, oversized via streamed body, unsupported content-type, timeout, non-http scheme",
+        "swift test passes; existing AddSourceView call sites still compile and behave identically"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Phase 0: Storage round-trip tests for ReadingArticle (Swift) and library item (JS)",
+      "description": "As a maintainer, I need persistence invariants pinned down before changing the storage shape.",
+      "acceptanceCriteria": [
+        "Add Tests/FastReadCoreTests/ReadingArticleCodableTests.swift that round-trips a ReadingArticle through JSONEncoder/Decoder and asserts every field including progress, wordIndex, finishedAt, isFinished is preserved",
+        "Add a v0 snapshot fixture (raw JSON committed under Tests/Fixtures/legacy-article-v0.json) and a test asserting current ReadingArticle decoding still accepts it",
+        "Add test/library-storage.test.mjs that constructs the JS library item shape (see addArticle in components/fast-read-screen.jsx) and round-trips it through JSON.stringify/parse asserting all fields stable",
+        "Both swift test and npm test pass"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Phase 1: Define Document schema (JS) with factory + tests",
+      "description": "As a maintainer, I need a format-agnostic Document model so importers and the reader stop coupling on a flat text blob.",
+      "acceptanceCriteria": [
+        "New src/document.js exports Document/Section types as JSDoc typedefs plus pure factories: createDocument({ title, author, sourceUrl, sourceKind, sections }) and createSection({ id, title, kind, text }); kind in 'chapter'|'page'|'body'",
+        "Export flattenText(document) that joins sections by '\\n\\n' and tokenizeDocument(document) that returns the same tokens that tokenize(flattenText(document)) would",
+        "Export sectionBoundaries(document) returning [{ sectionId, tokenStart, tokenEnd }] usable for future chapter nav",
+        "test/document.test.mjs covers: empty doc, single body section, multi-chapter doc with CJK title, boundaries math against tokenize",
+        "npm test passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Phase 1: Define Document schema (Swift) Codable + tests",
+      "description": "As a maintainer, I need the same Document schema in Swift, Codable, with parity helpers.",
+      "acceptanceCriteria": [
+        "New Sources/FastReadCore/Document.swift defines public structs Document and Section (id, title, kind enum body|chapter|page, text), both Codable and Equatable",
+        "Add static helpers Document.flattenText(_:) and Document.sectionBoundaries(_:) mirroring the JS versions",
+        "Add Tests/FastReadCoreTests/DocumentTests.swift covering empty doc, body-only, multi-chapter CJK, and a parity check that flattenText then RSVPEngine.tokenize equals tokenizing each section joined by \\n\\n",
+        "Tests/Fixtures/document-sample.json round-trips identically through JSONEncoder<->JSONDecoder and matches a JS-produced sample",
+        "swift test passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Phase 1: PlainTextAdapter + HtmlAdapter (JS) producing Document",
+      "description": "As a maintainer, I want HTML and plain-text ingest to flow through a SourceAdapter interface so EPUB/PDF can plug in later.",
+      "acceptanceCriteria": [
+        "New src/importers/index.js exports importDocument({ kind, input, sourceUrl }) that delegates to a registry of adapters with shape { kind, canHandle(input), import(input, opts) -> Document }",
+        "Register PlainTextAdapter (kind: 'text') wrapping current text path and HtmlAdapter (kind: 'html') wrapping extractArticle and emitting a single body Section",
+        "extractArticle stays unchanged in src/article-extract.js; HtmlAdapter calls it",
+        "test/importers.test.mjs replays the existing US-001 golden corpus via importDocument({kind:'html'}) and asserts the resulting Document.flattenText equals the prior expected text",
+        "npm test passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Phase 1: PlainTextAdapter + HtmlAdapter (Swift) producing Document",
+      "description": "As a maintainer, the Swift app must reach Document through the same adapter abstraction as JS.",
+      "acceptanceCriteria": [
+        "New Sources/FastReadCore/Importers.swift defines protocol SourceAdapter { var kind: SourceKind { get }; func canHandle(_:) -> Bool; func `import`(_:) throws -> Document } plus an ImporterRegistry",
+        "Implement PlainTextAdapter and HtmlAdapter; the latter wraps the current ArticleTextExtractor and emits a single body Section",
+        "Add Tests/FastReadCoreTests/ImportersTests.swift that runs the same fixtures used in US-001 (placed under Tests/Fixtures/articles/) through HtmlAdapter and asserts flattenText equals the expected text",
+        "swift test passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Phase 1: Storage migration v1 -> v2 (JS + Swift) with tests",
+      "description": "As a user, I want my existing library to keep working after the schema change without re-importing anything.",
+      "acceptanceCriteria": [
+        "Bump JS storage key from fastread-state-v1 to fastread-state-v2; on read, detect v1 payloads (legacy text field on each article) and rewrap into Document with one body Section before returning to the app; persist back as v2",
+        "Mirror the migration in Swift ReadingStore.loadArticles: when decoding finds the legacy single-text shape, build a Document with one body Section",
+        "test/storage-migration.test.mjs round-trips a recorded v1 localStorage snapshot and asserts the resulting in-memory shape has Document with a single body Section whose text matches",
+        "Tests/FastReadCoreTests/StorageMigrationTests.swift loads Tests/Fixtures/legacy-store-v1.json and asserts the same",
+        "npm test and swift test pass"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Phase 1: Wire JS callers through importer registry",
+      "description": "As a user, paste-text and fetch-URL on web and RN must produce articles via the new importer registry without behavior change.",
+      "acceptanceCriteria": [
+        "src/app.js loadUrl path goes through importDocument({kind:'html'}) and stores the resulting Document via the new storage shape",
+        "components/fast-read-screen.jsx fetchURL and addArticle both call importDocument; the existing UI keeps showing flat text using flattenText(document)",
+        "Existing test/article-extract.test.mjs and test/reader-core.test.mjs still pass unchanged",
+        "Add a smoke test test/web-flow.test.mjs that drives the loadUrl code path with a fake fetcher and asserts a Document lands in the in-memory state",
+        "npm test passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Phase 1: Wire Swift callers through importer registry",
+      "description": "As an iOS user, paste-text and fetch-URL must go through ImporterRegistry without behavior change.",
+      "acceptanceCriteria": [
+        "FastReadApp/ReadingStore.swift addArticle/importPasted/importURL paths call ImporterRegistry.importDocument and persist the Document on ReadingArticle",
+        "ReadingArticle gains a document: Document field; the legacy text: String stays as a computed convenience returning Document.flattenText for any UI that still reads it",
+        "FastReadApp/AddSourceView.swift call sites compile unchanged; existing fetch flow still produces a usable article in the library",
+        "Add Tests/FastReadCoreTests/ReadingStoreImportTests.swift covering paste-text and a stubbed URL fetch through the registry",
+        "swift test passes; the iOS app still builds (npm run verify:ios-performance build step or equivalent xcodebuild)"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Phase 2 (P1): EPUB OPF/spine parser + zip reader (JS) with Gutenberg fixture tests",
+      "description": "As a user, I want EPUB files to be parseable so I can read them in JustRead.",
+      "acceptanceCriteria": [
+        "Add fflate as a dependency via bun add fflate (record in package.json); if Bun is unavailable on this machine fall back to npm install fflate but keep package.json scripts Bun-friendly",
+        "New src/importers/epub-zip.js exposes readEpubEntries(arrayBuffer) -> Map<path, Uint8Array> using fflate",
+        "New src/importers/epub-parse.js exposes parseEpub(arrayBuffer) returning { metadata: {title, author?, language?}, spine: [{ id, href, mediaType, navTitle? }] } by reading container.xml -> .opf -> manifest+spine, with nav.xhtml or toc.ncx used to fill navTitle",
+        "Commit at least two small public-domain EPUB fixtures (e.g. trimmed Gutenberg samples) under test/fixtures/epub/; add test/epub-parse.test.mjs asserting metadata, spine length, and the navTitle for a known chapter",
+        "npm test passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Phase 2 (P1): EpubAdapter (JS) producing Document with chapter sections",
+      "description": "As a user, I want EPUB chapters surfaced as sections so future chapter nav can plug in.",
+      "acceptanceCriteria": [
+        "New src/importers/epub-adapter.js exports EpubAdapter implementing the SourceAdapter shape from US-008; canHandle accepts ArrayBuffer/Uint8Array of zip magic 'PK\\x03\\x04' or filename ending .epub",
+        "import(arrayBuffer) calls parseEpub then converts each spine item via htmlToText (reusing src/article-extract.js) into a Section with kind:'chapter' and the navTitle as section.title",
+        "Register EpubAdapter under kind:'epub' in src/importers/index.js",
+        "test/epub-adapter.test.mjs runs both fixtures from US-013 through importDocument({kind:'epub', input: arrayBuffer}) and asserts: section count == spine length (minus blank chapters), total tokenized words within +/-2% of a precomputed baseline written into the test, and a known sentence string appears inside one specific chapter",
+        "npm test passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Phase 2 (P1): EpubImporter (Swift) with parity tests against JS fixtures",
+      "description": "As an iOS user, EPUB import must produce the same Document shape as the web/RN side.",
+      "acceptanceCriteria": [
+        "Add ZIPFoundation via SwiftPM (Package.swift) and a new Sources/FastReadCore/EpubImporter.swift implementing the Swift SourceAdapter from US-009",
+        "Parses container.xml, the OPF manifest+spine, and toc.ncx/nav.xhtml; extracts chapter HTML to text using a Swift port of htmlToText (or reuse ArticleTextExtractor.readableText)",
+        "Tests/FastReadCoreTests/EpubImporterTests.swift uses the same EPUB fixtures committed in US-013 (referenced from Tests/Fixtures/epub/); asserts identical section count and chapter titles to the JS expected baseline",
+        "Cross-platform parity: the test computes RSVPEngine.tokenize(Document.flattenText(...)).count and asserts it equals the JS baseline word-count from US-014 within +/-2%",
+        "swift test passes"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Phase 2 (P1): EPUB file-picker UI on web + RN",
+      "description": "As a user, I want to pick an .epub file from my device on web and inside the Expo app and have it imported.",
+      "acceptanceCriteria": [
+        "Web: index.html / src/app.js gains an <input type='file' accept='.epub'> control; on change, read as ArrayBuffer and route through importDocument({kind:'epub'}); status text shows chapter count and total word count",
+        "RN: components/fast-read-screen.jsx adds a Pick EPUB action on the Source tab using expo-document-picker (added via bun add expo-document-picker if not present) constrained to application/epub+zip; loaded ArrayBuffer goes through importDocument and onAddArticle",
+        "Both flows show a clear error state when the file is not a valid EPUB or yields zero readable text",
+        "Add a non-UI test test/epub-flow.test.mjs that drives importDocument with a fixture ArrayBuffer and asserts the library item it would create has tokens > 0",
+        "npm test passes; the web flow is verified manually (note in progress.txt) since dev-browser tooling for Expo web may not be available"
+      ],
+      "priority": 16,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Phase 2 (P1): iOS Swift Files / share-sheet entry for EPUB",
+      "description": "As an iOS user, I want to import an .epub via the Files app or share sheet.",
+      "acceptanceCriteria": [
+        "FastReadApp/AddSourceView.swift gains a Pick EPUB button using SwiftUI's .fileImporter constrained to UTType-epub",
+        "Selected file is read into Data, passed to ImporterRegistry, and the resulting Document is added to ReadingStore",
+        "Info.plist declares the application/epub+zip document type so EPUBs can be opened via 'Open in JustRead'",
+        "The reader screen opens the new article successfully (multi-chapter Documents flatten to text via existing path)",
+        "swift test passes; the iOS app builds (npm run verify:ios-performance or xcodebuild build for the simulator); manual on-device verification is noted in progress.txt rather than required"
+      ],
+      "priority": 17,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}

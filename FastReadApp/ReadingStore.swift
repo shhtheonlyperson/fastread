@@ -80,7 +80,8 @@ final class ReadingStore: ObservableObject {
         self.defaults = defaults
         let settings = Self.loadSettings(from: defaults)
 
-        self.articles = Self.loadArticles(from: defaults)
+        let loadedArticles = Self.loadArticles(from: defaults)
+        self.articles = loadedArticles
         self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle)
         self.stats = Self.loadStats(from: defaults)
         self.wpm = settings.wpm
@@ -186,37 +187,77 @@ final class ReadingStore: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
+        guard let document = try? ImporterRegistry.shared.importDocument(
+            kind: .text,
+            input: trimmed,
+            options: ImportOptions(sourceUrl: sourceURL ?? "", title: title, author: "You")
+        ) else {
+            return
+        }
+
+        addArticle(document: document, source: source, sourceURL: sourceURL)
+    }
+
+    func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
+        addDraftArticle(text: text, title: title, source: source, sourceURL: url)
+    }
+
+    @discardableResult
+    func addEpubArticle(data: Data, filename: String? = nil) throws -> ReadingArticle? {
+        let document = try ImporterRegistry.shared.importEpub(
+            data: data,
+            options: ImportOptions(sourceUrl: "", title: "", author: "")
+        )
+        let flattened = Document.flattenText(document)
+        let trimmed = flattened.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let source: String
+        if let filename, !filename.isEmpty {
+            source = filename
+        } else if !document.title.isEmpty {
+            source = document.title
+        } else {
+            source = "EPUB"
+        }
+        addArticle(document: document, source: source, sourceURL: nil)
+        return articles.first
+    }
+
+    func addArticle(document: Document, source: String, sourceURL: String? = nil) {
+        let flattened = Document.flattenText(document)
+        let trimmed = flattened.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
         pause()
-        let tokens = RSVPEngine.tokenize(trimmed)
+        let tokens = RSVPEngine.tokenize(flattened)
         let now = Date()
+        let title = document.title.isEmpty ? "Pasted text" : document.title
+        let author = document.author.isEmpty ? "You" : document.author
         let article = ReadingArticle(
             id: "draft-\(UUID().uuidString)",
             title: title,
             source: source,
             sourceURL: sourceURL,
-            author: "You",
+            author: author,
             date: Self.displayDate(for: now),
             createdAt: now,
             lastOpenedAt: now,
             finishedAt: nil,
             readTime: "\(max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: tokens.count, wpm: wpm))))) min",
-            lede: Self.makeLede(from: trimmed, tokens: tokens),
+            lede: Self.makeLede(from: flattened, tokens: tokens),
             tag: "Reading now",
-            text: trimmed,
+            document: document,
             progress: 0,
             wordIndex: 0,
             timesOpened: 1,
             isFinished: false
         )
-        tokenCache[article.id] = TokenCacheEntry(text: trimmed, tokens: tokens)
+        tokenCache[article.id] = TokenCacheEntry(text: flattened, tokens: tokens)
         articles.insert(article, at: 0)
         selectedArticleID = article.id
         persistSelectedArticleID()
         persistArticles()
-    }
-
-    func addFetchedArticle(title: String, source: String, text: String, url: String? = nil) {
-        addDraftArticle(text: text, title: title, source: source, sourceURL: url)
     }
 
     func deleteArticle(_ id: ReadingArticle.ID) {
@@ -551,94 +592,3 @@ private enum StorageKey {
     static let selectedArticle = "justread.selectedArticle.v1"
 }
 
-enum ArticleFetchError: LocalizedError {
-    case invalidURL
-    case unsupportedScheme
-    case badStatus(Int)
-    case unsupportedContentType(String)
-    case tooLarge
-    case unreadable
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL:
-            "Enter a valid URL."
-        case .unsupportedScheme:
-            "Only http and https URLs are supported."
-        case let .badStatus(status):
-            "Fetch failed with HTTP \(status)."
-        case let .unsupportedContentType(type):
-            "Unsupported content type: \(type.isEmpty ? "unknown" : type)."
-        case .tooLarge:
-            "Page is too large to extract."
-        case .unreadable:
-            "Could not find enough readable text on that page."
-        }
-    }
-}
-
-struct ArticleFetchResult {
-    var title: String
-    var source: String
-    var url: String
-    var text: String
-    var wordCount: Int
-}
-
-enum ArticleLoader {
-    private static let maxHTMLBytes = 6 * 1024 * 1024
-
-    static func fetch(urlString: String) async throws -> ArticleFetchResult {
-        guard let normalized = SourceInputClassifier.normalizedURLString(from: urlString) else {
-            throw ArticleFetchError.invalidURL
-        }
-        guard let url = URL(string: normalized), let scheme = url.scheme else {
-            throw ArticleFetchError.invalidURL
-        }
-        guard ["http", "https"].contains(scheme.lowercased()) else {
-            throw ArticleFetchError.unsupportedScheme
-        }
-
-        var request = URLRequest(url: url, timeoutInterval: 15)
-        request.setValue("text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2", forHTTPHeaderField: "Accept")
-        request.setValue("Mozilla/5.0 JustRead iOS reader", forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw ArticleFetchError.unreadable
-        }
-        if !(200..<300).contains(http.statusCode) {
-            throw ArticleFetchError.badStatus(http.statusCode)
-        }
-        if data.count > maxHTMLBytes {
-            throw ArticleFetchError.tooLarge
-        }
-        let contentType = http.value(forHTTPHeaderField: "Content-Type") ?? ""
-        if !contentType.isEmpty,
-           contentType.range(of: #"text/html|application/xhtml\+xml|text/plain"#, options: [.regularExpression, .caseInsensitive]) == nil {
-            throw ArticleFetchError.unsupportedContentType(contentType)
-        }
-
-        let html = String(data: data, encoding: .utf8)
-            ?? String(data: data, encoding: .isoLatin1)
-            ?? ""
-        let text = PerformanceTrace.measure("Extract Article Text") {
-            ArticleTextExtractor.readableText(from: html)
-        }
-        let words = RSVPEngine.tokenize(text)
-
-        guard words.count >= 20 else {
-            throw ArticleFetchError.unreadable
-        }
-
-        let title = ArticleTextExtractor.extractTitle(from: html) ?? url.host(percentEncoded: false) ?? "Fetched article"
-        return ArticleFetchResult(
-            title: title,
-            source: url.host(percentEncoded: false) ?? "Web",
-            url: http.url?.absoluteString ?? url.absoluteString,
-            text: text,
-            wordCount: words.count
-        )
-    }
-
-}
