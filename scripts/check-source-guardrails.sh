@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Source-level guardrails for the iOS-only repo. Catches a small set of
+# regression patterns that have bitten us before and that are cheaper to
+# enforce as a grep than as a full XCTest.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,107 +29,39 @@ reject_pattern() {
   fi
 }
 
-reject_pattern "ReaderContextPreview|ContextTextPreview|SectionLabel\\(text: \"Context\"\\)|<SectionLabel>Context</SectionLabel>|readerContext" \
-  "READ context previews must stay removed from native and Expo reader surfaces." \
-  FastReadApp/ReaderView.swift components/fast-read-screen.jsx
+# Ban surfaces and properties that historically caused render-loop or
+# perf regressions on the reader screen.
+reject_pattern "ReaderContextPreview|ContextTextPreview|SectionLabel\\(text: \"Context\"\\)|readerContext" \
+  "READ context preview must stay removed from the reader." \
+  FastReadApp/ReaderView.swift
 
 reject_pattern "FullTextPreview|The full text|fullText|step:" \
   "Found a known perf-regression pattern in reader/settings UI." \
-  FastReadApp/ReaderView.swift FastReadApp/SettingsView.swift components/fast-read-screen.jsx
+  FastReadApp/ReaderView.swift FastReadApp/SettingsView.swift
 
 reject_pattern "Word typeface|WordTypeface|wordTypeface|wordFont|setWordFont" \
-  "Word typeface settings must stay removed from native and Expo reader surfaces." \
-  FastReadApp components/fast-read-screen.jsx
+  "Word typeface settings must stay removed from the reader." \
+  FastReadApp
 
-reject_pattern "TextInput|smartInput|Paste or type" \
-  "Expo Add screen must stay clipboard-only for the shipped TestFlight surface." \
-  components/fast-read-screen.jsx
-
-require_pattern "PanResponder\\.create" \
-  "Expo range controls must track finger movement continuously instead of only applying on press release." \
-  components/fast-read-screen.jsx
-
-require_pattern "scrollEnabled=\\{!isRangeScrubbing\\}" \
-  "Expo range controls must lock the vertical ScrollView while the user is scrubbing horizontally." \
-  components/fast-read-screen.jsx
-
-require_pattern "onStartShouldSetPanResponderCapture: \\(\\) => true" \
-  "Expo range controls must capture scrubber touches before the parent ScrollView can steal the gesture." \
-  components/fast-read-screen.jsx
-
-require_pattern "gestureState\\?\\.moveX\\) && gestureState\\.moveX > 0" \
-  "Expo scrubbers must ignore invalid initial PanResponder moveX=0 values so sliders do not snap while dragging." \
-  components/fast-read-screen.jsx
-
-require_pattern "GestureHandlerRootView" \
-  "Expo root layout must wrap the app with GestureHandlerRootView so swipe actions work reliably." \
-  app/_layout.jsx
-
-require_pattern "<Swipeable" \
-  "Expo Library rows must support trailing swipe-to-delete." \
-  components/fast-read-screen.jsx
-
+# Library rows must keep trailing swipe-to-delete affordance.
 require_pattern "\\.swipeActions\\(edge: \\.trailing" \
-  "Native SwiftUI Library rows must support trailing swipe-to-delete." \
+  "Library rows must support trailing swipe-to-delete." \
   FastReadApp/LibraryView.swift
 
-require_pattern "clipboardBeamActive" \
-  "Expo paste button must keep a visibly stronger active beam while reading/fetching clipboard content." \
-  components/fast-read-screen.jsx
-
-require_pattern "duration: isBeamActive \\? 850 : 2500" \
-  "Expo paste beam must speed up during active paste/fetch work." \
-  components/fast-read-screen.jsx
-
-require_pattern "rangeValueFromLocation" \
-  "Range input coordinate mapping must stay covered by shared reader-core tests." \
-  components/fast-read-screen.jsx src/reader-core.js test/reader-core.test.mjs
-
-require_pattern "rangeValueFromPageX" \
-  "Range inputs must use absolute page coordinates so nested thumb/fill touches do not snap values." \
-  components/fast-read-screen.jsx src/reader-core.js test/reader-core.test.mjs
-
-require_pattern "measureInWindow" \
-  "Range inputs must measure the track bounds before mapping absolute touch coordinates." \
-  components/fast-read-screen.jsx
-
-require_pattern "ui\\.tabs\\?\\.\\[tab\\.id\\]" \
-  "Tab labels must derive from the active locale so language changes update UI immediately." \
-  components/fast-read-screen.jsx
-
-require_pattern "pageHeadingCjk" \
-  "Page titles must define CJK-specific metrics so Chinese ADD/Settings titles do not clip." \
-  components/fast-read-screen.jsx
-
-require_pattern "heroLineCjk" \
-  "Library masthead must define CJK-specific metrics so Chinese headings do not clip." \
-  components/fast-read-screen.jsx
-
-require_pattern "nextArticleProgressState" \
-  "Expo reader progress sync must stay idempotent so playback timers are not starved by render loops." \
-  components/fast-read-screen.jsx src/reader-core.js
-
-require_pattern "return didChange \\? nextItems : items" \
-  "Expo reader progress sync must avoid library state writes when article progress is unchanged." \
-  components/fast-read-screen.jsx
-
-reject_pattern "\\[article, progress" \
-  "Expo reader effects must not depend on the full article object; use stable article ids instead." \
-  components/fast-read-screen.jsx
-
+# Ban synchronous HTML parsing on paste/load paths and computed token
+# properties on ReadingArticle (both regressed reader startup latency
+# in the past).
 reject_pattern "NSAttributedString[[:space:]]*\\(data:" \
   "Do not reintroduce synchronous NSAttributedString HTML parsing on paste/load paths." \
   FastReadApp
 
 reject_pattern "RSVPEngine\\.tokenize\\(text\\)|var tokens: \\[String\\]|var wordCount: Int \\{ tokens\\.count" \
   "ReadingArticle must not expose computed token/wordCount properties that tokenize on every access." \
-  FastReadApp/Models.swift
+  Sources/FastReadCore/ReadingArticle.swift
 
-require_pattern "contextWindow\\(tokens\\.length, index\\)" \
-  "Web renderPreview must use contextWindow so previews stay bounded." \
-  src/app.js
-
-if ! perl -0ne 'exit(/function renderPreview\(\) \{[\s\S]*?tokens\.slice\(window\.lowerBound, window\.upperBound\)/ ? 0 : 1)' src/app.js; then
-  echo "Web renderPreview must slice the bounded context window instead of iterating every token." >&2
-  exit 1
-fi
+# The Sources/FastReadCore module is the cross-target shared core and
+# must stay UIKit/SwiftUI free so the SwiftPM library remains macOS-
+# importable for tests and headless tools.
+reject_pattern "import (UIKit|SwiftUI|AppKit)" \
+  "Sources/FastReadCore must stay framework-free; UI lives in FastReadApp/." \
+  Sources/FastReadCore

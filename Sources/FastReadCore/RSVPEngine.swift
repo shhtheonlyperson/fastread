@@ -35,6 +35,17 @@ public enum RSVPEngine {
         }
     }
 
+    public static func countReadingUnits(_ input: String?) -> Int {
+        tokenize(input).filter { token in
+            token.contains { isFocusable($0) || isCJKCharacter($0) }
+        }.count
+    }
+
+    public static func containsCJK(_ input: String?) -> Bool {
+        guard let input else { return false }
+        return hasCJK(input)
+    }
+
     public static func tokenize(_ input: String?) -> [String] {
         guard let input else { return [] }
         let normalized = input.replacingOccurrences(of: "\u{00a0}", with: " ")
