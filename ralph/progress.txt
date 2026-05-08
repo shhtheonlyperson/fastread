@@ -7,6 +7,8 @@ Started: Thu May  7 22:42:30 PDT 2026
 - `extractArticle` candidate `source` values: `entry-content`, `main`, `article`, `main-element`, `json-ld`, `body`, `none`. Plain-text input is not an HTML path; tests treat `.txt` separately and produce a synthetic `source: "plaintext"`.
 - `countReadingUnits` (from `src/reader-core.js`) is the canonical word/CJK-unit counter. Use it for any token-count assertion.
 - Class-based selectors recognized: `entry-content`, `wp-block-post-content`, `post-content`, `article-content`, `article__content`, `article-body`, `story-body` (priority 80, beats `<article>`/`<main>`).
+- `src/url-ingest.js` exports `fetchAndExtract({ url, fetcher, maxBytes, signal })` plus typed error classes `InvalidURL`, `HttpError`, `OversizedError`, `UnsupportedContentType`, `TimeoutError`. Inject `fetcher` (defaults to `globalThis.fetch`) for unit testability — never call real network in tests.
+- The Swift port (US-004) must mirror the same error taxonomy: invalidURL, httpError(Int), oversized, unsupportedContentType(String), timeout.
 ---
 
 ## 2026-05-07 - US-001
@@ -40,4 +42,18 @@ Started: Thu May  7 22:42:30 PDT 2026
   - `RSVPEngine` (Swift) and `reader-core.js` are already byte-parity for the 14 cases above. Future refactors of either side must rerun `node test/generate-parity-fixture.mjs` and ensure no diff before committing — the generator commit and the Swift assertion are the regression gate.
   - `tokenize` collapses NBSP (U+00A0) to space on both sides; emit JSON fixtures with literal NBSP characters and they survive JSON.stringify round-trip.
   - For Arabic/RTL input the tokenizer falls through the non-CJK branch (whitespace split) — durations use the non-CJK 1.0× multiplier.
+---
+
+## 2026-05-07 - US-003
+- Extracted pure `fetchAndExtract` from the inline `fetchURL` callback in `components/fast-read-screen.jsx`.
+- Files added/changed:
+  - `src/url-ingest.js` (new): exports `fetchAndExtract({ url, fetcher, maxBytes, signal })` and typed error classes `InvalidURL`, `HttpError`, `OversizedError`, `UnsupportedContentType`, `TimeoutError`.
+  - `test/url-ingest.test.mjs` (new): 8 tests covering happy path, 404, content-length oversize, post-read oversize, application/pdf rejection, abort -> TimeoutError, non-http(s) URL (ftp/javascript), and ISO-8859-1 charset decoding fallback.
+  - `components/fast-read-screen.jsx`: `fetchURL` callback now delegates to `fetchAndExtract` with global `fetch` as the injected fetcher; status-string mapping converts typed errors to user-facing strings.
+- `npm test` passes (36 tests; 8 new).
+- **Learnings for future iterations:**
+  - URL parsing must guard against schemes other than http(s) BEFORE the auto-prepend `https://`. A naïve `startsWith("http")` check lets `ftp://...` slip through and become `https://ftp://...`. Detect a leading scheme via `/^[a-z][a-z0-9+.-]*:/i` and only prepend when there is no scheme.
+  - For decoding pages with non-utf-8 charset declarations, prefer reading via `arrayBuffer()` and using `TextDecoder(charset)` rather than `response.text()`. We fall back to ISO-8859-1 only when utf-8 decoding produces a U+FFFD replacement char.
+  - The accept header / supported content-type regex is duplicated in JS and Swift. Keep them in sync when touching either side (US-004 will mirror this taxonomy in Swift).
+  - Tests construct fake Response objects with `headers.get(name)` (case-insensitive), `ok`, `status`, `url`, `text()`, `arrayBuffer()`. Reuse this `makeResponse` helper pattern for any future ingest tests rather than pulling in `undici`/`msw`.
 ---
