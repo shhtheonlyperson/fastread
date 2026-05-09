@@ -1,5 +1,16 @@
 # TestFlight upload runbook
 
+> **Project-agnostic procedure has moved to the wiki:**
+> [`~/Documents/wiki/shh/TestFlight.md`](file:///Users/shh/Documents/wiki/shh/TestFlight.md)
+>
+> That doc covers both build paths (Expo + EAS local, bare iOS Xcode), the
+> shared validate → upload → poll → clear-export-compliance flow, and a
+> stumbling-blocks table.
+>
+> This file kept for fastread-specific values + the dense manual-cert flow
+> (RSA CSR, IOS_DISTRIBUTION cert, IOS_APP_STORE profile, keychain import)
+> that the wiki references in §3 Path B but doesn't duplicate.
+
 ## Current source of truth
 
 Use this section first. It reflects the successful May 8, 2026 upload and supersedes older assumptions in this file.
