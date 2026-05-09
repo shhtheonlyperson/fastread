@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject private var store: ReadingStore
     @Environment(\.openURL) private var openURL
     @State private var paceDraft: Double?
+    @State private var showAddDictionaryEntry = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -15,6 +16,7 @@ struct SettingsView: View {
                     SettingsGroup(label: "Focus indicator") {
                         SegmentedControl(selection: $store.focusIndicator, options: FocusIndicatorStyle.allCases)
                     }
+                    customWordsGroup
                     aboutGroup
                 }
                 .padding(.horizontal, 16)
@@ -22,6 +24,11 @@ struct SettingsView: View {
             .padding(.bottom, 112)
         }
         .background(JRColor.paper)
+        .sheet(isPresented: $showAddDictionaryEntry) {
+            AddDictionaryEntrySheet { entry in
+                store.addToUserDictionary(entry)
+            }
+        }
     }
 
     private var masthead: some View {
@@ -94,6 +101,59 @@ struct SettingsView: View {
                 Toggle("", isOn: $store.punctuationPause)
                     .labelsHidden()
                     .tint(JRColor.terracotta)
+            }
+        }
+    }
+
+    private var customWordsGroup: some View {
+        SettingsGroup(label: "Custom words") {
+            SettingsRow {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Keep names together")
+                    Text("Add proper nouns and terms so they aren't split across chunks. Especially helpful for Chinese names.")
+                        .font(JRFont.sans(12))
+                        .foregroundStyle(JRColor.inkQuiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            ForEach(Array(store.userDictionary.enumerated()), id: \.element) { _, entry in
+                SettingsRow {
+                    Text(entry)
+                        .font(JRFont.serif(16))
+                        .foregroundStyle(JRColor.ink)
+                        .accessibilityIdentifier("dict-entry-\(entry)")
+                    Spacer()
+                    Button {
+                        store.removeFromUserDictionary(entry)
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(JRColor.terracotta.opacity(0.85))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(entry)")
+                    .accessibilityIdentifier("dict-remove-\(entry)")
+                }
+            }
+
+            SettingsRow(isLast: true) {
+                Button {
+                    showAddDictionaryEntry = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(JRColor.terracotta)
+                        Text(store.userDictionary.isEmpty ? "Add your first word" : "Add word")
+                            .font(JRFont.serif(16, weight: .semibold))
+                            .foregroundStyle(JRColor.ink)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("dict-add-button")
             }
         }
     }
@@ -190,6 +250,74 @@ private protocol SegmentedOption: Identifiable, Hashable {
 }
 
 extension FocusIndicatorStyle: SegmentedOption {}
+
+private struct AddDictionaryEntrySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: String = ""
+    let onSubmit: (String) -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Add a word")
+                        .font(JRFont.serif(28, weight: .medium))
+                        .foregroundStyle(JRColor.ink)
+                        .padding(.top, 8)
+
+                    Text("Names, brands, or compound terms that the reader is splitting incorrectly. Examples: 黃士旗, 蔡英文, 星巴克.")
+                        .font(JRFont.sans(14))
+                        .foregroundStyle(JRColor.inkQuiet)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    TextField("Enter a name or term", text: $draft)
+                        .font(JRFont.serif(20))
+                        .foregroundStyle(JRColor.ink)
+                        .padding(14)
+                        .background(JRColor.paperStrong)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(JRColor.rule, lineWidth: 0.5)
+                        )
+                        .submitLabel(.done)
+                        .onSubmit(commit)
+                        .accessibilityIdentifier("dict-add-text-field")
+                        #if canImport(UIKit)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        #endif
+                }
+                .padding(.horizontal, 24)
+            }
+            .background(JRColor.paper)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .tint(JRColor.inkMid)
+                        .accessibilityIdentifier("dict-add-cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add", action: commit)
+                        .tint(JRColor.terracotta)
+                        .disabled(trimmed.isEmpty)
+                        .accessibilityIdentifier("dict-add-confirm")
+                }
+            }
+        }
+    }
+
+    private var trimmed: String {
+        draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func commit() {
+        let value = trimmed
+        guard !value.isEmpty else { return }
+        onSubmit(value)
+        dismiss()
+    }
+}
 
 private struct SegmentedControl<Option: SegmentedOption>: View {
     @Binding var selection: Option

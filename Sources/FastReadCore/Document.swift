@@ -57,12 +57,15 @@ public struct Document: Codable, Equatable, Sendable {
         document.sections.map { $0.text }.joined(separator: "\n\n")
     }
 
-    public static func sectionBoundaries(_ document: Document) -> [SectionBoundary] {
+    public static func sectionBoundaries(
+        _ document: Document,
+        userDictionary: [String] = []
+    ) -> [SectionBoundary] {
         var boundaries: [SectionBoundary] = []
         var cursor = 0
         boundaries.reserveCapacity(document.sections.count)
         for section in document.sections {
-            let tokenCount = RSVPEngine.tokenize(section.text).count
+            let tokenCount = RSVPEngine.tokenize(section.text, userDictionary: userDictionary).count
             let tokenEnd = cursor + tokenCount
             boundaries.append(
                 SectionBoundary(sectionId: section.id, tokenStart: cursor, tokenEnd: tokenEnd)

@@ -510,6 +510,9 @@ struct RSVPStage: View {
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: isBig ? 220 : 180)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(token)
+        .accessibilityIdentifier("rsvp-current-token")
     }
 
     private var wordColor: Color {

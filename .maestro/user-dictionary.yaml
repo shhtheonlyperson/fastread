@@ -1,0 +1,107 @@
+# Maestro flow: verify the user dictionary affects Chinese tokenization end-to-end.
+#
+# Boots the app fresh with a Chinese sentence pre-seeded as a draft
+# article, then walks the UI:
+#   1. Open reader → confirm "黃" is the first focus token (NLTokenizer
+#      splits the OOV name 黃士旗 into single chars by default).
+#   2. Open Settings → add 黃士旗 to the custom-words dictionary.
+#   3. Re-open reader → confirm the focus now reads 黃士旗 as one chunk.
+#
+# Pre-requisites are handled by scripts/maestro-test.sh:
+#   - booted iOS simulator
+#   - fastread Debug build installed with the seed launch argument
+#
+# Run:
+#   ./scripts/maestro-test.sh
+#   # or, with the env already set up:
+#   maestro test .maestro/user-dictionary.yaml
+
+appId: com.shhtheonlyperson.fastread
+---
+# The wrapper script (scripts/maestro-test.sh) is what launches the
+# app with the seed launch arguments. We deliberately do NOT run
+# launchApp here — Maestro would re-launch the process and drop the
+# seed args, leaving us with an empty library. Just attach to the
+# running app and wait for the tab bar to settle.
+- extendedWaitUntil:
+    visible: "READ"
+    timeout: 8000
+
+# 1) Confirm the OOV failure happens BEFORE the dictionary is
+#    populated. Without 黃士旗 in the dict, NLTokenizer returns single
+#    Han characters as separate tokens, so the first focus token is "黃".
+- tapOn: "READ"
+- extendedWaitUntil:
+    visible:
+      id: "rsvp-current-token"
+      text: "黃"
+    timeout: 5000
+- takeScreenshot: 01-reader-before-dict
+
+# Reader hides the tab bar, so step out via the LIBRARY chevron before
+# navigating to Settings.
+- tapOn: "LIBRARY"
+
+# 2) Walk to Settings → Custom words → Add → type 黃士旗 → confirm.
+- tapOn: "SETTINGS"
+- extendedWaitUntil:
+    visible: "Custom words"
+    timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: "dict-add-button"
+    direction: DOWN
+- tapOn:
+    id: "dict-add-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "dict-add-text-field"
+    timeout: 5000
+- tapOn:
+    id: "dict-add-text-field"
+- inputText: "黃士旗"
+- tapOn:
+    id: "dict-add-confirm"
+
+# Entry shows up in the Custom words list.
+- extendedWaitUntil:
+    visible:
+      id: "dict-entry-黃士旗"
+    timeout: 5000
+- takeScreenshot: 02-settings-after-add
+
+# 3) Back to reader; the same article should now show 黃士旗 as ONE
+#    token (the cache invalidation in ReadingStore re-tokenizes against
+#    the new dictionary).
+- tapOn: "READ"
+- extendedWaitUntil:
+    visible:
+      id: "rsvp-current-token"
+      text: "黃士旗"
+    timeout: 5000
+- takeScreenshot: 03-reader-after-dict
+
+# 4) Round-trip the remove path so we know the cache invalidates back.
+- tapOn: "LIBRARY"
+- tapOn: "SETTINGS"
+- extendedWaitUntil:
+    visible:
+      id: "dict-remove-黃士旗"
+    timeout: 5000
+- tapOn:
+    id: "dict-remove-黃士旗"
+- assertNotVisible:
+    id: "dict-entry-黃士旗"
+
+- tapOn: "READ"
+- extendedWaitUntil:
+    visible:
+      id: "rsvp-current-token"
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "rsvp-current-token"
+      text: "黃"
+    timeout: 5000
+- takeScreenshot: 04-reader-after-remove

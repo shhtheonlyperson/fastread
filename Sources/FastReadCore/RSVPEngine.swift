@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 public enum RSVPEngine {
     public struct FocusSplit: Equatable {
@@ -46,7 +47,7 @@ public enum RSVPEngine {
         return hasCJK(input)
     }
 
-    public static func tokenize(_ input: String?) -> [String] {
+    public static func tokenize(_ input: String?, userDictionary: [String] = []) -> [String] {
         guard let input else { return [] }
         let normalized = input.replacingOccurrences(of: "\u{00a0}", with: " ")
         guard hasCJK(normalized) else {
@@ -54,7 +55,7 @@ public enum RSVPEngine {
                 .split(whereSeparator: { $0.isWhitespace })
                 .map(String.init)
         }
-        return tokenizeCJK(normalized)
+        return tokenizeMixed(normalized, userDictionary: userDictionary)
     }
 
     public static func focusIndex(in token: String?) -> Int {
@@ -167,62 +168,114 @@ public enum RSVPEngine {
         }
     }
 
-    private static func tokenizeCJK(_ input: String) -> [String] {
+    private static func tokenizeMixed(_ input: String, userDictionary: [String]) -> [String] {
         var tokens: [String] = []
-        var buffer: [Character] = []
-        let characters = Array(input)
-        var index = 0
-
-        func flush() {
-            guard !buffer.isEmpty else { return }
-            tokens.append(String(buffer))
-            buffer.removeAll()
+        for segment in splitByScript(input) {
+            if segment.isCJK {
+                tokens.append(contentsOf: tokenizeCJKSegment(segment.text, userDictionary: userDictionary))
+            } else {
+                tokens.append(
+                    contentsOf: segment.text
+                        .split(whereSeparator: { $0.isWhitespace })
+                        .map(String.init)
+                )
+            }
         }
-
-        while index < characters.count {
-            let character = characters[index]
-
-            if character.isWhitespace {
-                flush()
-                index += 1
-                continue
-            }
-
-            if isCJKPunctuation(character) || isASCIIPunctuationPause(character) {
-                if !buffer.isEmpty {
-                    buffer.append(character)
-                    flush()
-                } else if !tokens.isEmpty {
-                    tokens[tokens.count - 1].append(character)
-                }
-                index += 1
-                continue
-            }
-
-            if isCJKCharacter(character) {
-                buffer.append(character)
-                if buffer.filter(isCJKCharacter).count >= 2 {
-                    flush()
-                }
-                index += 1
-                continue
-            }
-
-            flush()
-            var word = String(character)
-            while index + 1 < characters.count,
-                  !characters[index + 1].isWhitespace,
-                  !isCJKCharacter(characters[index + 1]),
-                  !isCJKPunctuation(characters[index + 1]) {
-                index += 1
-                word.append(characters[index])
-            }
-            tokens.append(word)
-            index += 1
-        }
-
-        flush()
         return tokens
+    }
+
+    private static func splitByScript(_ input: String) -> [(text: String, isCJK: Bool)] {
+        var segments: [(String, Bool)] = []
+        var buffer = ""
+        var bufferIsCJK: Bool? = nil
+        for character in input {
+            let cjk = isCJKCharacter(character) || isCJKPunctuation(character)
+            if let previous = bufferIsCJK, previous != cjk {
+                segments.append((buffer, previous))
+                buffer = ""
+            }
+            buffer.append(character)
+            bufferIsCJK = cjk
+        }
+        if let last = bufferIsCJK, !buffer.isEmpty {
+            segments.append((buffer, last))
+        }
+        return segments
+    }
+
+    private static func tokenizeCJKSegment(_ text: String, userDictionary: [String]) -> [String] {
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = text
+
+        var raw: [(text: String, lo: String.Index, hi: String.Index)] = []
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            let slice = String(text[range])
+            if !slice.isEmpty {
+                raw.append((slice, range.lowerBound, range.upperBound))
+            }
+            return true
+        }
+
+        let merged = applyUserDictionary(raw, in: text, dictionary: userDictionary)
+
+        var tokens: [String] = []
+        var lastEnd = text.startIndex
+        for span in merged {
+            if lastEnd < span.lo {
+                attachInterstitialPunctuation(text[lastEnd..<span.lo], to: &tokens)
+            }
+            tokens.append(span.text)
+            lastEnd = span.hi
+        }
+        if lastEnd < text.endIndex {
+            attachInterstitialPunctuation(text[lastEnd..<text.endIndex], to: &tokens)
+        }
+        return tokens
+    }
+
+    private static func attachInterstitialPunctuation(_ slice: Substring, to tokens: inout [String]) {
+        for character in slice {
+            guard isCJKPunctuation(character) || isASCIIPunctuationPause(character) else { continue }
+            if !tokens.isEmpty {
+                tokens[tokens.count - 1].append(character)
+            }
+        }
+    }
+
+    private static func applyUserDictionary(
+        _ raw: [(text: String, lo: String.Index, hi: String.Index)],
+        in source: String,
+        dictionary: [String]
+    ) -> [(text: String, lo: String.Index, hi: String.Index)] {
+        let entries = Set(dictionary.filter { !$0.isEmpty })
+        guard !entries.isEmpty, !raw.isEmpty else { return raw }
+        let maxLength = entries.map(\.count).max() ?? 0
+        guard maxLength > 0 else { return raw }
+
+        var result: [(text: String, lo: String.Index, hi: String.Index)] = []
+        var index = 0
+        while index < raw.count {
+            var bestEnd: Int? = nil
+            var concat = ""
+            var probe = index
+            while probe < raw.count {
+                concat.append(raw[probe].text)
+                if concat.count > maxLength { break }
+                if entries.contains(concat) {
+                    bestEnd = probe
+                }
+                probe += 1
+            }
+            if let end = bestEnd {
+                let mergedText = String(source[raw[index].lo..<raw[end].hi])
+                result.append((mergedText, raw[index].lo, raw[end].hi))
+                index = end + 1
+            } else {
+                result.append(raw[index])
+                index += 1
+            }
+        }
+        return result
     }
 
     private static func hasCJK(_ string: String) -> Bool {

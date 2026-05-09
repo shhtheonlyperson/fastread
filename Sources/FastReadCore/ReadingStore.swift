@@ -14,6 +14,7 @@ public final class ReadingStore: ObservableObject {
     @Published public var focusIndicator: FocusIndicatorStyle {
         didSet { persistSettings() }
     }
+    @Published public private(set) var userDictionary: [String] = []
     @Published public private(set) var isPlaying = false
     @Published public var sourceStatus = ""
 
@@ -86,6 +87,7 @@ public final class ReadingStore: ObservableObject {
         self.wpm = Self.normalizedWPM(settings.wpm)
         self.punctuationPause = settings.punctuationPause
         self.focusIndicator = settings.focusIndicator
+        self.userDictionary = Self.loadUserDictionary(from: defaults)
 
         ensureSelectedArticle()
         rollStatsIfNeeded()
@@ -115,6 +117,35 @@ public final class ReadingStore: ObservableObject {
 
     public func setWPM(_ value: Double) {
         updateWPM(value, persist: true)
+    }
+
+    public func addToUserDictionary(_ entry: String) {
+        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !userDictionary.contains(trimmed) else { return }
+        userDictionary.append(trimmed)
+        invalidateTokenizationCaches()
+        persistUserDictionary()
+    }
+
+    public func removeFromUserDictionary(_ entry: String) {
+        guard let index = userDictionary.firstIndex(of: entry) else { return }
+        userDictionary.remove(at: index)
+        invalidateTokenizationCaches()
+        persistUserDictionary()
+    }
+
+    public func clearUserDictionary() {
+        guard !userDictionary.isEmpty else { return }
+        userDictionary = []
+        invalidateTokenizationCaches()
+        persistUserDictionary()
+    }
+
+    private func invalidateTokenizationCaches() {
+        // Token boundaries depend on the dictionary, so any cached tokens
+        // and section offsets must be recomputed on next access.
+        tokenCache.removeAll(keepingCapacity: true)
+        documentMetadataCache.removeAll(keepingCapacity: true)
     }
 
     public func previewWPM(_ value: Double) {
@@ -248,7 +279,7 @@ public final class ReadingStore: ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         pause()
-        let tokens = RSVPEngine.tokenize(flattened)
+        let tokens = RSVPEngine.tokenize(flattened, userDictionary: userDictionary)
         let now = Date()
         let title = document.title.isEmpty ? "Pasted text" : document.title
         let author = document.author.isEmpty ? "You" : document.author
@@ -457,6 +488,10 @@ public final class ReadingStore: ObservableObject {
         encode(stats, forKey: StorageKey.stats)
     }
 
+    private func persistUserDictionary() {
+        encode(userDictionary, forKey: StorageKey.userDictionary)
+    }
+
     private func encode<T: Encodable>(_ value: T, forKey key: String) {
         guard let data = try? JSONEncoder().encode(value) else { return }
         defaults.set(data, forKey: key)
@@ -474,6 +509,22 @@ public final class ReadingStore: ObservableObject {
             )
         }
         return payload
+    }
+
+    private static func loadUserDictionary(from defaults: UserDefaults) -> [String] {
+        guard
+            let data = defaults.data(forKey: StorageKey.userDictionary),
+            let entries = try? JSONDecoder().decode([String].self, from: data)
+        else {
+            return []
+        }
+        // Drop blanks and de-dup while preserving original order.
+        var seen = Set<String>()
+        return entries.compactMap { raw in
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return nil }
+            return trimmed
+        }
     }
 
     private static func loadArticles(from defaults: UserDefaults) -> [ReadingArticle] {
@@ -570,7 +621,7 @@ public final class ReadingStore: ObservableObject {
         }
 
         let tokens = PerformanceTrace.measure("Tokenize Article") {
-            RSVPEngine.tokenize(article.text)
+            RSVPEngine.tokenize(article.text, userDictionary: userDictionary)
         }
         tokenCache[article.id] = TokenCacheEntry(text: article.text, tokens: tokens)
         return tokens
@@ -581,7 +632,7 @@ public final class ReadingStore: ObservableObject {
             return cached
         }
         let metadata = PerformanceTrace.measure("Build Document Metadata") {
-            let boundaries = Document.sectionBoundaries(article.document)
+            let boundaries = Document.sectionBoundaries(article.document, userDictionary: userDictionary)
             return DocumentMetadataCacheEntry(
                 boundaries: boundaries,
                 frontMatter: Document.detectFrontMatter(article.document, boundaries: boundaries)
@@ -656,4 +707,5 @@ private enum StorageKey {
     static let articles = "justread.articles.v1"
     static let stats = "justread.stats.v1"
     static let selectedArticle = "justread.selectedArticle.v1"
+    static let userDictionary = "justread.userDictionary.v1"
 }

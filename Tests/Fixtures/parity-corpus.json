@@ -1,6 +1,6 @@
 {
-  "generatedBy": "test/generate-parity-fixture.mjs",
-  "source": "src/reader-core.js",
+  "generatedBy": "Tools/FastReadCoreVerifier",
+  "source": "Sources/FastReadCore/RSVPEngine.swift",
   "wpm": 450,
   "punctuationPause": true,
   "entries": [
@@ -60,8 +60,8 @@
         "快速",
         "閱讀，",
         "眼睛",
-        "更輕",
-        "鬆。"
+        "更",
+        "輕鬆。"
       ],
       "focusSplits": [
         {
@@ -80,12 +80,12 @@
           "after": ""
         },
         {
-          "before": "更",
-          "focus": "輕",
+          "before": "",
+          "focus": "更",
           "after": ""
         },
         {
-          "before": "",
+          "before": "輕",
           "focus": "鬆",
           "after": "。"
         }
@@ -391,10 +391,11 @@
       "input": "速読で集中力が上がる。",
       "tokens": [
         "速読",
-        "で集",
-        "中力",
-        "が上",
-        "がる。"
+        "で",
+        "集中",
+        "力",
+        "が",
+        "上がる。"
       ],
       "focusSplits": [
         {
@@ -403,27 +404,33 @@
           "after": ""
         },
         {
-          "before": "で",
-          "focus": "集",
+          "before": "",
+          "focus": "で",
           "after": ""
         },
         {
-          "before": "中",
+          "before": "集",
+          "focus": "中",
+          "after": ""
+        },
+        {
+          "before": "",
           "focus": "力",
           "after": ""
         },
         {
-          "before": "が",
-          "focus": "上",
+          "before": "",
+          "focus": "が",
           "after": ""
         },
         {
-          "before": "が",
-          "focus": "る",
-          "after": "。"
+          "before": "上",
+          "focus": "が",
+          "after": "る。"
         }
       ],
       "durations": [
+        200,
         200,
         200,
         200,

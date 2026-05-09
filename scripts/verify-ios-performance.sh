@@ -36,3 +36,15 @@ else
     CODE_SIGNING_ALLOWED=NO \
     test
 fi
+
+# Curated Maestro flows. These cover behaviour the XCUITest scheme
+# can't reach without too much setup (e.g. typing CJK text, the user
+# dictionary cache invalidation path). Skips if Maestro isn't on the
+# machine yet — the runner script prints a clear install hint.
+if [ -x "$HOME/.maestro/bin/maestro" ] || command -v maestro >/dev/null 2>&1; then
+  echo "[verify] Running Maestro flows…"
+  FASTREAD_SIMULATOR_NAME="${FASTREAD_SIMULATOR_NAME:-iPhone 17 Pro}" \
+    scripts/maestro-test.sh
+else
+  echo "[verify] Skipping Maestro flows — install with: curl -sSL https://get.maestro.mobile.dev | bash"
+fi

@@ -263,6 +263,62 @@ final class ReadingStoreTests: XCTestCase {
         XCTAssertTrue(fm?.hasSkippableFrontMatter ?? false)
     }
 
+    // MARK: - User dictionary
+
+    func testUserDictionaryStartsEmptyAndAccepts新詞() {
+        let store = makeStore()
+        XCTAssertEqual(store.userDictionary, [])
+
+        store.addToUserDictionary("黃士旗")
+        store.addToUserDictionary("星巴克")
+        XCTAssertEqual(store.userDictionary, ["黃士旗", "星巴克"])
+    }
+
+    func testUserDictionaryDeduplicatesAndTrimsInput() {
+        let store = makeStore()
+        store.addToUserDictionary("  黃士旗  ")
+        store.addToUserDictionary("黃士旗")
+        store.addToUserDictionary("")
+        XCTAssertEqual(store.userDictionary, ["黃士旗"])
+    }
+
+    func testUserDictionaryAffectsCurrentArticleTokens() {
+        let store = makeStore()
+        store.addDraftArticle(text: "黃士旗去吃飯與星巴克碰面。", title: "Note")
+
+        // Without any dictionary entries the names get split.
+        XCTAssertEqual(store.currentTokens.first, "黃")
+
+        store.addToUserDictionary("黃士旗")
+        store.addToUserDictionary("星巴克")
+
+        // Cache must invalidate so the new tokens reflect the dictionary.
+        XCTAssertEqual(store.currentTokens.first, "黃士旗")
+        XCTAssertTrue(store.currentTokens.contains("星巴克"))
+    }
+
+    func testUserDictionaryRoundTripsThroughUserDefaults() {
+        do {
+            let store = makeStore()
+            store.addToUserDictionary("黃士旗")
+            store.addToUserDictionary("陽明山")
+        }
+        let reborn = makeStore()
+        XCTAssertEqual(reborn.userDictionary, ["黃士旗", "陽明山"])
+    }
+
+    func testRemoveAndClearUserDictionary() {
+        let store = makeStore()
+        store.addToUserDictionary("黃士旗")
+        store.addToUserDictionary("星巴克")
+
+        store.removeFromUserDictionary("黃士旗")
+        XCTAssertEqual(store.userDictionary, ["星巴克"])
+
+        store.clearUserDictionary()
+        XCTAssertEqual(store.userDictionary, [])
+    }
+
     // MARK: - Helpers
 
     private static func longBody(_ words: Int) -> String {

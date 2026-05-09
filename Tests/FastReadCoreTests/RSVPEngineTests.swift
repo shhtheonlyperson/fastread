@@ -11,15 +11,68 @@ final class RSVPEngineTests: XCTestCase {
     func testTokenizeHandlesTraditionalSimplifiedAndMixedCJK() {
         XCTAssertEqual(
             RSVPEngine.tokenize("快速閱讀，眼睛更輕鬆。"),
-            ["快速", "閱讀，", "眼睛", "更輕", "鬆。"]
+            ["快速", "閱讀，", "眼睛", "更", "輕鬆。"]
         )
         XCTAssertEqual(
             RSVPEngine.tokenize("快速阅读让注意力更稳定。"),
-            ["快速", "阅读", "让注", "意力", "更稳", "定。"]
+            ["快速", "阅读", "让", "注意力", "更", "稳定。"]
         )
         XCTAssertEqual(
             RSVPEngine.tokenize("JustRead 支援中文。"),
             ["JustRead", "支援", "中文。"]
+        )
+    }
+
+    func testTokenizePreservesContentAtChineseEnglishBoundaries() {
+        // The previous tokenizer + NLTokenizer alone both dropped tokens at
+        // script boundaries (Apple/MacBook Pro etc.). The hybrid pipeline must
+        // keep every word.
+        XCTAssertEqual(
+            RSVPEngine.tokenize("Apple在2025年發表新MacBook Pro"),
+            ["Apple", "在", "2025", "年", "發表", "新", "MacBook", "Pro"]
+        )
+        XCTAssertEqual(
+            RSVPEngine.tokenize("我用VS Code寫iOS app"),
+            ["我", "用", "VS", "Code", "寫", "iOS", "app"]
+        )
+    }
+
+    func testTokenizeKeepsCompoundLatinUnitsWhole() {
+        // Latin runs split only on whitespace so 25°C, 12.5%, RFC-7231,
+        // HTTP/1.1 etc. survive intact.
+        XCTAssertEqual(
+            RSVPEngine.tokenize("今天氣溫 25°C 大約華氏 77°F"),
+            ["今天", "氣溫", "25°C", "大約", "華氏", "77°F"]
+        )
+        XCTAssertEqual(
+            RSVPEngine.tokenize("可參考 RFC-7231 (HTTP/1.1)"),
+            ["可", "參考", "RFC-7231", "(HTTP/1.1)"]
+        )
+        XCTAssertEqual(
+            RSVPEngine.tokenize("Dr. Smith 在 NTU 教 AI 課程"),
+            ["Dr.", "Smith", "在", "NTU", "教", "AI", "課程"]
+        )
+    }
+
+    func testTokenizeUserDictionaryMergesProperNouns() {
+        XCTAssertEqual(
+            RSVPEngine.tokenize("黃士旗去吃飯"),
+            ["黃", "士", "旗", "去", "吃飯"]
+        )
+        XCTAssertEqual(
+            RSVPEngine.tokenize("黃士旗去吃飯", userDictionary: ["黃士旗"]),
+            ["黃士旗", "去", "吃飯"]
+        )
+        XCTAssertEqual(
+            RSVPEngine.tokenize("蔡英文總統訪問星巴克", userDictionary: ["蔡英文", "星巴克"]),
+            ["蔡英文", "總統", "訪問", "星巴克"]
+        )
+    }
+
+    func testTokenizeUserDictionaryPrefersLongestMatch() {
+        XCTAssertEqual(
+            RSVPEngine.tokenize("台灣大學資訊系很棒", userDictionary: ["台灣", "台灣大學", "資訊系"]),
+            ["台灣大學", "資訊系", "很", "棒"]
         )
     }
 

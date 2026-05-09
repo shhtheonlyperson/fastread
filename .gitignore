@@ -13,3 +13,7 @@ xcuserdata/
 # Convenience copy for EpubE2ETests — see Tests/FastReadCoreTests/EpubE2ETests.swift.
 # Real EPUBs are typically copyrighted; never commit them.
 /test.epub
+
+# Maestro flow screenshots get dumped at the repo root by the
+# `takeScreenshot` step. Run logs live under ~/.maestro/tests/.
+/[0-9][0-9]-*.png

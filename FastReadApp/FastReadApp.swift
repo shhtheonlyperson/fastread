@@ -9,7 +9,9 @@ struct FastReadApp: App {
 
     init() {
         UITestSupport.applyLaunchOverrides()
-        _store = StateObject(wrappedValue: ReadingStore())
+        let store = ReadingStore()
+        UITestSupport.applyPostStoreOverrides(store: store)
+        _store = StateObject(wrappedValue: store)
     }
 
     var body: some Scene {
@@ -35,6 +37,20 @@ private enum UITestSupport {
         if let idx = args.firstIndex(of: "-FASTREAD_SEED_EPUB"),
            idx + 1 < args.count {
             seedEpub(from: URL(fileURLWithPath: args[idx + 1]))
+        }
+#endif
+    }
+
+    @MainActor
+    static func applyPostStoreOverrides(store: ReadingStore) {
+#if DEBUG
+        let args = CommandLine.arguments
+        if let idx = args.firstIndex(of: "-FASTREAD_SEED_DRAFT_TEXT"),
+           idx + 1 < args.count {
+            let text = args[idx + 1]
+            let title = (args.firstIndex(of: "-FASTREAD_SEED_DRAFT_TITLE")
+                .flatMap { i in i + 1 < args.count ? args[i + 1] : nil }) ?? "Test note"
+            store.addDraftArticle(text: text, title: title, source: "Maestro")
         }
 #endif
     }
