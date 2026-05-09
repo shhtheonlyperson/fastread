@@ -25,9 +25,11 @@ Use this section first. It reflects the successful May 8, 2026 upload and supers
 - Active key path: `~/.appstoreconnect/private_keys/AuthKey_ASC_KEY_ID_PLACEHOLDER.p8`
 - Stale/revoked key id to avoid: `REVOKED_ASC_KEY_ID_PLACEHOLDER`
 - Current TestFlight version line: `0.2.1`
-- Latest successfully uploaded build: `24`
-- Latest delivery/build UUID: `f1a73e84-9760-47b3-bca2-e1bad474f6d5`
-- Build `24` was only visible to testers after export compliance was cleared.
+- Latest successfully uploaded build: `26`
+- Latest delivery/build UUID: `a1ebdb44-fcb1-4ecd-b8da-b4065aa27f7e`
+- Active distribution cert id: `DISTRIBUTION_CERT_ID_PLACEHOLDER` (issued 2026-05-09, replaces revoked `5853F89C…`)
+- Active provisioning profile UUID: `PROVISIONING_PROFILE_UUID_PLACEHOLDER`
+- Build `26` reached `IN_BETA_TESTING` directly because `Info.plist` declares `ITSAppUsesNonExemptEncryption=NO`; no manual export-compliance patch was needed.
 
 Important: do not trust `.env.local` blindly. During the May 8 release, `.env.local` pointed at revoked key `REVOKED_ASC_KEY_ID_PLACEHOLDER`.
 
@@ -39,6 +41,45 @@ The app should declare no non-exempt encryption in `FastReadApp/Info.plist`:
 <key>ITSAppUsesNonExemptEncryption</key>
 <false/>
 ```
+
+## May 9, 2026 — login keychain CDSA hang gotcha
+
+If `codesign` hangs indefinitely after "replacing existing signature" on a freshly-imported `.p12` distribution identity, the import landed in the legacy CDSA path of `login.keychain-db` and `securityd` never returns. Symptoms:
+
+- `xcodebuild archive` sits in the CodeSign step for >10 minutes.
+- Standalone `codesign --force --sign <hash> --timestamp=none /tmp/test.sh` never completes (sample shows `mach_msg2_trap` blocked in `Security::SecurityServer::ClientSession::generateSignature`).
+- The same `codesign` call against an Xcode-managed identity (e.g. `Apple Development: Created via API (ASC_KEY_ID_PLACEHOLDER)`) succeeds in <1s, proving the signer/network are fine.
+
+Workaround that actually shipped build 26:
+
+```bash
+KEYCHAIN=~/Library/Keychains/fastread-build.keychain-db
+PASS="fastread"
+security delete-keychain "$KEYCHAIN" 2>/dev/null
+security create-keychain -p "$PASS" "$KEYCHAIN"
+security set-keychain-settings -lut 21600 "$KEYCHAIN"
+security unlock-keychain -p "$PASS" "$KEYCHAIN"
+# Add to user search list, keep login.keychain-db alongside
+security list-keychains -d user -s "$KEYCHAIN" \
+  $(security list-keychains -d user | sed 's/[" ]//g')
+# Build the .p12 with PBE-SHA1-3DES (security only imports legacy format
+# correctly) but import it into the FRESH keychain so the key lives in the
+# modern data-protection store, not CDSA.
+openssl pkcs12 -export \
+  -inkey distribution.key -in distribution.cer \
+  -out distribution-legacy.p12 -name "JustRead Distribution" \
+  -password pass:"$PASS" \
+  -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg SHA1 -legacy
+security import distribution-legacy.p12 -k "$KEYCHAIN" -P "$PASS" \
+  -A -T /usr/bin/codesign
+security set-key-partition-list \
+  -S "apple-tool:,apple:,codesign:" -s -k "$PASS" "$KEYCHAIN"
+# IMPORTANT: also remove the broken duplicate from login.keychain-db,
+# otherwise xcodebuild may pick the CDSA copy first and hang.
+security delete-identity -Z <hash> ~/Library/Keychains/login.keychain-db
+```
+
+After this, `codesign` against the new identity returns immediately and `xcodebuild ... archive` finishes in ~3 minutes.
 
 ## May 8, 2026 working flow
 
