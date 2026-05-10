@@ -139,11 +139,22 @@ prelaunch_with_args() {
   xcrun simctl launch "$DEVICE_UDID" "$BUNDLE_ID" "${args[@]}" >/dev/null
 }
 
-# Pick which flow(s) to run.
+# Pick which flow(s) to run. iOS flows live at .maestro/*.yaml;
+# Android flows are .maestro/android-*.yaml and run via the
+# separate scripts/maestro-android.sh runner — exclude them here so
+# the iOS gate doesn't try to drive an Android emulator.
 FLOW_FILTER="${1:-}"
-FLOWS=(.maestro/*.yaml)
+FLOWS=()
 if [ -n "$FLOW_FILTER" ]; then
-  FLOWS=(.maestro/*"$FLOW_FILTER"*.yaml)
+  for f in .maestro/*"$FLOW_FILTER"*.yaml; do
+    [[ "$(basename "$f")" == android-* ]] && continue
+    FLOWS+=("$f")
+  done
+else
+  for f in .maestro/*.yaml; do
+    [[ "$(basename "$f")" == android-* ]] && continue
+    FLOWS+=("$f")
+  done
 fi
 
 EXIT=0
