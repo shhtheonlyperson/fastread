@@ -1,21 +1,16 @@
-// Spike harness: a stripped-down Reader screen that loops through the
-// seeded sample at a chosen WPM and logs each token swap with the
-// wall-clock interval since the previous swap. The delta from the
-// engine-prescribed duration is the runtime jitter — that's what we
-// want to compare against iOS to decide whether KMP holds up at
-// 1000+ wpm on Pixel 8 hardware.
+// JustRead Android v0.1 — minimum viable RSVP reader for Play Console
+// internal testing. Three screens: Paste (textarea + Read), Reader
+// (current token + pace + pause/play + back), Settings (user dictionary
+// editor). Auto-sweep mode preserved for performance verification when
+// launched with `--ei sweep_seconds N`.
 //
-// Logs land in adb logcat under tag FastReadSpike. The companion
-// scripts/spike-perf-report.py turns a captured log into a verdict.
-//
-// Visuals follow the design handoff (FastReadApp/DesignSystem.swift +
-// design_handoff_justread/README.md): cream paper background, ink/ink-
-// mid/ink-quiet text, terracotta accent, Fraunces serif for the word
-// stage, Inter sans for chrome, JetBrains Mono for the stats strip.
+// Visuals follow design_handoff_justread/README.md (cream paper bg,
+// terracotta focus letter, Fraunces serif word stage, Inter sans
+// chrome). Persistence is SharedPreferences for v1 — DataStore +
+// proper KMP layout comes with the full Path A migration.
 
 package com.shhtheonlyperson.fastread.spike
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -31,10 +26,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -42,14 +41,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.core.RSVPEngine
+import com.shhtheonlyperson.fastread.spike.data.Persistence
 import com.shhtheonlyperson.fastread.spike.ui.FocusIndicatorStyle
 import com.shhtheonlyperson.fastread.spike.ui.JRColor
 import com.shhtheonlyperson.fastread.spike.ui.JRFont
@@ -61,44 +67,148 @@ import kotlin.math.abs
 
 private const val TAG = "FastReadSpike"
 
-// Mixed Trad-Chinese + Latin sample, repeated so the spike has enough
-// tokens (~700) to run for ~30s at each tested WPM.
-private val SAMPLE = """
-    黃士旗去吃飯與星巴克碰面。中華民國總統蔡英文今天宣布，可口可樂與百事可樂的競爭依然激烈。
-    Apple在2025年發表新MacBook Pro，價格 1999 美元起。我用VS Code寫iOS app，效率提升 30%。
-    今天氣溫 25°C 大約華氏 77°F，成長率達 12.5% 創新高。可參考 RFC-7231 (HTTP/1.1)。
-    Dr. Smith 在 NTU 教 AI 課程，他說「Hello, world」就走了。重量100公斤、長度3公尺。
-    詳情請見 https://example.com/docs 頁面，寄信到 hello@example.com 報名。
-    張三、李四和王五一起去陽明山健行，海拔 1120 公尺。快速閱讀，眼睛更輕鬆。
-""".trimIndent().repeat(6)
+// Used by the auto-sweep mode and as a default if the user has nothing
+// pasted yet. Gives them something to read on first launch.
+private const val DEFAULT_SAMPLE = """黃士旗去吃飯與星巴克碰面。中華民國總統蔡英文今天宣布，可口可樂與百事可樂的競爭依然激烈。Apple 在 2025 年發表新 MacBook Pro，價格 1999 美元起。我用 VS Code 寫 iOS app，效率提升 30%。今天氣溫 25°C 大約華氏 77°F，成長率達 12.5% 創新高。可參考 RFC-7231 (HTTP/1.1)。Dr. Smith 在 NTU 教 AI 課程，他說「Hello, world」就走了。重量 100 公斤、長度 3 公尺。詳情請見 https://example.com/docs 頁面。張三、李四和王五一起去陽明山健行，海拔 1120 公尺。快速閱讀，眼睛更輕鬆。"""
+
+private enum class Screen { Paste, Reader, Settings }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val sweepSeconds = intent.getIntExtra("sweep_seconds", 0)
+        val sweepSeconds = intent.getIntExtra("sweep_seconds", 0).takeIf { it > 0 }
         setContent {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = JRColor.paper,
-            ) { SpikeScreen(autoSweepSeconds = sweepSeconds.takeIf { it > 0 }) }
+            Surface(modifier = Modifier.fillMaxSize(), color = JRColor.paper) {
+                JustReadApp(autoSweepSeconds = sweepSeconds)
+            }
         }
     }
 }
 
 @Composable
-private fun SpikeScreen(autoSweepSeconds: Int? = null) {
-    val tokens = remember {
-        RSVPEngine.tokenize(
-            SAMPLE,
-            userDictionary = listOf("黃士旗", "蔡英文", "星巴克", "陽明山"),
+private fun JustReadApp(autoSweepSeconds: Int? = null) {
+    val context = LocalContext.current
+    val store = remember { Persistence(context) }
+    var screen by remember { mutableStateOf(if (autoSweepSeconds != null) Screen.Reader else Screen.Paste) }
+    var article by remember { mutableStateOf(store.article.ifEmpty { DEFAULT_SAMPLE }) }
+    var wpm by remember { mutableIntStateOf(store.wpm) }
+    var index by remember { mutableIntStateOf(store.index) }
+    val dictionary = remember { store.dictionary.toMutableStateList() }
+
+    when (screen) {
+        Screen.Paste -> PasteScreen(
+            article = article,
+            onArticleChange = { article = it },
+            onRead = {
+                store.article = article
+                if (store.article != article) {
+                    // text changed — start over
+                    index = 0
+                    store.index = 0
+                }
+                screen = Screen.Reader
+            },
+            onSettings = { screen = Screen.Settings },
+        )
+        Screen.Reader -> ReaderScreen(
+            article = article,
+            initialWpm = wpm,
+            initialIndex = index,
+            dictionary = dictionary,
+            onWpmChange = { wpm = it; store.wpm = it },
+            onIndexChange = { index = it; store.index = it },
+            onBack = { screen = Screen.Paste },
+            autoSweepSeconds = autoSweepSeconds,
+        )
+        Screen.Settings -> SettingsScreen(
+            dictionary = dictionary,
+            onAdd = { entry ->
+                val trimmed = entry.trim()
+                if (trimmed.isNotEmpty() && !dictionary.contains(trimmed)) {
+                    dictionary.add(trimmed)
+                    store.dictionary = dictionary.toList()
+                }
+            },
+            onRemove = {
+                dictionary.remove(it)
+                store.dictionary = dictionary.toList()
+            },
+            onBack = { screen = Screen.Paste },
         )
     }
-    var wpm by remember { mutableIntStateOf(450) }
-    var index by remember { mutableIntStateOf(0) }
-    var isPlaying by remember { mutableStateOf(false) }
+}
+
+// ---- Paste screen ---------------------------------------------------
+
+@Composable
+private fun PasteScreen(
+    article: String,
+    onArticleChange: (String) -> Unit,
+    onRead: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 60.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        SectionLabel("JUSTREAD")
+        Text(
+            "Capture\nyour next read.",
+            color = JRColor.ink,
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = JRFont.serif,
+            lineHeight = 34.sp,
+        )
+
+        SectionLabel("PASTE TEXT")
+        BasicTextField(
+            value = article,
+            onValueChange = onArticleChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(280.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(JRColor.paperStrong)
+                .padding(14.dp)
+                .testTag("paste-text-field"),
+            textStyle = TextStyle(
+                color = JRColor.ink,
+                fontSize = 16.sp,
+                fontFamily = JRFont.serif,
+                lineHeight = 22.sp,
+            ),
+            cursorBrush = SolidColor(JRColor.terracotta),
+        )
+
+        PrimaryButton(label = "READ", onTap = onRead, testTag = "read-button")
+        SecondaryButton(label = "Custom words", onTap = onSettings, testTag = "settings-button")
+        Spacer(Modifier.height(48.dp))
+    }
+}
+
+// ---- Reader screen --------------------------------------------------
+
+@Composable
+private fun ReaderScreen(
+    article: String,
+    initialWpm: Int,
+    initialIndex: Int,
+    dictionary: List<String>,
+    onWpmChange: (Int) -> Unit,
+    onIndexChange: (Int) -> Unit,
+    onBack: () -> Unit,
+    autoSweepSeconds: Int? = null,
+) {
+    val tokens = remember(article, dictionary.toList()) {
+        RSVPEngine.tokenize(article, userDictionary = dictionary)
+    }
+    var wpm by remember { mutableIntStateOf(initialWpm) }
+    var index by remember { mutableIntStateOf(initialIndex.coerceIn(0, (tokens.size - 1).coerceAtLeast(0))) }
+    var isPlaying by remember { mutableStateOf(autoSweepSeconds != null) }
     var jitterAvg by remember { mutableStateOf(0.0) }
     var jitterMax by remember { mutableLongStateOf(0L) }
-    var sampleCount by remember { mutableIntStateOf(0) }
+    var samples by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     var job by remember { mutableStateOf<Job?>(null) }
 
@@ -106,16 +216,18 @@ private fun SpikeScreen(autoSweepSeconds: Int? = null) {
         job?.cancel()
         job = null
         isPlaying = false
+        onIndexChange(index)
     }
 
-    fun start() {
-        stop()
-        index = 0
-        jitterAvg = 0.0
-        jitterMax = 0L
-        sampleCount = 0
+    fun start(resetMetrics: Boolean = false) {
+        job?.cancel()
+        if (resetMetrics) {
+            jitterAvg = 0.0
+            jitterMax = 0L
+            samples = 0
+        }
         isPlaying = true
-        Log.i(TAG, "RUN_START wpm=$wpm tokens=${tokens.size}")
+        if (autoSweepSeconds != null) Log.i(TAG, "RUN_START wpm=$wpm tokens=${tokens.size}")
         job = scope.launch {
             var lastSwap = System.nanoTime()
             while (index < tokens.size - 1) {
@@ -126,67 +238,46 @@ private fun SpikeScreen(autoSweepSeconds: Int? = null) {
                 val actualMs = (now - lastSwap) / 1_000_000.0
                 lastSwap = now
                 val jitter = abs(actualMs - targetMs).toLong()
-                if (sampleCount > 5) {
-                    val warmup = sampleCount - 5
+                if (samples > 5) {
+                    val warmup = samples - 5
                     jitterAvg = (jitterAvg * (warmup - 1) + jitter) / warmup
                     if (jitter > jitterMax) jitterMax = jitter
                 }
-                Log.i(
-                    TAG,
-                    "TOK i=$index target=${targetMs}ms actual=${"%.2f".format(actualMs)}ms " +
-                        "jitter=${jitter}ms tok=\"$token\"",
-                )
+                if (autoSweepSeconds != null) {
+                    Log.i(
+                        TAG,
+                        "TOK i=$index target=${targetMs}ms actual=${"%.2f".format(actualMs)}ms " +
+                            "jitter=${jitter}ms tok=\"$token\"",
+                    )
+                }
                 index += 1
-                sampleCount += 1
+                samples += 1
             }
             isPlaying = false
-            Log.i(
-                TAG,
-                "RUN_END wpm=$wpm samples=$sampleCount avgJitter=${"%.2f".format(jitterAvg)} " +
-                    "maxJitter=$jitterMax",
-            )
+            if (autoSweepSeconds != null) {
+                Log.i(TAG, "RUN_END wpm=$wpm samples=$samples avgJitter=${"%.2f".format(jitterAvg)} maxJitter=$jitterMax")
+            }
         }
     }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 60.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // Masthead — small caps label per handoff README
-        Text(
-            "PERF SPIKE",
-            color = JRColor.inkQuiet,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = JRFont.sans,
-            letterSpacing = 0.66.sp,
-        )
-        Text(
-            "Pixel 8\nframe-timing run.",
-            color = JRColor.ink,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = JRFont.serif,
-            lineHeight = 34.sp,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.clickable { stop(); onBack() }.testTag("back-button"),
+            ) {
+                SectionLabel("‹ EDIT")
+            }
+        }
 
-        // Stats strip in mono per handoff
-        Text(
-            "${tokens.size} tokens · WPM=$wpm · samples=$sampleCount · " +
-                "avg jitter=${"%.2f".format(jitterAvg)}ms · max=${jitterMax}ms",
-            color = JRColor.inkQuiet,
-            fontSize = 11.sp,
-            fontFamily = JRFont.mono,
-            modifier = Modifier.testTag("stats"),
-        )
-
-        // Card-style RSVP stage
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(4.dp))
                 .background(JRColor.paperStrong)
-                .padding(16.dp),
+                .padding(20.dp),
         ) {
             RSVPStage(
                 token = tokens.getOrElse(index) { "" },
@@ -202,49 +293,174 @@ private fun SpikeScreen(autoSweepSeconds: Int? = null) {
             letterSpacing = 0.66.sp,
         )
 
-        // Pace pills row
-        Text(
-            "PACE",
-            color = JRColor.inkQuiet,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = JRFont.sans,
-            letterSpacing = 0.66.sp,
-        )
+        SectionLabel("PACE")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (target in listOf(450, 600, 800, 1000, 1200)) {
+            for (target in listOf(300, 450, 600, 800, 1000)) {
                 PacePill(value = target, selected = wpm == target) {
                     wpm = target
+                    onWpmChange(target)
                     if (isPlaying) start()
                 }
             }
         }
 
         Spacer(Modifier.height(4.dp))
-        StartStopButton(isPlaying = isPlaying) { if (isPlaying) stop() else start() }
+        PrimaryButton(
+            label = if (isPlaying) "PAUSE" else if (index >= tokens.size - 1) "RESTART" else "PLAY",
+            onTap = {
+                if (isPlaying) stop()
+                else {
+                    if (index >= tokens.size - 1) {
+                        index = 0
+                        onIndexChange(0)
+                    }
+                    start()
+                }
+            },
+            testTag = if (isPlaying) "pause-button" else "play-button",
+        )
+
+        if (autoSweepSeconds != null) {
+            Text(
+                "auto-sweep · samples=$samples · avg jitter=${"%.2f".format(jitterAvg)}ms · max=${jitterMax}ms",
+                color = JRColor.inkQuiet,
+                fontSize = 11.sp,
+                fontFamily = JRFont.mono,
+                modifier = Modifier.testTag("stats"),
+            )
+        }
     }
 
-    // Auto-sweep entry: when launched with `--ei sweep_seconds 20`, cycle
-    // through 600 / 800 / 1000 / 1200 wpm, run each for the given number
-    // of seconds, then stop. Logcat (FastReadSpike tag) is the only
-    // output — perf-report.py turns it into the verdict. No taps needed,
-    // so the sweep is device-agnostic (Pixel 8 / 10 Pro / emulator all
-    // work the same way).
     if (autoSweepSeconds != null) {
-        androidx.compose.runtime.LaunchedEffect(Unit) {
-            val targets = listOf(600, 800, 1000, 1200)
-            for (target in targets) {
+        LaunchedEffect(Unit) {
+            for (target in listOf(600, 800, 1000, 1200)) {
                 wpm = target
+                onWpmChange(target)
+                index = 0
+                onIndexChange(0)
                 Log.i(TAG, "AUTO_SWEEP_BEGIN wpm=$target seconds=$autoSweepSeconds")
-                start()
-                kotlinx.coroutines.delay(autoSweepSeconds * 1000L)
+                start(resetMetrics = true)
+                delay(autoSweepSeconds * 1000L)
                 stop()
                 Log.i(TAG, "AUTO_SWEEP_END wpm=$target")
-                kotlinx.coroutines.delay(500)
+                delay(500)
             }
             Log.i(TAG, "AUTO_SWEEP_DONE")
         }
     }
+}
+
+// ---- Settings screen ------------------------------------------------
+
+@Composable
+private fun SettingsScreen(
+    dictionary: SnapshotStateList<String>,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var draft by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 60.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(modifier = Modifier.clickable(onClick = onBack).testTag("back-button")) {
+            SectionLabel("‹ EDIT")
+        }
+        Text(
+            "Custom words",
+            color = JRColor.ink,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = JRFont.serif,
+        )
+        Text(
+            "Names and terms here stay together when reading. Especially helpful for Chinese names that get split.",
+            color = JRColor.inkMid,
+            fontSize = 13.sp,
+            fontFamily = JRFont.sans,
+            lineHeight = 19.sp,
+        )
+
+        SectionLabel("WORDS (${dictionary.size})")
+        for (entry in dictionary) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(JRColor.paperStrong)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    entry,
+                    color = JRColor.ink,
+                    fontSize = 16.sp,
+                    fontFamily = JRFont.serif,
+                    modifier = Modifier
+                        .testTag("dict-entry-$entry")
+                        .weight(1f, fill = true),
+                )
+                Box(
+                    modifier = Modifier
+                        .clickable { onRemove(entry) }
+                        .padding(horizontal = 6.dp)
+                        .testTag("dict-remove-$entry"),
+                ) {
+                    Text(
+                        "REMOVE",
+                        color = JRColor.terracotta,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = JRFont.sans,
+                        letterSpacing = 0.66.sp,
+                    )
+                }
+            }
+        }
+
+        SectionLabel("ADD")
+        BasicTextField(
+            value = draft,
+            onValueChange = { draft = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(4.dp))
+                .background(JRColor.paperStrong)
+                .padding(14.dp)
+                .testTag("dict-add-text-field"),
+            textStyle = TextStyle(
+                color = JRColor.ink,
+                fontSize = 18.sp,
+                fontFamily = JRFont.serif,
+            ),
+            cursorBrush = SolidColor(JRColor.terracotta),
+        )
+        PrimaryButton(label = "ADD", testTag = "dict-add-confirm", onTap = {
+            if (draft.isNotBlank()) {
+                onAdd(draft)
+                draft = ""
+            }
+        })
+        Spacer(Modifier.height(48.dp))
+    }
+}
+
+// ---- Shared bits ----------------------------------------------------
+
+private val Modifier.weightTest: Modifier get() = this
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        color = JRColor.inkQuiet,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        fontFamily = JRFont.sans,
+        letterSpacing = 0.66.sp,
+    )
 }
 
 @Composable
@@ -270,7 +486,7 @@ private fun PacePill(value: Int, selected: Boolean, onTap: () -> Unit) {
 }
 
 @Composable
-private fun StartStopButton(isPlaying: Boolean, onTap: () -> Unit) {
+private fun PrimaryButton(label: String, onTap: () -> Unit, testTag: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -278,10 +494,10 @@ private fun StartStopButton(isPlaying: Boolean, onTap: () -> Unit) {
             .background(JRColor.terracotta)
             .clickable(onClick = onTap)
             .padding(vertical = 14.dp)
-            .testTag(if (isPlaying) "stop-button" else "start-button"),
+            .testTag(testTag),
     ) {
         Text(
-            if (isPlaying) "STOP" else "START",
+            label,
             color = JRColor.paper,
             fontSize = 13.sp,
             fontFamily = JRFont.sans,
@@ -294,6 +510,24 @@ private fun StartStopButton(isPlaying: Boolean, onTap: () -> Unit) {
 }
 
 @Composable
-private fun ColumnTap(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    content()
+private fun SecondaryButton(label: String, onTap: () -> Unit, testTag: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(JRColor.paperStrong)
+            .clickable(onClick = onTap)
+            .padding(vertical = 14.dp)
+            .testTag(testTag),
+    ) {
+        Text(
+            label,
+            color = JRColor.inkMid,
+            fontSize = 14.sp,
+            fontFamily = JRFont.sans,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }

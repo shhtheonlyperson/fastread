@@ -1,30 +1,61 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// keystore.properties is gitignored; upload-keystore.jks lives next
+// to it at the project root. Same pattern as ~/proj/osho/android.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
 android {
+    // Kotlin package id stays `.spike` to avoid churning the source
+    // directory; Play Console only cares about `applicationId`.
     namespace = "com.shhtheonlyperson.fastread.spike"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.shhtheonlyperson.fastread.spike"
+        applicationId = "com.shhtheonlyperson.fastread.android"
         // Pixel 8 launched with Android 14 (API 34) — that's our floor
         // because we depend on the latest ICU rev for Trad-Chinese
         // word segmentation and the current Compose Material 3 render
         // path. Anything older means a different ICU dictionary and a
-        // separate parity story we don't want to own for a spike.
+        // separate parity story we don't want to own for v1.
         minSdk = 34
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1"
+        versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // applicationIdSuffix lets debug + release co-exist on a
+            // device without uninstalling between builds.
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = false
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -54,7 +85,5 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
-    // Real org.json on the JVM unit-test classpath; the Android stub
-    // library on the unit-test path throws "Method not mocked" otherwise.
     testImplementation("org.json:json:20240303")
 }

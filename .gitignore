@@ -25,3 +25,12 @@ android-spike/.gradle/
 android-spike/build/
 android-spike/app/build/
 android-spike/local.properties
+
+# NEVER commit upload signing material. If the keystore.jks is lost,
+# Play App Signing flow lets us reset the upload key via Play Console
+# support, but the file + passwords here unlock signed releases for
+# this app, so they stay local-only.
+android-spike/upload-keystore.jks
+android-spike/keystore.properties
+android-spike/google-service-account*.json
+android-spike/fastlane/report.xml

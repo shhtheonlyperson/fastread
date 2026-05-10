@@ -1,0 +1,94 @@
+# Maestro flow (Android): mirror of .maestro/user-dictionary.yaml.
+# Verifies that the Kotlin port of RSVPEngine + Compose UI behaves
+# the same as the iOS app:
+#   1. With dict empty, "黃士旗" is split into single-char tokens.
+#   2. Adding "黃士旗" via Settings merges them.
+#   3. Removing it splits them again.
+#
+# Run via scripts/maestro-android.sh, which builds + installs the
+# debug APK and pre-paste s the test article via SharedPreferences.
+
+appId: com.shhtheonlyperson.fastread.android.debug
+---
+- launchApp:
+    appId: com.shhtheonlyperson.fastread.android.debug
+    clearKeychain: false
+    clearState: true
+
+# 0) Land on the Paste screen, type the test article in the text field.
+- extendedWaitUntil:
+    visible:
+      id: "paste-text-field"
+    timeout: 8000
+- tapOn:
+    id: "paste-text-field"
+- eraseText: 9999
+- inputText: "黃士旗去吃飯與星巴克碰面。"
+- hideKeyboard
+
+- tapOn:
+    id: "read-button"
+
+# 1) Reader appears. Without dict the first token must be the single
+#    character 黃 — that's the bigram-failure baseline we want to fix.
+- extendedWaitUntil:
+    visible:
+      id: "rsvp-current-token"
+      text: "黃"
+    timeout: 8000
+- takeScreenshot: a-01-reader-before-dict
+
+# Back to Paste, then into Custom Words.
+- tapOn:
+    id: "back-button"
+- tapOn:
+    id: "settings-button"
+- extendedWaitUntil:
+    visible: "Custom words"
+    timeout: 5000
+
+# 2) Add 黃士旗.
+- tapOn:
+    id: "dict-add-text-field"
+- inputText: "黃士旗"
+- hideKeyboard
+- tapOn:
+    id: "dict-add-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "dict-entry-黃士旗"
+    timeout: 5000
+- takeScreenshot: a-02-settings-after-add
+
+# Back to Paste, then Read again. With the dict populated, the cache
+# invalidates and the same article re-tokenises so 黃士旗 is one chunk.
+- tapOn:
+    id: "back-button"
+- tapOn:
+    id: "read-button"
+- extendedWaitUntil:
+    visible:
+      id: "rsvp-current-token"
+      text: "黃士旗"
+    timeout: 5000
+- takeScreenshot: a-03-reader-after-dict
+
+# 3) Remove the entry, verify the reader splits it back to "黃".
+- tapOn:
+    id: "back-button"
+- tapOn:
+    id: "settings-button"
+- tapOn:
+    id: "dict-remove-黃士旗"
+- assertNotVisible:
+    id: "dict-entry-黃士旗"
+- tapOn:
+    id: "back-button"
+- tapOn:
+    id: "read-button"
+- extendedWaitUntil:
+    visible:
+      id: "rsvp-current-token"
+      text: "黃"
+    timeout: 5000
+- takeScreenshot: a-04-reader-after-remove

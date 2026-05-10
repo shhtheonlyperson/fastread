@@ -1,0 +1,149 @@
+opt_out_usage
+
+default_platform(:android)
+
+# Mirrors ~/proj/osho/android/fastlane/Fastfile (which is itself
+# mirrored from the shh-mobile-release skill's android-local-fallback
+# reference). Two lanes:
+#   bundle exec fastlane verify    — build a signed AAB and run
+#                                    bundletool validate, no upload.
+#   bundle exec fastlane internal  — build + upload to Play Console
+#                                    Internal testing track via the
+#                                    Google Play Developer API.
+#
+# Service-account JSON path resolution order (first-found wins):
+#   $FASTREAD_PLAY_SERVICE_ACCOUNT_JSON
+#   $SUPPLY_JSON_KEY
+#   $PLAY_STORE_JSON_KEY
+#   android-spike/google-service-account.fastread.json
+#   android-spike/google-play-service-account.fastread.json
+
+platform :android do
+  private_lane :ensure_java_home do
+    next ENV["JAVA_HOME"] unless ENV["JAVA_HOME"].to_s.empty?
+
+    candidates = [
+      "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home",
+      "/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+    ]
+    java_home = candidates.find { |path| File.executable?(File.join(path, "bin", "java")) }
+    next nil unless java_home
+
+    ENV["JAVA_HOME"] = java_home
+    ENV["PATH"] = "#{File.join(java_home, "bin")}:#{ENV["PATH"]}"
+    UI.message("Using JAVA_HOME=#{java_home}")
+    java_home
+  end
+
+  private_lane :ensure_android_sdk do
+    next ENV["ANDROID_HOME"] unless ENV["ANDROID_HOME"].to_s.empty?
+
+    candidates = [
+      File.expand_path("~/Library/Android/sdk"),
+      "/opt/homebrew/share/android-commandlinetools",
+      "/usr/local/share/android-commandlinetools"
+    ]
+    sdk_home = candidates.find { |path| File.directory?(File.join(path, "platforms", "android-35")) }
+    next nil unless sdk_home
+
+    ENV["ANDROID_HOME"] = sdk_home
+    ENV["ANDROID_SDK_ROOT"] = sdk_home
+    ENV["PATH"] = [
+      File.join(sdk_home, "platform-tools"),
+      File.join(sdk_home, "cmdline-tools", "latest", "bin"),
+      ENV["PATH"]
+    ].join(":")
+    UI.message("Using ANDROID_HOME=#{sdk_home}")
+    sdk_home
+  end
+
+  private_lane :play_json_key_path do
+    explicit_path = ENV["FASTREAD_PLAY_SERVICE_ACCOUNT_JSON"] || ENV["SUPPLY_JSON_KEY"] || ENV["PLAY_STORE_JSON_KEY"]
+    if explicit_path.to_s.empty?
+      [
+        "google-service-account.fastread.json",
+        "google-play-service-account.fastread.json"
+      ].map { |path| File.absolute_path(path, File.expand_path("..", __dir__)) }
+        .find { |path| File.exist?(path) } ||
+        File.absolute_path("google-service-account.fastread.json", File.expand_path("..", __dir__))
+    else
+      File.absolute_path(explicit_path, File.expand_path("..", __dir__))
+    end
+  end
+
+  private_lane :ensure_play_json_key do
+    json_key = play_json_key_path
+    unless File.exist?(json_key)
+      UI.user_error!("Missing Google Play service-account JSON at #{File.expand_path(json_key)}. Set FASTREAD_PLAY_SERVICE_ACCOUNT_JSON to a valid key path or place the key at android-spike/google-service-account.fastread.json.")
+    end
+
+    require "json"
+    begin
+      parsed = JSON.parse(File.read(json_key))
+    rescue JSON::ParserError => e
+      UI.user_error!("Google Play service-account JSON is not valid JSON: #{e.message}")
+    end
+
+    required_fields = ["type", "client_email", "private_key", "token_uri"]
+    missing_fields = required_fields.select { |field| parsed[field].to_s.empty? }
+    unless missing_fields.empty?
+      UI.user_error!("Google Play service-account JSON is missing required fields: #{missing_fields.join(", ")}. This is probably not a service-account key.")
+    end
+
+    unless parsed["type"] == "service_account" && parsed["client_email"].end_with?(".gserviceaccount.com") && parsed["private_key"].include?("BEGIN PRIVATE KEY")
+      UI.user_error!("Google Play credential must be a Google Cloud service-account JSON key, not Firebase google-services.json or an OAuth client file.")
+    end
+
+    json_key
+  end
+
+  private_lane :build_release_bundle do
+    ensure_java_home
+    ensure_android_sdk
+    gradle(task: ":app:bundleRelease", project_dir: ".")
+    File.expand_path("app/build/outputs/bundle/release/app-release.aab", File.expand_path("..", __dir__))
+  end
+
+  desc "Build and validate the Android app bundle without uploading to Play Console"
+  lane :verify do
+    aab_path = build_release_bundle
+    if `which bundletool`.strip.empty?
+      UI.message("bundletool not on PATH — skipping validate. Install with: brew install bundletool")
+    else
+      sh("bundletool validate --bundle=#{aab_path}")
+    end
+    UI.success("Built #{aab_path}")
+  end
+
+  desc "Build and upload the Android app bundle to Play Console internal testing"
+  lane :internal do
+    json_key = ensure_play_json_key
+    aab_path = build_release_bundle
+    upload_to_play_store(
+      json_key: json_key,
+      track: "internal",
+      release_status: "completed",
+      aab: aab_path,
+      skip_upload_screenshots: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true
+    )
+  end
+
+  desc "Build and upload the Android app bundle as a draft (first-time upload before Play Console accepts the package id)"
+  lane :draft do
+    json_key = ensure_play_json_key
+    aab_path = build_release_bundle
+    upload_to_play_store(
+      json_key: json_key,
+      track: "internal",
+      release_status: "draft",
+      aab: aab_path,
+      skip_upload_screenshots: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true
+    )
+  end
+end

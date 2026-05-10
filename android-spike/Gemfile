@@ -1,0 +1,5 @@
+source "https://rubygems.org"
+
+# Pinned to the same major version osho uses, so the
+# upload_to_play_store action signature stays consistent.
+gem "fastlane", "~> 2.233"
