@@ -3,8 +3,11 @@
 # Debug build installed and the chosen launch arguments seeded.
 #
 # Usage:
-#   scripts/maestro-test.sh                  # run all flows
-#   scripts/maestro-test.sh user-dictionary  # run a single flow by name
+#   scripts/maestro-test.sh                       # run all flows
+#   scripts/maestro-test.sh user-dictionary       # run a single flow
+#   scripts/maestro-test.sh --report user-dictionary
+#                                                 # also record video
+#                                                 # + open build/maestro/index.html
 #
 # Assumes:
 #   - macOS with Xcode (xcrun simctl available)
@@ -16,6 +19,12 @@
 # none is up). Each flow runs against a fresh install so the
 # pre-launch seed args take effect deterministically.
 set -euo pipefail
+
+WITH_REPORT=0
+if [ "${1:-}" = "--report" ]; then
+  WITH_REPORT=1
+  shift
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -146,8 +155,22 @@ for flow in "${FLOWS[@]}"; do
   flow_name="$(basename "${flow%.yaml}")"
   echo "▶ $flow"
   prelaunch_with_args "$flow_name"
-  if ! maestro --device "$DEVICE_UDID" test "$flow"; then
+  mkdir -p build/maestro
+  if ! maestro --device "$DEVICE_UDID" test \
+      --format HTML-DETAILED \
+      --output "build/maestro/${flow_name}.html" \
+      --debug-output "build/maestro/debug" \
+      "$flow"; then
     EXIT=1
+  fi
+  if [ "$WITH_REPORT" -eq 1 ] && [ "$EXIT" -eq 0 ]; then
+    echo "  → recording video for $flow_name…"
+    prelaunch_with_args "$flow_name"
+    maestro --device "$DEVICE_UDID" record --local \
+      "$flow" "build/maestro/${flow_name}.mp4" >/dev/null
+    echo "  → stitching index.html…"
+    python3 "$ROOT/scripts/maestro-report.py"
+    open "build/maestro/index.html" 2>/dev/null || true
   fi
 done
 
