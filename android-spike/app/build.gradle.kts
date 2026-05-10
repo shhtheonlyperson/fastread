@@ -10,7 +10,12 @@ android {
 
     defaultConfig {
         applicationId = "com.shhtheonlyperson.fastread.spike"
-        minSdk = 26
+        // Pixel 8 launched with Android 14 (API 34) — that's our floor
+        // because we depend on the latest ICU rev for Trad-Chinese
+        // word segmentation and the current Compose Material 3 render
+        // path. Anything older means a different ICU dictionary and a
+        // separate parity story we don't want to own for a spike.
+        minSdk = 34
         targetSdk = 35
         versionCode = 1
         versionName = "0.1"

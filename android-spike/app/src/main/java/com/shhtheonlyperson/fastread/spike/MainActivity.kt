@@ -15,6 +15,7 @@
 
 package com.shhtheonlyperson.fastread.spike
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -74,17 +75,18 @@ private val SAMPLE = """
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val sweepSeconds = intent.getIntExtra("sweep_seconds", 0)
         setContent {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = JRColor.paper,
-            ) { SpikeScreen() }
+            ) { SpikeScreen(autoSweepSeconds = sweepSeconds.takeIf { it > 0 }) }
         }
     }
 }
 
 @Composable
-private fun SpikeScreen() {
+private fun SpikeScreen(autoSweepSeconds: Int? = null) {
     val tokens = remember {
         RSVPEngine.tokenize(
             SAMPLE,
@@ -220,6 +222,28 @@ private fun SpikeScreen() {
 
         Spacer(Modifier.height(4.dp))
         StartStopButton(isPlaying = isPlaying) { if (isPlaying) stop() else start() }
+    }
+
+    // Auto-sweep entry: when launched with `--ei sweep_seconds 20`, cycle
+    // through 600 / 800 / 1000 / 1200 wpm, run each for the given number
+    // of seconds, then stop. Logcat (FastReadSpike tag) is the only
+    // output — perf-report.py turns it into the verdict. No taps needed,
+    // so the sweep is device-agnostic (Pixel 8 / 10 Pro / emulator all
+    // work the same way).
+    if (autoSweepSeconds != null) {
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            val targets = listOf(600, 800, 1000, 1200)
+            for (target in targets) {
+                wpm = target
+                Log.i(TAG, "AUTO_SWEEP_BEGIN wpm=$target seconds=$autoSweepSeconds")
+                start()
+                kotlinx.coroutines.delay(autoSweepSeconds * 1000L)
+                stop()
+                Log.i(TAG, "AUTO_SWEEP_END wpm=$target")
+                kotlinx.coroutines.delay(500)
+            }
+            Log.i(TAG, "AUTO_SWEEP_DONE")
+        }
     }
 }
 
