@@ -17,3 +17,11 @@ xcuserdata/
 # Maestro flow screenshots get dumped at the repo root by the
 # `takeScreenshot` step. Run logs live under ~/.maestro/tests/.
 /[0-9][0-9]-*.png
+
+# Android spike build output. Keep the source under android-spike/
+# committed so the perf decision is reproducible, but ignore the
+# generated Gradle / dex / apk artifacts.
+android-spike/.gradle/
+android-spike/build/
+android-spike/app/build/
+android-spike/local.properties
