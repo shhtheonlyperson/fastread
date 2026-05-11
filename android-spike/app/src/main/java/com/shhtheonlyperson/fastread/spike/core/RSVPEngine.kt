@@ -109,7 +109,13 @@ object RSVPEngine {
                 tokens += segment.split(Regex("\\s+")).filter { it.isNotEmpty() }
             }
         }
-        return tokens
+        // ICU + script-split alone over-segments — names, particles, and
+        // number+measure-word pairs come out as single Han chars. The
+        // ChunkShaper post-pass merges those back into rhythmic 2–4 char
+        // chunks that match how the eye-brain pipeline actually reads.
+        // The Swift side runs the same five passes against the same
+        // gold corpus (Tests/Fixtures/rsvp-gold-corpus.tsv).
+        return ChunkShaper.shape(tokens)
     }
 
     private fun splitByScript(input: String): List<Pair<String, Boolean>> {
@@ -158,12 +164,29 @@ object RSVPEngine {
         val merged = applyUserDictionary(raw, text, userDictionary)
 
         val tokens = mutableListOf<String>()
+        // Punctuation in the gap BEFORE the first token (e.g., an opening
+        // 「) buffers and prepends to the first word — same fix as the
+        // Swift version, so quoted phrases keep their opening mark.
+        var leadingPunct = StringBuilder()
         var lastEnd = 0
         for (span in merged) {
             if (lastEnd < span.lo) {
-                attachInterstitialPunctuation(text.substring(lastEnd, span.lo), tokens)
+                val gap = text.substring(lastEnd, span.lo)
+                for (ch in gap) {
+                    if (!(isCJKPunctuation(ch) || isASCIIPunctuationPause(ch))) continue
+                    if (tokens.isEmpty()) {
+                        leadingPunct.append(ch)
+                    } else {
+                        tokens[tokens.lastIndex] = tokens.last() + ch
+                    }
+                }
             }
-            tokens += span.text
+            if (tokens.isEmpty() && leadingPunct.isNotEmpty()) {
+                tokens += leadingPunct.toString() + span.text
+                leadingPunct = StringBuilder()
+            } else {
+                tokens += span.text
+            }
             lastEnd = span.hi
         }
         if (lastEnd < text.length) {
