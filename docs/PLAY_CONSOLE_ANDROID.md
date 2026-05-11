@@ -11,7 +11,7 @@ These match what shipped. Update on every release.
 - Min SDK: **34** (Android 14, Pixel 8 launch line)
 - Target SDK: **35**
 - Latest signed AAB: `android-spike/app/build/outputs/bundle/release/app-release.aab`
-- Latest version: `0.1.0` (versionCode 1)
+- Latest version: `0.2.1` (versionCode 3)
 - Upload keystore: `android-spike/upload-keystore.jks` (gitignored, never commit)
 - Keystore properties: `android-spike/keystore.properties` (gitignored)
 - **Upload key SHA-256:**
