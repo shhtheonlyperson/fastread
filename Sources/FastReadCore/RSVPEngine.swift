@@ -2,6 +2,11 @@ import Foundation
 import NaturalLanguage
 
 public enum RSVPEngine {
+    /// Bump when the tokenizer or shaper produces a materially different
+    /// chunking for the same input. Persisted tokens whose recorded
+    /// `tokenizerVersion` doesn't match are discarded and recomputed.
+    public static let version: Int = 1
+
     public struct FocusSplit: Equatable {
         public let before: String
         public let focus: String

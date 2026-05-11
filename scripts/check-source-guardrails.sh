@@ -55,7 +55,11 @@ reject_pattern "NSAttributedString[[:space:]]*\\(data:" \
   "Do not reintroduce synchronous NSAttributedString HTML parsing on paste/load paths." \
   FastReadApp
 
-reject_pattern "RSVPEngine\\.tokenize\\(text\\)|var tokens: \\[String\\]|var wordCount: Int \\{ tokens\\.count" \
+# The non-optional `[String]` shape used to be the symptom of a computed
+# property that re-tokenized on every access. The current persisted-tokens
+# field is `[String]?` — stored, version-gated, and explicitly there to
+# avoid that recomputation — so the regex skips the `?` form.
+reject_pattern "RSVPEngine\\.tokenize\\(text\\)|var tokens: \\[String\\][^?]|var wordCount: Int \\{ tokens\\.count" \
   "ReadingArticle must not expose computed token/wordCount properties that tokenize on every access." \
   Sources/FastReadCore/ReadingArticle.swift
 

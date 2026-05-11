@@ -115,6 +115,7 @@ private fun JustReadApp(autoSweepSeconds: Int? = null) {
             initialWpm = wpm,
             initialIndex = index,
             dictionary = dictionary,
+            store = store,
             onWpmChange = { wpm = it; store.wpm = it },
             onIndexChange = { index = it; store.index = it },
             onBack = { screen = Screen.Paste },
@@ -195,13 +196,26 @@ private fun ReaderScreen(
     initialWpm: Int,
     initialIndex: Int,
     dictionary: List<String>,
+    store: Persistence,
     onWpmChange: (Int) -> Unit,
     onIndexChange: (Int) -> Unit,
     onBack: () -> Unit,
     autoSweepSeconds: Int? = null,
 ) {
     val tokens = remember(article, dictionary.toList()) {
-        RSVPEngine.tokenize(article, userDictionary = dictionary)
+        // Fast path: SharedPreferences carries tokens from a previous
+        // launch, and the tokenizer version still matches. Persistence
+        // already wiped the cache when the article or dictionary
+        // changed, so a hit here is safe to trust.
+        val cached = store.tokens
+        if (cached != null && store.tokenizerVersion == RSVPEngine.VERSION) {
+            cached
+        } else {
+            val fresh = RSVPEngine.tokenize(article, userDictionary = dictionary)
+            store.tokens = fresh
+            store.tokenizerVersion = RSVPEngine.VERSION
+            fresh
+        }
     }
     var wpm by remember { mutableIntStateOf(initialWpm) }
     var index by remember { mutableIntStateOf(initialIndex.coerceIn(0, (tokens.size - 1).coerceAtLeast(0))) }

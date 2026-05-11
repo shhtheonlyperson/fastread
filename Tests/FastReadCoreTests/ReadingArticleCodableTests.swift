@@ -86,6 +86,33 @@ final class ReadingArticleCodableTests: XCTestCase {
         XCTAssertNil(decoded.finishedAt)
     }
 
+    func testRoundTripPreservesPersistedTokens() throws {
+        let original = ReadingArticle(
+            id: "article-tokens",
+            title: "Persisted tokens",
+            source: "Clipboard",
+            author: "You",
+            date: "May 11, 2026",
+            readTime: "1 min",
+            lede: "...",
+            tag: "Reading now",
+            text: "黃士旗 去吃飯。",
+            progress: 0,
+            wordIndex: 0,
+            timesOpened: 1,
+            isFinished: false,
+            tokens: ["黃士旗", "去吃飯。"],
+            tokenizerVersion: RSVPEngine.version
+        )
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(ReadingArticle.self, from: data)
+
+        XCTAssertEqual(decoded.tokens, ["黃士旗", "去吃飯。"])
+        XCTAssertEqual(decoded.tokenizerVersion, RSVPEngine.version)
+        XCTAssertEqual(decoded, original)
+    }
+
     func testDecodesLegacyV0Fixture() throws {
         guard let url = Bundle.module.url(
             forResource: "legacy-article-v0",
@@ -114,5 +141,9 @@ final class ReadingArticleCodableTests: XCTestCase {
         XCTAssertEqual(article.timesOpened, 2)
         XCTAssertFalse(article.isFinished)
         XCTAssertTrue(article.text.contains("legacy reading article"))
+        // Legacy v0 records pre-date the persisted-tokens fields, so the
+        // decoder should leave both slots nil for ReadingStore to backfill.
+        XCTAssertNil(article.tokens)
+        XCTAssertNil(article.tokenizerVersion)
     }
 }

@@ -325,6 +325,47 @@ final class ReadingStoreTests: XCTestCase {
         XCTAssertEqual(store.userDictionary, [])
     }
 
+    // MARK: - Persisted tokens
+
+    func testAddArticleStampsTokenizerVersionAndPersistsTokens() {
+        let store = makeStore()
+        store.addDraftArticle(text: "黃士旗 去吃飯。陽明山很美。", title: "Persist tokens")
+
+        let article = try? XCTUnwrap(store.currentArticle)
+        XCTAssertNotNil(article)
+        XCTAssertEqual(article?.tokenizerVersion, RSVPEngine.version)
+        XCTAssertEqual(article?.tokens, store.currentTokens)
+        XCTAssertFalse(article?.tokens?.isEmpty ?? true)
+    }
+
+    func testRelaunchUsesPersistedTokensWithoutReTokenizing() {
+        let bodyText = "黃士旗 去吃飯。陽明山很美。蔡英文總統發表演說。"
+        do {
+            let store = makeStore()
+            store.addDraftArticle(text: bodyText, title: "Survives relaunch")
+        }
+        let reborn = makeStore()
+        let revived = reborn.currentArticle
+        XCTAssertNotNil(revived?.tokens)
+        XCTAssertEqual(revived?.tokenizerVersion, RSVPEngine.version)
+        XCTAssertEqual(revived?.tokens, reborn.currentTokens)
+    }
+
+    func testUserDictionaryChangeStripsPersistedTokens() {
+        let store = makeStore()
+        store.addDraftArticle(text: "張三王老師很嚴格。", title: "Dict invalidation")
+        XCTAssertNotNil(store.currentArticle?.tokens)
+
+        store.addToUserDictionary("王老師")
+
+        // Persisted tokens are dropped on dict change. The current
+        // articles array reflects the cleared slot; the next read /
+        // mutation rebuilds + re-persists.
+        XCTAssertNil(store.articles.first?.tokens)
+        XCTAssertNil(store.articles.first?.tokenizerVersion)
+        XCTAssertTrue(store.currentTokens.contains("王老師"))
+    }
+
     // MARK: - Helpers
 
     private static func longBody(_ words: Int) -> String {

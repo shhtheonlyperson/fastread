@@ -19,7 +19,11 @@ public final class ReadingStore: ObservableObject {
     @Published public var sourceStatus = ""
 
     private var playbackTask: Task<Void, Never>?
-    private var tokenCache: [String: TokenCacheEntry] = [:]
+    /// In-memory fallback for articles whose persisted `tokens` slot is
+    /// nil (legacy upgrade, or after a user-dictionary change). Lookups
+    /// hit `article.tokens` first; this dict only matters until the next
+    /// mutation re-persists tokens on the article record.
+    private var tokenCache: [String: [String]] = [:]
     private var documentMetadataCache: [String: DocumentMetadataCacheEntry] = [:]
     private let defaults: UserDefaults
 
@@ -143,9 +147,22 @@ public final class ReadingStore: ObservableObject {
 
     private func invalidateTokenizationCaches() {
         // Token boundaries depend on the dictionary, so any cached tokens
-        // and section offsets must be recomputed on next access.
+        // and section offsets must be recomputed on next access. Strip
+        // the persisted per-article tokens too so the version-gated fast
+        // path falls through to a fresh tokenize on next access.
         tokenCache.removeAll(keepingCapacity: true)
         documentMetadataCache.removeAll(keepingCapacity: true)
+        var changed = false
+        for index in articles.indices {
+            if articles[index].tokens != nil || articles[index].tokenizerVersion != nil {
+                articles[index].tokens = nil
+                articles[index].tokenizerVersion = nil
+                changed = true
+            }
+        }
+        if changed {
+            persistArticles()
+        }
     }
 
     public func previewWPM(_ value: Double) {
@@ -300,9 +317,11 @@ public final class ReadingStore: ObservableObject {
             progress: 0,
             wordIndex: 0,
             timesOpened: 1,
-            isFinished: false
+            isFinished: false,
+            tokens: tokens,
+            tokenizerVersion: RSVPEngine.version
         )
-        tokenCache[article.id] = TokenCacheEntry(text: flattened, tokens: tokens)
+        tokenCache[article.id] = tokens
         articles.insert(article, at: 0)
         selectedArticleID = article.id
         persistSelectedArticleID()
@@ -389,7 +408,10 @@ public final class ReadingStore: ObservableObject {
         var article = articles[selectedArticleIndex]
         mutate(&article)
 
-        let count = tokens(for: article).count
+        // ensureTokens populates article.tokens + tokenizerVersion when
+        // the persisted slot is empty/stale, so the next launch can take
+        // the fast path without re-tokenizing.
+        let count = ensureTokens(for: &article).count
         article.wordIndex = RSVPEngine.clamp(article.wordIndex, min: 0, max: max(count - 1, 0))
         if count > 0 {
             article.progress = article.isFinished ? 1 : Double(article.wordIndex + 1) / Double(count)
@@ -616,15 +638,40 @@ public final class ReadingStore: ObservableObject {
     }
 
     private func tokens(for article: ReadingArticle) -> [String] {
-        if let cached = tokenCache[article.id], cached.text == article.text {
-            return cached.tokens
+        // Fast path: the article carries its tokens from import / last
+        // mutation and the recorded version still matches the engine.
+        if let persisted = article.tokens,
+           let recorded = article.tokenizerVersion,
+           recorded == RSVPEngine.version {
+            return persisted
         }
-
+        // Memo path: read-only callers (list rows, lede previews) hit
+        // here on a legacy upgrade or right after an invalidate.
+        // `updateSelectedArticle` re-persists tokens on the next mutation.
+        if let cached = tokenCache[article.id] {
+            return cached
+        }
         let tokens = PerformanceTrace.measure("Tokenize Article") {
             RSVPEngine.tokenize(article.text, userDictionary: userDictionary)
         }
-        tokenCache[article.id] = TokenCacheEntry(text: article.text, tokens: tokens)
+        tokenCache[article.id] = tokens
         return tokens
+    }
+
+    @discardableResult
+    private func ensureTokens(for article: inout ReadingArticle) -> [String] {
+        if let persisted = article.tokens,
+           let recorded = article.tokenizerVersion,
+           recorded == RSVPEngine.version {
+            return persisted
+        }
+        let fresh = PerformanceTrace.measure("Tokenize Article") {
+            RSVPEngine.tokenize(article.text, userDictionary: userDictionary)
+        }
+        article.tokens = fresh
+        article.tokenizerVersion = RSVPEngine.version
+        tokenCache[article.id] = fresh
+        return fresh
     }
 
     private func documentMetadata(for article: ReadingArticle) -> DocumentMetadataCacheEntry {
@@ -690,11 +737,6 @@ private struct SettingsPayload: Codable {
     public var wpm: Double
     public var punctuationPause: Bool
     public var focusIndicator: FocusIndicatorStyle
-}
-
-private struct TokenCacheEntry {
-    public var text: String
-    public var tokens: [String]
 }
 
 private struct DocumentMetadataCacheEntry {

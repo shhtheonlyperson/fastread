@@ -18,6 +18,13 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
     public var wordIndex: Int
     public var timesOpened: Int
     public var isFinished: Bool
+    /// Tokens produced by `RSVPEngine.tokenize` for `text` at the time the
+    /// article was imported (or last mutated). Persisted so the reader
+    /// doesn't re-tokenize on every launch — invalidated when
+    /// `tokenizerVersion` no longer matches `RSVPEngine.version`.
+    public var tokens: [String]?
+    /// The `RSVPEngine.version` value in effect when `tokens` was computed.
+    public var tokenizerVersion: Int?
 
     public var text: String { Document.flattenText(document) }
 
@@ -38,7 +45,9 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
         progress: Double,
         wordIndex: Int,
         timesOpened: Int,
-        isFinished: Bool
+        isFinished: Bool,
+        tokens: [String]? = nil,
+        tokenizerVersion: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -57,6 +66,8 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
         self.wordIndex = wordIndex
         self.timesOpened = timesOpened
         self.isFinished = isFinished
+        self.tokens = tokens
+        self.tokenizerVersion = tokenizerVersion
     }
 
     public init(
@@ -76,7 +87,9 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
         progress: Double,
         wordIndex: Int,
         timesOpened: Int,
-        isFinished: Bool
+        isFinished: Bool,
+        tokens: [String]? = nil,
+        tokenizerVersion: Int? = nil
     ) {
         let document = Document(
             title: title,
@@ -102,7 +115,9 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
             progress: progress,
             wordIndex: wordIndex,
             timesOpened: timesOpened,
-            isFinished: isFinished
+            isFinished: isFinished,
+            tokens: tokens,
+            tokenizerVersion: tokenizerVersion
         )
     }
 
@@ -112,6 +127,7 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
         case readTime, lede, tag
         case document, text
         case progress, wordIndex, timesOpened, isFinished
+        case tokens, tokenizerVersion
     }
 
     public init(from decoder: Decoder) throws {
@@ -147,6 +163,9 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
             )
         }
 
+        let tokens = try c.decodeIfPresent([String].self, forKey: .tokens)
+        let tokenizerVersion = try c.decodeIfPresent(Int.self, forKey: .tokenizerVersion)
+
         self.init(
             id: id,
             title: title,
@@ -164,7 +183,9 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
             progress: progress,
             wordIndex: wordIndex,
             timesOpened: timesOpened,
-            isFinished: isFinished
+            isFinished: isFinished,
+            tokens: tokens,
+            tokenizerVersion: tokenizerVersion
         )
     }
 
@@ -188,6 +209,8 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
         try c.encode(wordIndex, forKey: .wordIndex)
         try c.encode(timesOpened, forKey: .timesOpened)
         try c.encode(isFinished, forKey: .isFinished)
+        try c.encodeIfPresent(tokens, forKey: .tokens)
+        try c.encodeIfPresent(tokenizerVersion, forKey: .tokenizerVersion)
     }
 
     public static func == (lhs: ReadingArticle, rhs: ReadingArticle) -> Bool {
@@ -208,5 +231,7 @@ public struct ReadingArticle: Identifiable, Codable, Equatable {
             && lhs.wordIndex == rhs.wordIndex
             && lhs.timesOpened == rhs.timesOpened
             && lhs.isFinished == rhs.isFinished
+            && lhs.tokens == rhs.tokens
+            && lhs.tokenizerVersion == rhs.tokenizerVersion
     }
 }

@@ -10,6 +10,12 @@ import java.text.BreakIterator
 import java.util.Locale
 
 object RSVPEngine {
+    /// Bump when the tokenizer or shaper produces a materially different
+    /// chunking for the same input. Persistence drops cached tokens whose
+    /// stored `tokenizerVersion` no longer matches this value. Kept in
+    /// lock-step with Sources/FastReadCore/RSVPEngine.swift.
+    const val VERSION: Int = 1
+
     data class FocusSplit(val before: String, val focus: String, val after: String)
 
     data class ContextWindow(
