@@ -224,12 +224,29 @@ public enum RSVPEngine {
         let merged = applyUserDictionary(raw, in: text, dictionary: userDictionary)
 
         var tokens: [String] = []
+        // Punctuation that appears in the gap BEFORE the first token (e.g.,
+        // an opening 「) is buffered and prepended to the first word, so
+        // quoted phrases keep their opening mark instead of dropping it.
+        var leadingPunct = ""
         var lastEnd = text.startIndex
         for span in merged {
             if lastEnd < span.lo {
-                attachInterstitialPunctuation(text[lastEnd..<span.lo], to: &tokens)
+                let gap = text[lastEnd..<span.lo]
+                for character in gap {
+                    guard isCJKPunctuation(character) || isASCIIPunctuationPause(character) else { continue }
+                    if tokens.isEmpty {
+                        leadingPunct.append(character)
+                    } else {
+                        tokens[tokens.count - 1].append(character)
+                    }
+                }
             }
-            tokens.append(span.text)
+            if tokens.isEmpty, !leadingPunct.isEmpty {
+                tokens.append(leadingPunct + span.text)
+                leadingPunct = ""
+            } else {
+                tokens.append(span.text)
+            }
             lastEnd = span.hi
         }
         if lastEnd < text.endIndex {

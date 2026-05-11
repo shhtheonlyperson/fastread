@@ -25,11 +25,12 @@ Use this section first. It reflects the successful May 8, 2026 upload and supers
 - Active key path: `~/.appstoreconnect/private_keys/AuthKey_ASC_KEY_ID_PLACEHOLDER.p8`
 - Stale/revoked key id to avoid: `REVOKED_ASC_KEY_ID_PLACEHOLDER`
 - Current TestFlight version line: `0.2.1`
-- Latest successfully uploaded build: `26`
-- Latest delivery/build UUID: `a1ebdb44-fcb1-4ecd-b8da-b4065aa27f7e`
+- Latest successfully uploaded build: `27`
+- Latest delivery/build UUID: `9e6ebe4c-ff18-490c-bc7b-a13cc8eb1c44`
 - Active distribution cert id: `DISTRIBUTION_CERT_ID_PLACEHOLDER` (issued 2026-05-09, replaces revoked `5853F89C…`)
 - Active provisioning profile UUID: `PROVISIONING_PROFILE_UUID_PLACEHOLDER`
-- Build `26` reached `IN_BETA_TESTING` directly because `Info.plist` declares `ITSAppUsesNonExemptEncryption=NO`; no manual export-compliance patch was needed.
+- Builds `26` and `27` reached `IN_BETA_TESTING` directly because `Info.plist` declares `ITSAppUsesNonExemptEncryption=NO`; no manual export-compliance patch was needed.
+- If `errSecInternalComponent` shows up during CodeSign, the dedicated `fastread-build.keychain-db` has auto-locked; unlock it (`security unlock-keychain -p fastread …`) and re-grant the partition list. See §"May 9, 2026 — login keychain CDSA hang gotcha" below.
 
 Important: do not trust `.env.local` blindly. During the May 8 release, `.env.local` pointed at revoked key `REVOKED_ASC_KEY_ID_PLACEHOLDER`.
 

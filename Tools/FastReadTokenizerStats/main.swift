@@ -21,8 +21,16 @@ import Foundation
 @main
 struct Main {
     static func main() {
-        let path = CommandLine.arguments.dropFirst().first
-            ?? "Tests/Fixtures/rsvp-gold-corpus.tsv"
+        // Optional `--epub <path>` mode: print chunk-shape stats over the
+        // flattened text of an actual EPUB chapter — gives a "real reading
+        // material" view that sits next to the curated gold-corpus run.
+        let cli = CommandLine.arguments.dropFirst()
+        if let idx = cli.firstIndex(of: "--epub"), idx + 1 < cli.endIndex {
+            let epubPath = cli[idx + 1]
+            runEpubMode(path: epubPath)
+            return
+        }
+        let path = cli.first ?? "Tests/Fixtures/rsvp-gold-corpus.tsv"
         let url = URL(fileURLWithPath: path)
         guard let raw = try? String(contentsOf: url, encoding: .utf8) else {
             fputs("❌ couldn't read \(path)\n", stderr)
@@ -87,6 +95,47 @@ struct Main {
             print("  gold:   \(row.gold.joined(separator: " | "))")
             print("  actual: \(row.actual.joined(separator: " | "))")
         }
+    }
+
+    // ---- EPUB-mode (real-world content sampling) -----------------------
+
+    static func runEpubMode(path: String) {
+        let url = URL(fileURLWithPath: path)
+        guard let data = try? Data(contentsOf: url) else {
+            fputs("❌ couldn't read \(path)\n", stderr)
+            exit(1)
+        }
+        let importer = EpubImporter()
+        guard importer.canHandle(data: data),
+              let doc = try? importer.import(data: data) else {
+            fputs("❌ not a valid EPUB at \(path)\n", stderr)
+            exit(1)
+        }
+        let text = Document.flattenText(doc)
+        let tokens = RSVPEngine.tokenize(text)
+        print("EPUB: \(doc.title)  (\(text.unicodeScalars.count) chars, \(tokens.count) tokens)")
+        let stats = chunkStats(tokens)
+        print(String(format: "  mean chunk length:    %.2f chars  %@",
+            stats.meanLen,
+            verdict(stats.meanLen, ideal: 2.5...3.0)))
+        print(String(format: "  %% singletons:         %5.1f%%      %@",
+            stats.pctSingletons * 100,
+            verdict(stats.pctSingletons * 100, max: 15)))
+        print(String(format: "  %% long (4+ CJK):      %5.1f%%      %@",
+            stats.pctLong * 100,
+            verdict(stats.pctLong * 100, max: 10)))
+        print(String(format: "  length variance:      %.2f       (lower = smoother rhythm)",
+            stats.lenVariance))
+        print(String(format: "  function-word orphans: %4.1f%%      %@",
+            stats.fnWordOrphans * 100,
+            verdict(stats.fnWordOrphans * 100, max: 5)))
+
+        // Sample 30 representative chunks for eyeball check.
+        print("\nFirst 30 chunks:")
+        for tok in tokens.prefix(30) { print("  \(tok)") }
+        print("\nRandom 30 from middle:")
+        let mid = max(0, tokens.count / 2 - 15)
+        for tok in tokens[mid..<min(tokens.count, mid + 30)] { print("  \(tok)") }
     }
 
     // ---- Boundary scoring -----------------------------------------------

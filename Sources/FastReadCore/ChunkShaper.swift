@@ -32,12 +32,45 @@ import Foundation
 enum ChunkShaper {
     static func shape(_ tokens: [String]) -> [String] {
         var result = mergeCrossScriptUnits(tokens)
+        result = mergePrepDigitNoun(result)
         // Coalesce BEFORE particles: otherwise 的's shorter-side rule
         // looks at single-Han stragglers (倫 from 周杰倫) instead of
         // the real modifier (周杰倫).
         result = coalesceSingleCharRuns(result)
         result = glueFunctionParticles(result)
         result = absorbStraySingletons(result)
+        return result
+    }
+
+    /// Preposition + Latin-digit run + multi-Han noun → one chunk.
+    /// Captures address / building / room-number patterns where the
+    /// preposition modifies a numbered place: 在|101|大樓 → 在101大樓.
+    /// Deliberately skipped when the noun is a single-Han measure word
+    /// (mergeCrossScriptUnits already handled e.g. 100|公斤) — the rule
+    /// is "prep + number + ≥2-char noun", which leaves 在2025年 as
+    /// `在 | 2025年` so the prep flashes alone like the corpus prefers.
+    private static let prepositionsForCompound: Set<Character> = [
+        "在", "從", "到", "向", "於",
+    ]
+
+    private static func mergePrepDigitNoun(_ tokens: [String]) -> [String] {
+        var result: [String] = []
+        var i = 0
+        while i < tokens.count {
+            let cur = tokens[i]
+            if cur.count == 1,
+               let c = cur.first,
+               prepositionsForCompound.contains(c),
+               i + 2 < tokens.count,
+               isDigitRun(tokens[i + 1]),
+               cjkCount(tokens[i + 2]) >= 2 {
+                result.append(cur + tokens[i + 1] + tokens[i + 2])
+                i += 3
+                continue
+            }
+            result.append(cur)
+            i += 1
+        }
         return result
     }
 
