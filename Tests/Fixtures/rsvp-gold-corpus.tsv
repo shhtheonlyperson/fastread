@@ -1,0 +1,79 @@
+# RSVP 速讀理想 chunk 邊界 — 手動修正用
+#
+# 每列三欄,tab 分隔:
+#   id    input    ideal-chunks  (chunks 用 `|` 分隔)
+#
+# 「ideal」= 你直覺看到 flash 過去最舒服的那種切法。原則:
+#   • 每塊 2–4 個 CJK 字,單字塊與 5+ 字塊都要少
+#   • 專名整塊不拆 (黃士旗 / 星巴克 / 陽明山)
+#   • 跨 script 複合單位整塊 (100公斤 / 25°C / HTTP/1.1)
+#   • 虛詞 (的 了 是 在 跟 和) 黏鄰居,不單獨閃
+#   • VP / PP 短的可整塊 (去吃飯 / 在桌上)
+#
+# 修法:
+#   1. 在編輯器裡開啟這個檔
+#   2. 對任何 chunks 不順眼的列,把 `|` 往左/往右移到你覺得對的位置
+#   3. 增刪 `|` 隨意。input 欄不要改。
+#   4. 存檔後跑:
+#        swift run FastReadTokenizerStats Tests/Fixtures/rsvp-gold-corpus.tsv
+#   5. 看 boundary F1 提升,確認方向對了就 commit。
+#
+# === People (10) ===
+zh-people-01	黃士旗去吃飯	黃士旗|去吃飯
+zh-people-02	蔡英文總統發表演說	蔡英文|總統|發表|演說
+zh-people-03	馬英九出訪美國	馬英九|出訪|美國
+zh-people-04	我跟王小明約見面	我跟|王小明|約見面
+zh-people-05	張三李四王五一起去陽明山	張三|李四|王五|一起|去|陽明山
+zh-people-06	林志玲是台灣女星	林志玲|是|台灣|女星
+zh-people-07	周杰倫的新歌很好聽	周杰倫|的新歌|很好聽
+zh-people-08	老師告訴學生王大文	老師|告訴|學生|王大文
+zh-people-09	跟阿明一起去看電影	跟阿明|一起|去看|電影
+zh-people-10	孔子曰學而時習之	孔子曰|學而|時習之
+# === Places (5) ===
+zh-place-01	我去陽明山健行	我|去|陽明山|健行
+zh-place-02	從台北到高雄要四小時	從台北|到高雄|要|四小時
+zh-place-03	信義區的新光三越很大	信義區的|新光三越|很大
+zh-place-04	中華民國的總統府	中華民國|的總統府
+zh-place-05	在101大樓上班	在101大樓|上班
+# === Brands / Compounds (5) ===
+zh-brand-01	星巴克的拿鐵很好喝	星巴克的|拿鐵|很好喝
+zh-brand-02	可口可樂跟百事可樂競爭	可口可樂|跟|百事可樂|競爭
+zh-brand-03	麥當勞推出新漢堡	麥當勞|推出|新漢堡
+zh-brand-04	7-Eleven 24 小時營業	7-Eleven|24 小時|營業
+zh-brand-05	博客來書店打折	博客來|書店|打折
+# === Numbers + Units (5) ===
+zh-num-01	重量 100 公斤	重量|100公斤
+zh-num-02	今天氣溫 25°C	今天|氣溫|25°C
+zh-num-03	成長率達 12.5% 創新高	成長率|達|12.5%|創新高
+zh-num-04	等了 5 個月	等了|5個月
+zh-num-05	距離 3 公里	距離|3公里
+# === Tech / Code / URL (5) ===
+zh-tech-01	Apple 在 2025 年發表 MacBook Pro	Apple|在|2025年|發表|MacBook Pro
+zh-tech-02	我用 VS Code 寫程式	我用|VS Code|寫程式
+zh-tech-03	詳情見 https://example.com/docs	詳情|見|https://example.com/docs
+zh-tech-04	RFC-7231 描述 HTTP/1.1	RFC-7231|描述|HTTP/1.1
+zh-tech-05	fetchUser() 取得使用者資料	fetchUser()|取得|使用者|資料
+# === Quotes / Punctuation (3) ===
+zh-quote-01	他說「Hello, world」就走了	他說|「Hello, world」|就走了
+zh-quote-02	「快速閱讀」是門學問	「快速閱讀」|是門|學問
+zh-quote-03	老師問我懂了嗎	老師|問我|懂了嗎
+# === Classical / Literary (3) ===
+zh-class-01	道可道非常道	道可道|非常道
+zh-class-02	學而時習之不亦說乎	學而|時習之|不亦|說乎
+zh-class-03	朝聞道夕死可矣	朝聞道|夕死|可矣
+# === Daily / Conversational (10) ===
+zh-daily-01	我去吃飯了	我|去吃飯了
+zh-daily-02	你來看一下	你來|看一下
+zh-daily-03	等一下我馬上來	等一下|我|馬上來
+zh-daily-04	好的沒問題	好的|沒問題
+zh-daily-05	怎麼辦才好	怎麼辦|才好
+zh-daily-06	不要走那麼快	不要|走|那麼快
+zh-daily-07	慢慢來不要急	慢慢來|不要急
+zh-daily-08	拿出來給我看	拿出來|給我看
+zh-daily-09	我打算今天回家	我打算|今天|回家
+zh-daily-10	謝謝你的幫忙	謝謝|你的|幫忙
+# === Modern / Abstract (4) ===
+zh-mod-01	元宇宙是個新概念	元宇宙|是個|新概念
+zh-mod-02	區塊鏈技術正夯	區塊鏈|技術|正夯
+zh-mod-03	人工智慧改變世界	人工智慧|改變|世界
+zh-mod-04	大數據時代來臨	大數據|時代|來臨

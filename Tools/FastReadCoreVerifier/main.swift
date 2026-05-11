@@ -12,7 +12,7 @@ let tokens = RSVPEngine.tokenize("  Read\tfast.\nNow  ")
 expect(tokens == ["Read", "fast.", "Now"], "tokenize should split whitespace and preserve punctuation")
 expect(RSVPEngine.tokenize("Read\u{00a0}fast") == ["Read", "fast"], "tokenize should normalize nbsp")
 expect(
-    RSVPEngine.tokenize("快速閱讀，眼睛更輕鬆。") == ["快速", "閱讀，", "眼睛", "更", "輕鬆。"],
+    RSVPEngine.tokenize("快速閱讀，眼睛更輕鬆。") == ["快速", "閱讀，", "眼睛", "更輕鬆。"],
     "tokenize should split Traditional Chinese using word boundaries with punctuation attached"
 )
 expect(
@@ -20,12 +20,16 @@ expect(
     "tokenize should preserve mixed Latin and CJK runs"
 )
 expect(
-    RSVPEngine.tokenize("Apple在2025年發表新MacBook Pro") == ["Apple", "在", "2025", "年", "發表", "新", "MacBook", "Pro"],
+    RSVPEngine.tokenize("Apple在2025年發表新MacBook Pro") == ["Apple", "在", "2025年", "發表新", "MacBook", "Pro"],
     "tokenize should not drop tokens at script boundaries"
 )
 expect(
-    RSVPEngine.tokenize("黃士旗去吃飯", userDictionary: ["黃士旗"]) == ["黃士旗", "去", "吃飯"],
-    "user dictionary should merge known names back into a single token"
+    RSVPEngine.tokenize("黃士旗去吃飯") == ["黃士旗", "去吃飯"],
+    "ChunkShaper should auto-merge 4-char Han runs into name + VP rhythm"
+)
+expect(
+    RSVPEngine.tokenize("張三王老師很嚴格", userDictionary: ["王老師"]) == ["張三", "王老師", "很嚴格"],
+    "user dictionary should still help when adjacent multi-char chunks should fuse"
 )
 
 expect(RSVPEngine.focusIndex(in: "a") == 0, "one focusable character should use index 0")

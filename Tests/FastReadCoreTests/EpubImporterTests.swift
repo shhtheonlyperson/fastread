@@ -55,13 +55,14 @@ final class EpubImporterTests: XCTestCase {
         let flat = Document.flattenText(doc)
         XCTAssertTrue(flat.contains("道可道，非常道。"))
 
-        // Hybrid Apple-NLTokenizer baseline: 55 tokens for the bundled Tao
-        // Te Ching three-chapter fixture. Earlier 41-token figure came from
-        // the retired JS reader-core which used fixed bigram chunking.
-        // +/-4% (~2 tokens) tolerance accommodates ICU dictionary tweaks.
+        // Post-ChunkShaper baseline: 36 tokens for the bundled Tao Te
+        // Ching three-chapter fixture. ICU produces ~55 over-segmented
+        // single-Han chunks that the shaper fuses into 2-3 char rhythm
+        // groups (道可道 / 非常道 / etc.) for RSVP-friendly playback.
+        // +/-6% (~2 tokens) tolerance covers minor rule tweaks.
         let tokenCount = RSVPEngine.tokenize(flat).count
-        let baseline = 55
-        let tolerance = max(1, Int((Double(baseline) * 0.04).rounded()))
+        let baseline = 36
+        let tolerance = max(1, Int((Double(baseline) * 0.06).rounded()))
         XCTAssertLessThanOrEqual(
             abs(tokenCount - baseline), tolerance,
             "Tao token count \(tokenCount) outside +/-\(tolerance) of NL baseline \(baseline)"

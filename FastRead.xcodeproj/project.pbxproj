@@ -12,6 +12,7 @@
 		09AD17DA1A143CDDE10A3F10 /* ReadingArticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98798242F669C12BF85C749E /* ReadingArticle.swift */; };
 		0C265CD8831A4E689904BAC3 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADE6B2CF9774E32ADEF766C /* Document.swift */; };
 		0D60DE15C487A9CE6E5EDE59 /* RSVPEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4B7F5A93890ABF14673F1C /* RSVPEngine.swift */; };
+		C8A2F31E5E4D4C9F8B127A50 /* ChunkShaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A2F31E5E4D4C9F8B127A51 /* ChunkShaper.swift */; };
 		15552BB9DA20A949BB01CD56 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0E00466B5860507CB216E6 /* Models.swift */; };
 		1D831D8C8E97EEBC9578AEF3 /* AddSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E2F445EF5E719C926A5E96 /* AddSourceView.swift */; };
 		29D48A3F31278EA97CBE6371 /* StorageMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA151E47FA34E4D70C3359E /* StorageMigration.swift */; };
@@ -58,6 +59,7 @@
 		EE2A1F36E0B2E2A8AF8F22F7 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		F01674E5AD04A666B0ACBAD9 /* Fraunces.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces.ttf; sourceTree = "<group>"; };
 		FA4B7F5A93890ABF14673F1C /* RSVPEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSVPEngine.swift; sourceTree = "<group>"; };
+		C8A2F31E5E4D4C9F8B127A51 /* ChunkShaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChunkShaper.swift; sourceTree = "<group>"; };
 		FDD8F34083BFBDE1B7AE4876 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		FEED61BDDD8732C345E85E72 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -131,6 +133,7 @@
 				98798242F669C12BF85C749E /* ReadingArticle.swift */,
 				38B1E41A59263BDDBD274708 /* ReadingStore.swift */,
 				FA4B7F5A93890ABF14673F1C /* RSVPEngine.swift */,
+				C8A2F31E5E4D4C9F8B127A51 /* ChunkShaper.swift */,
 				9BA151E47FA34E4D70C3359E /* StorageMigration.swift */,
 				7824B9896AB1602B9EEBD45E /* UrlIngest.swift */,
 			);
@@ -261,6 +264,7 @@
 				9FE51353B9131D0A8F8118F2 /* LibraryView.swift in Sources */,
 				15552BB9DA20A949BB01CD56 /* Models.swift in Sources */,
 				0D60DE15C487A9CE6E5EDE59 /* RSVPEngine.swift in Sources */,
+				C8A2F31E5E4D4C9F8B127A50 /* ChunkShaper.swift in Sources */,
 				95D09B32C7D345423240EBC0 /* ReaderView.swift in Sources */,
 				09AD17DA1A143CDDE10A3F10 /* ReadingArticle.swift in Sources */,
 				056374111C5ECA1B6ABAD815 /* ReadingStore.swift in Sources */,

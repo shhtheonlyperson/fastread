@@ -283,18 +283,24 @@ final class ReadingStoreTests: XCTestCase {
     }
 
     func testUserDictionaryAffectsCurrentArticleTokens() {
+        // Picking an input the ChunkShaper alone can't fix: ICU splits
+        // 張三 / 王 / 老師 into a 2-char chunk + a single Han + a 2-char
+        // chunk. The shaper has to guess where the boundary belongs and
+        // absorbs 王 backward into 張三 (= 張三王 | 老師). Adding 王老師
+        // to the dictionary tells the merge step to fuse 王 + 老師 *before*
+        // the shaper sees the input, fixing the chunk.
         let store = makeStore()
-        store.addDraftArticle(text: "黃士旗去吃飯與星巴克碰面。", title: "Note")
+        store.addDraftArticle(text: "張三王老師很嚴格,蔡英文也是。", title: "Note")
 
-        // Without any dictionary entries the names get split.
-        XCTAssertEqual(store.currentTokens.first, "黃")
+        // Without dictionary, the 王 lands with the wrong neighbour.
+        XCTAssertTrue(store.currentTokens.contains("張三王"))
+        XCTAssertFalse(store.currentTokens.contains("王老師"))
 
-        store.addToUserDictionary("黃士旗")
-        store.addToUserDictionary("星巴克")
+        store.addToUserDictionary("王老師")
 
-        // Cache must invalidate so the new tokens reflect the dictionary.
-        XCTAssertEqual(store.currentTokens.first, "黃士旗")
-        XCTAssertTrue(store.currentTokens.contains("星巴克"))
+        // Cache invalidated; the new tokens reflect the dictionary.
+        XCTAssertFalse(store.currentTokens.contains("張三王"))
+        XCTAssertTrue(store.currentTokens.contains("王老師"))
     }
 
     func testUserDictionaryRoundTripsThroughUserDefaults() {

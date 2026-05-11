@@ -181,7 +181,12 @@ public enum RSVPEngine {
                 )
             }
         }
-        return tokens
+        // ICU + script-split alone over-segments — names, particles, and
+        // number+measure-word pairs come out as single Han chars. The
+        // ChunkShaper post-pass merges those back into rhythmic 2–4 char
+        // chunks that match how the eye-brain pipeline actually reads.
+        // See Tools/FastReadTokenizerStats + Tests/Fixtures/rsvp-gold-corpus.tsv.
+        return ChunkShaper.shape(tokens)
     }
 
     private static func splitByScript(_ input: String) -> [(text: String, isCJK: Bool)] {

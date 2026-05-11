@@ -9,13 +9,16 @@ final class RSVPEngineTests: XCTestCase {
     }
 
     func testTokenizeHandlesTraditionalSimplifiedAndMixedCJK() {
+        // ChunkShaper rhythm rules merge orphan particles + content adverbs
+        // (更 / 让) with their semantic neighbour. The bare ICU output here
+        // was 5 singletons; the shaped output is 4 rhythmic chunks.
         XCTAssertEqual(
             RSVPEngine.tokenize("快速閱讀，眼睛更輕鬆。"),
-            ["快速", "閱讀，", "眼睛", "更", "輕鬆。"]
+            ["快速", "閱讀，", "眼睛", "更輕鬆。"]
         )
         XCTAssertEqual(
             RSVPEngine.tokenize("快速阅读让注意力更稳定。"),
-            ["快速", "阅读", "让", "注意力", "更", "稳定。"]
+            ["快速", "阅读让", "注意力", "更稳定。"]
         )
         XCTAssertEqual(
             RSVPEngine.tokenize("JustRead 支援中文。"),
@@ -24,16 +27,16 @@ final class RSVPEngineTests: XCTestCase {
     }
 
     func testTokenizePreservesContentAtChineseEnglishBoundaries() {
-        // The previous tokenizer + NLTokenizer alone both dropped tokens at
-        // script boundaries (Apple/MacBook Pro etc.). The hybrid pipeline must
-        // keep every word.
+        // The hybrid pipeline still keeps every word at the script boundary
+        // — the shaper additionally merges digit + 年 / 新 + … into compact
+        // 2–3 char rhythm groups.
         XCTAssertEqual(
             RSVPEngine.tokenize("Apple在2025年發表新MacBook Pro"),
-            ["Apple", "在", "2025", "年", "發表", "新", "MacBook", "Pro"]
+            ["Apple", "在", "2025年", "發表新", "MacBook", "Pro"]
         )
         XCTAssertEqual(
             RSVPEngine.tokenize("我用VS Code寫iOS app"),
-            ["我", "用", "VS", "Code", "寫", "iOS", "app"]
+            ["我用", "VS", "Code", "寫", "iOS", "app"]
         )
     }
 
@@ -46,7 +49,7 @@ final class RSVPEngineTests: XCTestCase {
         )
         XCTAssertEqual(
             RSVPEngine.tokenize("可參考 RFC-7231 (HTTP/1.1)"),
-            ["可", "參考", "RFC-7231", "(HTTP/1.1)"]
+            ["可參考", "RFC-7231", "(HTTP/1.1)"]
         )
         XCTAssertEqual(
             RSVPEngine.tokenize("Dr. Smith 在 NTU 教 AI 課程"),
@@ -55,17 +58,22 @@ final class RSVPEngineTests: XCTestCase {
     }
 
     func testTokenizeUserDictionaryMergesProperNouns() {
+        // The shaper now auto-merges 黃士旗 even without a dictionary, via
+        // the 4-char Han-run + peel-forward rule. Where the dictionary
+        // still matters is when ICU produces *adjacent multi-char* chunks
+        // that ought to fuse (王 + 老師 → 王老師) — the shaper alone has
+        // no way to know that the 王 belongs to the next word.
         XCTAssertEqual(
             RSVPEngine.tokenize("黃士旗去吃飯"),
-            ["黃", "士", "旗", "去", "吃飯"]
+            ["黃士旗", "去吃飯"]
         )
         XCTAssertEqual(
-            RSVPEngine.tokenize("黃士旗去吃飯", userDictionary: ["黃士旗"]),
-            ["黃士旗", "去", "吃飯"]
+            RSVPEngine.tokenize("張三王老師很嚴格"),
+            ["張三王", "老師", "很嚴格"]
         )
         XCTAssertEqual(
-            RSVPEngine.tokenize("蔡英文總統訪問星巴克", userDictionary: ["蔡英文", "星巴克"]),
-            ["蔡英文", "總統", "訪問", "星巴克"]
+            RSVPEngine.tokenize("張三王老師很嚴格", userDictionary: ["王老師"]),
+            ["張三", "王老師", "很嚴格"]
         )
     }
 
