@@ -136,6 +136,23 @@ struct Main {
         print("\nRandom 30 from middle:")
         let mid = max(0, tokens.count / 2 - 15)
         for tok in tokens[mid..<min(tokens.count, mid + 30)] { print("  \(tok)") }
+
+        // Chapter-1-ish slice (~ first 1500 scalars after the front matter).
+        let frontMatterScalars = 600
+        let bodyStart = text.unicodeScalars.index(
+            text.unicodeScalars.startIndex,
+            offsetBy: min(frontMatterScalars, text.unicodeScalars.count - 1)
+        )
+        let bodyEnd = text.unicodeScalars.index(
+            bodyStart,
+            offsetBy: min(1500, text.unicodeScalars.count - frontMatterScalars - 1)
+        )
+        let chapter = String(text.unicodeScalars[bodyStart..<bodyEnd])
+        let chapterTokens = RSVPEngine.tokenize(chapter)
+        print("\nChapter-1-ish slice (\(chapter.unicodeScalars.count) chars → \(chapterTokens.count) chunks):")
+        for (i, tok) in chapterTokens.enumerated() {
+            print("  \(i+1). \(tok)")
+        }
     }
 
     // ---- Boundary scoring -----------------------------------------------

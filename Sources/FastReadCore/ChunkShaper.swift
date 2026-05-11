@@ -229,6 +229,11 @@ enum ChunkShaper {
         chunk.filter(isHanCharacter).count
     }
 
+    private static func endsInHardPunct(_ chunk: String) -> Bool {
+        guard let last = chunk.last else { return false }
+        return hardClauseEndings.contains(last)
+    }
+
     // MARK: - Pass 3: coalesce runs of single CJK chunks
 
     /// Walk the token stream looking for runs of 3+ adjacent single-Han
@@ -245,7 +250,30 @@ enum ChunkShaper {
     /// wants split as `pronoun-V | rest` rather than `pronoun-V-V`.
     /// e.g., 你來看一下 → 你來 | 看一下 (gold) instead of 你來看 | 一下.
     private static let pronouns: Set<Character> = [
-        "我", "你", "他", "她", "它", "您", "咱",
+        "我", "你", "他", "她", "它", "您", "咱", "妳",
+    ]
+
+    /// Motion / aspect verbs that commonly start a VP right after a name,
+    /// signalling a k=4 run should split as `name(3) | verb-led VP(N)`.
+    /// Used to *guard* the k=4 peel rule so it only fires when the 4th
+    /// run char looks verb-like — keeps `黃|士|旗|去 + 吃飯 → 黃士旗 |
+    /// 去吃飯` while leaving `阿|娜|擦|得 + 發光 → 阿娜 | 擦得 | 發光`
+    /// (得 isn't a motion verb, the run is name + verb + complement).
+    private static let peelForwardVerbs: Set<Character> = [
+        "去", "來", "回", "走", "上", "下", "進", "出",
+        "看", "說", "講", "做", "想", "聽", "讀", "寫",
+        "吃", "喝", "買", "賣", "找",
+    ]
+
+    /// Hard punctuation that ends a clause / sentence — absorbing a
+    /// stray singleton backward across one of these glues content from
+    /// a new clause onto the tail of the old one (e.g., 說謊。+也 →
+    /// 說謊。也). Block backward-absorb when the previous chunk ends
+    /// with any of these.
+    private static let hardClauseEndings: Set<Character> = [
+        "。", "，", "！", "？", "；", "：",
+        "」", "』", "）", "》", "〉",
+        ".", ",", "!", "?", ";", ":",
     ]
 
     private static func coalesceSingleCharRuns(_ tokens: [String]) -> [String] {
@@ -282,11 +310,20 @@ enum ChunkShaper {
                     continue
                 }
                 if runLen == 4, nextHasRoom {
-                    // Name-led 4 + VP: 黃|士|旗|去 + 吃飯 → 黃士旗 | 去吃飯.
-                    result.append(tokens[i..<(i + 3)].joined())
-                    result.append(tokens[i + 3] + tokens[j])
-                    i = j + 1
-                    continue
+                    // Name-led 4 + VP: only peel when there's a positive
+                    // signal that the run actually splits as name(3) +
+                    // verb. Without the guard this rule splits 阿娜 +
+                    // 擦得 + 發光 into 阿娜擦 / 得發光 (treating 得 as a
+                    // verb when it's a complement marker).
+                    let fourthChar = tokens[i + 3].first
+                    let peel = runHasPronoun
+                        || (fourthChar.map { peelForwardVerbs.contains($0) } ?? false)
+                    if peel {
+                        result.append(tokens[i..<(i + 3)].joined())
+                        result.append(tokens[i + 3] + tokens[j])
+                        i = j + 1
+                        continue
+                    }
                 }
                 if runLen == 5, nextHasRoom, cjkCount(tokens[j]) == 1 {
                     result.append(tokens[i..<(i + 3)].joined())
@@ -302,14 +339,21 @@ enum ChunkShaper {
                 }
                 i = j
             } else if runLen == 2 {
-                // Merge a 2-singleton run only when the following chunk
-                // isn't already a multi-Han phrase that should "claim"
-                // the second singleton. This preserves `我 | 去吃飯了`
-                // (next = 吃飯了, multi → leave 我 and 去 alone) while
-                // still fixing `我用 | VS Code` (next = Latin → merge).
+                // Merge a 2-singleton run when:
+                //   • next is non-multi-CJK (so the second singleton
+                //     has nothing better to bind with — fixes
+                //     `我用 + VS Code` → `我用 | VS Code`), OR
+                //   • next is multi but neither singleton is a pronoun
+                //     (so `怡 + 婷 + 常常` reads as `怡婷 | 常常` and the
+                //     name stays together — without this the 婷 ends
+                //     up forward-absorbed into 常常).
+                // Pronoun guard keeps the S+VP rhythm: `我 | 去 +
+                // 吃飯了` doesn't collapse to `我去 | 吃飯了`.
                 let nextNotMultiCJK = j >= tokens.count
                     || cjkCount(tokens[j]) < 2
-                if nextNotMultiCJK {
+                let neitherIsPronoun = !(tokens[i].first.map { pronouns.contains($0) } ?? false)
+                    && !(tokens[i + 1].first.map { pronouns.contains($0) } ?? false)
+                if nextNotMultiCJK || neitherIsPronoun {
                     result.append(tokens[i..<j].joined())
                     i = j
                 } else {
@@ -345,10 +389,15 @@ enum ChunkShaper {
                 i += 1
                 continue
             }
-            // Backward into multi-char prev (cap 3).
+            // Backward into multi-char prev (cap 3). Skip when the
+            // previous chunk ends in clause-ending punctuation — that
+            // boundary is a hard semantic break, and merging across it
+            // produces `說謊。也` / `遊子。一` style fusion across two
+            // sentences.
             if let last = result.last,
                cjkCount(last) >= 2,
-               cjkCount(last) + 1 <= 3 {
+               cjkCount(last) + 1 <= 3,
+               !endsInHardPunct(last) {
                 result[result.count - 1] = last + cur
                 i += 1
                 continue
