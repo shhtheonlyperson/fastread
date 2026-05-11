@@ -25,12 +25,14 @@ Use this section first. It reflects the successful May 10, 2026 upload and super
 - Active key path: `~/.appstoreconnect/private_keys/AuthKey_ASC_KEY_ID_PLACEHOLDER.p8`
 - Stale/revoked key id to avoid: `REVOKED_ASC_KEY_ID_PLACEHOLDER`
 - Current TestFlight version line: `0.2.1`
-- Latest successfully uploaded build: `28`
-- Latest delivery/build UUID: `4bcbf71f-a187-43dd-ad77-5898cfdf3fb4`
+- Latest successfully uploaded build: `29`
+- Latest delivery/build UUID: `ffd4036a-af46-4bab-8357-d40c40a16738`
 - Active distribution cert id: `DISTRIBUTION_CERT_ID_PLACEHOLDER` (issued 2026-05-09, replaces revoked `5853F89C…`)
 - Active provisioning profile UUID: `PROVISIONING_PROFILE_UUID_PLACEHOLDER`
-- Builds `26`, `27`, and `28` reached `IN_BETA_TESTING` directly because `Info.plist` declares `ITSAppUsesNonExemptEncryption=NO`; no manual export-compliance patch was needed.
+- Builds `26`, `27`, `28`, and `29` all reached `IN_BETA_TESTING` directly because `Info.plist` declares `ITSAppUsesNonExemptEncryption=NO`; no manual export-compliance patch was needed.
+- Android counterpart now at `0.2.1` versionCode `4` — signed AAB at `android-spike/app/build/outputs/bundle/release/app-release.aab`, awaiting Play Console first-time browser setup before fastlane can upload (see [`docs/PLAY_CONSOLE_ANDROID.md`](PLAY_CONSOLE_ANDROID.md)).
 - If `errSecInternalComponent` shows up during CodeSign, the dedicated `fastread-build.keychain-db` has auto-locked; unlock it (`security unlock-keychain -p fastread …`) and re-grant the partition list. See §"May 9, 2026 — login keychain CDSA hang gotcha" below.
+- If `xcrun altool` rejects an upload with `ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE` and `previousBundleVersion: N`, that build number is already registered on ASC even if it never reached your TestFlight UI — bump `CURRENT_PROJECT_VERSION` to `N+1` and re-archive. Build 28 burned this way on 2026-05-11.
 
 Important: do not trust `.env.local` blindly. During the May 8 release, `.env.local` pointed at revoked key `REVOKED_ASC_KEY_ID_PLACEHOLDER`.
 
