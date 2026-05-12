@@ -17,27 +17,18 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        Group {
-            if store.currentArticle == nil {
-                emptyReader
-            } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        header
-                        if inFrontMatter, let fm = frontMatter {
-                            skipIntroBanner(fm: fm)
-                                .padding(.horizontal, 24)
-                                .padding(.bottom, 12)
-                        }
-                        stageCard
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
-                        paceControl
-                            .padding(.top, 22)
-                    }
-                    .padding(.bottom, 112)
+        GeometryReader { proxy in
+            let isLandscape = proxy.size.width > proxy.size.height
+            Group {
+                if store.currentArticle == nil {
+                    emptyReader
+                } else if isLandscape {
+                    landscapeReader
+                } else {
+                    portraitReader
                 }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .background(JRColor.paper)
         .overlay(alignment: .bottom) {
@@ -52,6 +43,42 @@ struct ReaderView: View {
                 store.pause()
             }
         }
+    }
+
+    private var portraitReader: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                header()
+                if inFrontMatter, let fm = frontMatter {
+                    skipIntroBanner(fm: fm)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 12)
+                }
+                stageCard()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                paceControl()
+                    .padding(.top, 22)
+            }
+            .padding(.bottom, 112)
+        }
+    }
+
+    private var landscapeReader: some View {
+        VStack(spacing: 8) {
+            header(compact: true)
+            if inFrontMatter, let fm = frontMatter {
+                skipIntroBanner(fm: fm)
+                    .padding(.bottom, 2)
+            }
+            stageCard(compact: true)
+            paceControl(compact: true)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .clipped()
     }
 
     private func skipIntroBanner(fm: Document.FrontMatterDetection) -> some View {
@@ -162,7 +189,7 @@ struct ReaderView: View {
         .padding(.horizontal, 24)
     }
 
-    private var header: some View {
+    private func header(compact: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Button(action: onBack) {
@@ -195,25 +222,26 @@ struct ReaderView: View {
             }
 
             Text(store.currentArticle?.title ?? "Untitled")
-                .font(JRFont.serif(22, weight: .medium))
+                .font(JRFont.serif(compact ? 18 : 22, weight: .medium))
                 .tracking(-0.4)
                 .lineSpacing(1)
                 .foregroundStyle(JRColor.ink)
-                .padding(.top, 12)
+                .lineLimit(compact ? 1 : 2)
+                .padding(.top, compact ? 6 : 12)
 
             Text(articleMeta)
                 .font(JRFont.sans(12))
                 .foregroundStyle(JRColor.inkQuiet)
                 .lineLimit(1)
-                .padding(.top, 8)
+                .padding(.top, compact ? 3 : 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 60)
-        .padding(.horizontal, 24)
-        .padding(.bottom, 16)
+        .padding(.top, compact ? 0 : 60)
+        .padding(.horizontal, compact ? 0 : 24)
+        .padding(.bottom, compact ? 4 : 16)
     }
 
-    private var stageCard: some View {
+    private func stageCard(compact: Bool = false) -> some View {
         JRCard(padding: 0) {
             VStack(spacing: 0) {
                 ZStack {
@@ -221,19 +249,19 @@ struct ReaderView: View {
                         token: store.currentToken,
                         focusStyle: store.focusIndicator
                     )
-                    .frame(minHeight: 180)
+                    .frame(minHeight: compact ? 112 : 180)
 
-                    EnterFocusPlayButton(action: onFocus)
+                    EnterFocusPlayButton(action: onFocus, compact: compact)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 20)
-                .padding(.bottom, 8)
+                .padding(.horizontal, compact ? 12 : 16)
+                .padding(.top, compact ? 8 : 20)
+                .padding(.bottom, compact ? 4 : 8)
 
                 progressScrubber
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, store.currentIndex >= store.currentTokens.count - 1 ? 12 : 20)
+                    .padding(.horizontal, compact ? 12 : 16)
+                    .padding(.bottom, compact ? 10 : (store.currentIndex >= store.currentTokens.count - 1 ? 12 : 20))
 
-                if store.currentIndex >= store.currentTokens.count - 1, !store.currentTokens.isEmpty {
+                if !compact, store.currentIndex >= store.currentTokens.count - 1, !store.currentTokens.isEmpty {
                     doneStrip
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
@@ -290,14 +318,14 @@ struct ReaderView: View {
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 
-    private var paceControl: some View {
+    private func paceControl(compact: Bool = false) -> some View {
         VStack(spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 SectionLabel(text: "Pace")
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(Int(store.wpm.rounded()))")
-                        .font(JRFont.serif(22, weight: .semibold))
+                        .font(JRFont.serif(compact ? 18 : 22, weight: .semibold))
                         .foregroundStyle(JRColor.ink)
                     Text("wpm")
                         .font(JRFont.mono(11))
@@ -336,7 +364,7 @@ struct ReaderView: View {
             .tracking(0.6)
             .foregroundStyle(JRColor.inkQuiet)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, compact ? 8 : 24)
     }
 
     private var minutesLeftLabel: String {
@@ -374,7 +402,7 @@ struct FocusModeView: View {
                     Spacer()
 
                     Button {
-                        isPresented = false
+                        closeFocusMode()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .bold))
@@ -406,7 +434,15 @@ struct FocusModeView: View {
         .onTapGesture {
             store.pause()
         }
+        .onDisappear {
+            store.pause()
+        }
         .focusStatusBarHidden()
+    }
+
+    private func closeFocusMode() {
+        store.pause()
+        isPresented = false
     }
 
     private var focusTransport: some View {
@@ -567,17 +603,25 @@ private struct FocusIndicator: View {
 
 private struct EnterFocusPlayButton: View {
     let action: () -> Void
+    var compact = false
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "play.fill")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(JRColor.ink.opacity(0.34))
-                .padding(.leading, 2)
-                .frame(width: 52, height: 52)
-                .background(JRColor.ink.opacity(0.035))
-                .clipShape(Circle())
-                .overlay(Circle().stroke(JRColor.ink.opacity(0.10), lineWidth: 0.5))
+            ZStack {
+                Circle()
+                    .fill(.regularMaterial)
+                    .frame(width: compact ? 72 : 88, height: compact ? 72 : 88)
+                    .shadow(color: JRColor.ink.opacity(0.16), radius: 16, x: 0, y: 8)
+
+                Circle()
+                    .fill(JRColor.terracotta.opacity(0.94))
+                    .frame(width: compact ? 56 : 66, height: compact ? 56 : 66)
+
+                Image(systemName: "play.fill")
+                    .font(.system(size: compact ? 22 : 26, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.leading, 3)
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play in focus mode")

@@ -11,9 +11,18 @@
 
 package com.shhtheonlyperson.fastread.spike
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,13 +35,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,8 +57,10 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -63,6 +77,8 @@ import com.shhtheonlyperson.fastread.spike.ui.RSVPStage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import java.util.zip.ZipFile
 import kotlin.math.abs
 
 private const val TAG = "FastReadSpike"
@@ -93,7 +109,45 @@ private fun JustReadApp(autoSweepSeconds: Int? = null) {
     var article by remember { mutableStateOf(store.article.ifEmpty { DEFAULT_SAMPLE }) }
     var wpm by remember { mutableIntStateOf(store.wpm) }
     var index by remember { mutableIntStateOf(store.index) }
+    var importStatus by remember { mutableStateOf("") }
+    var localEpubs by remember { mutableStateOf(findLocalEpubFiles(context)) }
     val dictionary = remember { store.dictionary.toMutableStateList() }
+    val activity = context.findActivity()
+
+    LaunchedEffect(screen) {
+        activity?.requestedOrientation = when (screen) {
+            Screen.Reader -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+            Screen.Paste, Screen.Settings -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
+    fun loadArticleFromEpub(name: String, text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) {
+            importStatus = "Could not read that EPUB."
+            return
+        }
+        article = trimmed
+        store.article = trimmed
+        index = 0
+        store.index = 0
+        importStatus = "Loaded $name"
+        screen = Screen.Reader
+    }
+
+    val epubPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val name = context.displayName(uri) ?: "EPUB"
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                EpubTextExtractor.extract(input.readBytes())
+            }.orEmpty()
+        }.onSuccess { text ->
+            loadArticleFromEpub(name, text)
+        }.onFailure {
+            importStatus = "Could not read that EPUB."
+        }
+    }
 
     when (screen) {
         Screen.Paste -> PasteScreen(
@@ -109,6 +163,23 @@ private fun JustReadApp(autoSweepSeconds: Int? = null) {
                 screen = Screen.Reader
             },
             onSettings = { screen = Screen.Settings },
+            status = importStatus,
+            localEpubs = localEpubs,
+            onRefreshLocalEpubs = { localEpubs = findLocalEpubFiles(context) },
+            onPickEpub = {
+                localEpubs = findLocalEpubFiles(context)
+                epubPicker.launch(arrayOf("application/epub+zip", "application/octet-stream", "*/*"))
+            },
+            onImportLocalEpub = { file ->
+                runCatching {
+                    EpubTextExtractor.extract(file.file.readBytes())
+                }.onSuccess { text ->
+                    loadArticleFromEpub(file.displayName, text)
+                    localEpubs = findLocalEpubFiles(context)
+                }.onFailure {
+                    importStatus = "Could not read that EPUB."
+                }
+            },
         )
         Screen.Reader -> ReaderScreen(
             article = article,
@@ -147,7 +218,16 @@ private fun PasteScreen(
     onArticleChange: (String) -> Unit,
     onRead: () -> Unit,
     onSettings: () -> Unit,
+    status: String,
+    localEpubs: List<LocalEpubFile>,
+    onRefreshLocalEpubs: () -> Unit,
+    onPickEpub: () -> Unit,
+    onImportLocalEpub: (LocalEpubFile) -> Unit,
 ) {
+    LaunchedEffect(Unit) {
+        onRefreshLocalEpubs()
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 60.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -181,6 +261,26 @@ private fun PasteScreen(
             ),
             cursorBrush = SolidColor(JRColor.terracotta),
         )
+
+        SectionLabel("EPUB BOOK")
+        SecondaryButton(label = "Pick EPUB", onTap = onPickEpub, testTag = "pick-epub-button")
+
+        if (status.isNotBlank()) {
+            Text(
+                status.uppercase(),
+                color = JRColor.inkQuiet,
+                fontSize = 11.sp,
+                fontFamily = JRFont.mono,
+                letterSpacing = 0.66.sp,
+            )
+        }
+
+        if (localEpubs.isNotEmpty()) {
+            SectionLabel("FILES FOLDER")
+            localEpubs.forEach { file ->
+                LocalEpubButton(file = file, onTap = { onImportLocalEpub(file) })
+            }
+        }
 
         PrimaryButton(label = "READ", onTap = onRead, testTag = "read-button")
         SecondaryButton(label = "Custom words", onTap = onSettings, testTag = "settings-button")
@@ -274,9 +374,38 @@ private fun ReaderScreen(
         }
     }
 
+    fun playFromCurrent() {
+        if (index >= tokens.size - 1) {
+            index = 0
+            onIndexChange(0)
+        }
+        start()
+    }
+
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    var wasLandscape by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(isLandscape) {
+        if (wasLandscape && !isLandscape) {
+            stop()
+        }
+        wasLandscape = isLandscape
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            stop()
+        }
+    }
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 60.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .padding(top = if (isLandscape) 24.dp else 60.dp)
+            .then(if (isLandscape) Modifier else Modifier.verticalScroll(scrollState)),
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -291,12 +420,19 @@ private fun ReaderScreen(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(4.dp))
                 .background(JRColor.paperStrong)
-                .padding(20.dp),
+                .padding(if (isLandscape) 10.dp else 20.dp),
+            contentAlignment = Alignment.Center,
         ) {
             RSVPStage(
                 token = tokens.getOrElse(index) { "" },
                 focusStyle = FocusIndicatorStyle.Dot,
+                minHeight = if (isLandscape) 112.dp else 180.dp,
+                modifier = Modifier.blur(if (isPlaying) 0.dp else 1.2.dp),
             )
+
+            if (!isPlaying) {
+                StagePlayButton(compact = isLandscape, onTap = ::playFromCurrent)
+            }
         }
 
         Text(
@@ -323,13 +459,7 @@ private fun ReaderScreen(
             label = if (isPlaying) "PAUSE" else if (index >= tokens.size - 1) "RESTART" else "PLAY",
             onTap = {
                 if (isPlaying) stop()
-                else {
-                    if (index >= tokens.size - 1) {
-                        index = 0
-                        onIndexChange(0)
-                    }
-                    start()
-                }
+                else playFromCurrent()
             },
             testTag = if (isPlaying) "pause-button" else "play-button",
         )
@@ -465,6 +595,91 @@ private fun SettingsScreen(
 
 private val Modifier.weightTest: Modifier get() = this
 
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private data class LocalEpubFile(
+    val file: File,
+    val displayName: String,
+    val locationName: String,
+)
+
+private fun findLocalEpubFiles(context: Context): List<LocalEpubFile> {
+    val roots = listOfNotNull(
+        context.filesDir,
+        context.getExternalFilesDir(null),
+        context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS),
+    )
+
+    return roots
+        .distinctBy { it.absolutePath }
+        .flatMap { root ->
+            root.walkTopDown()
+                .maxDepth(2)
+                .filter { it.isFile && it.extension.equals("epub", ignoreCase = true) }
+                .map {
+                    LocalEpubFile(
+                        file = it,
+                        displayName = it.nameWithoutExtension,
+                        locationName = it.parentFile?.name?.uppercase() ?: "APP FILES",
+                    )
+                }
+                .toList()
+        }
+        .sortedBy { it.displayName.lowercase() }
+}
+
+private fun Context.displayName(uri: Uri): String? {
+    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index >= 0) return cursor.getString(index)
+        }
+    }
+    return uri.lastPathSegment
+}
+
+private object EpubTextExtractor {
+    private val tagRegex = Regex("<[^>]+>")
+    private val whitespaceRegex = Regex("\\s+")
+
+    fun extract(bytes: ByteArray): String {
+        val temp = File.createTempFile("justread-", ".epub")
+        return try {
+            temp.writeBytes(bytes)
+            ZipFile(temp).use { zip ->
+                zip.entries().asSequence()
+                    .filter { !it.isDirectory }
+                    .filter { entry ->
+                        val name = entry.name.lowercase()
+                        name.endsWith(".xhtml") || name.endsWith(".html") || name.endsWith(".htm")
+                    }
+                    .sortedBy { it.name }
+                    .joinToString("\n\n") { entry ->
+                        zip.getInputStream(entry).bufferedReader().use { reader ->
+                            reader.readText()
+                                .replace(tagRegex, " ")
+                                .replace("&nbsp;", " ")
+                                .replace("&amp;", "&")
+                                .replace("&lt;", "<")
+                                .replace("&gt;", ">")
+                                .replace("&quot;", "\"")
+                                .replace("&#39;", "'")
+                                .replace(whitespaceRegex, " ")
+                                .trim()
+                        }
+                    }
+                    .trim()
+            }
+        } finally {
+            temp.delete()
+        }
+    }
+}
+
 @Composable
 private fun SectionLabel(text: String) {
     Text(
@@ -476,6 +691,59 @@ private fun SectionLabel(text: String) {
         letterSpacing = 0.66.sp,
     )
 }
+
+@Composable
+private fun StagePlayButton(compact: Boolean, onTap: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(if (compact) 58.dp else 70.dp)
+            .clip(CircleShape)
+            .background(JRColor.terracotta)
+            .clickable(onClick = onTap)
+            .testTag("stage-play-button"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "▶",
+            color = JRColor.paper,
+            fontSize = if (compact) 24.sp else 30.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 3.dp),
+        )
+    }
+}
+
+@Composable
+private fun LocalEpubButton(file: LocalEpubFile, onTap: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(JRColor.paperStrong)
+            .clickable(onClick = onTap)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .testTag("local-epub-${file.displayName}"),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                file.displayName,
+                color = JRColor.ink,
+                fontSize = 17.sp,
+                fontFamily = JRFont.serif,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                locationText(file.locationName),
+                color = JRColor.inkQuiet,
+                fontSize = 10.sp,
+                fontFamily = JRFont.mono,
+                letterSpacing = 0.6.sp,
+            )
+        }
+    }
+}
+
+private fun locationText(locationName: String): String = "ANDROID FILES / $locationName"
 
 @Composable
 private fun PacePill(value: Int, selected: Boolean, onTap: () -> Unit) {
