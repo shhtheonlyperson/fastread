@@ -11,6 +11,7 @@ struct AddSourceView: View {
     @State private var status = ""
     @State private var isLoading = false
     @State private var showEpubPicker = false
+    @State private var localEpubs: [LocalEpubFile] = []
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -20,6 +21,7 @@ struct AddSourceView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     clipboardHero
                     epubPicker
+                    localEpubPicker
                     recentSources
                 }
                 .padding(.horizontal, 24)
@@ -34,6 +36,7 @@ struct AddSourceView: View {
         ) { result in
             handleEpubPick(result)
         }
+        .onAppear(perform: refreshLocalEpubs)
     }
 
     private var epubContentTypes: [UTType] {
@@ -41,9 +44,13 @@ struct AddSourceView: View {
         if let epub = UTType("org.idpf.epub-container") {
             types.append(epub)
         }
+        if let epubExtension = UTType(filenameExtension: "epub") {
+            types.append(epubExtension)
+        }
         if #available(iOS 14.0, *) {
             types.append(UTType.epub)
         }
+        types.append(.data)
         return types
     }
 
@@ -51,6 +58,7 @@ struct AddSourceView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "EPUB book")
             Button {
+                refreshLocalEpubs()
                 showEpubPicker = true
             } label: {
                 HStack(spacing: 12) {
@@ -77,6 +85,48 @@ struct AddSourceView: View {
         }
     }
 
+    @ViewBuilder
+    private var localEpubPicker: some View {
+        if !localEpubs.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel(text: "Files folder")
+                ForEach(localEpubs) { file in
+                    Button {
+                        importLocalEpub(file)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "doc.richtext")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(JRColor.terracotta)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(file.displayName)
+                                    .font(JRFont.serif(17, weight: .semibold))
+                                    .foregroundStyle(JRColor.ink)
+                                    .lineLimit(2)
+                                Text(file.locationName)
+                                    .font(JRFont.mono(10))
+                                    .tracking(0.6)
+                                    .foregroundStyle(JRColor.inkQuiet)
+                            }
+                            Spacer()
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(JRColor.inkQuiet)
+                        }
+                        .padding(.vertical, 14)
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(JRColor.paperStrong)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isLoading)
+                    .opacity(isLoading ? 0.55 : 1)
+                }
+            }
+        }
+    }
+
     @MainActor
     private func handleEpubPick(_ result: Result<[URL], Error>) {
         switch result {
@@ -84,6 +134,10 @@ struct AddSourceView: View {
             status = error.localizedDescription
         case .success(let urls):
             guard let url = urls.first else { return }
+            guard url.pathExtension.caseInsensitiveCompare("epub") == .orderedSame else {
+                status = "Choose an EPUB file."
+                return
+            }
             let needsScope = url.startAccessingSecurityScopedResource()
             defer { if needsScope { url.stopAccessingSecurityScopedResource() } }
             do {
@@ -92,6 +146,7 @@ struct AddSourceView: View {
                 if let article = try store.addEpubArticle(data: data, filename: filename) {
                     let words = store.wordCount(for: article)
                     status = "Loaded · \(words) words"
+                    refreshLocalEpubs()
                     onLoaded()
                 } else {
                     status = "Could not read that EPUB."
@@ -99,6 +154,60 @@ struct AddSourceView: View {
             } catch {
                 status = "Could not read that EPUB."
             }
+        }
+    }
+
+    @MainActor
+    private func importLocalEpub(_ file: LocalEpubFile) {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let data = try Data(contentsOf: file.url)
+            if let article = try store.addEpubArticle(data: data, filename: file.url.lastPathComponent) {
+                let words = store.wordCount(for: article)
+                status = "Loaded · \(words) words"
+                refreshLocalEpubs()
+                onLoaded()
+            } else {
+                status = "Could not read that EPUB."
+            }
+        } catch {
+            status = "Could not read that EPUB."
+        }
+    }
+
+    private func refreshLocalEpubs() {
+        localEpubs = Self.findLocalEpubs()
+    }
+
+    private static func findLocalEpubs() -> [LocalEpubFile] {
+        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return []
+        }
+
+        let searchRoots = [
+            documentsURL,
+            documentsURL.appendingPathComponent("Inbox", isDirectory: true)
+        ]
+        var files: [LocalEpubFile] = []
+
+        for root in searchRoots {
+            guard let urls = try? FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+
+            for url in urls where url.pathExtension.caseInsensitiveCompare("epub") == .orderedSame {
+                files.append(LocalEpubFile(url: url, documentsURL: documentsURL))
+            }
+        }
+
+        return files.sorted {
+            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
         }
     }
 
@@ -228,6 +337,29 @@ struct AddSourceView: View {
         } catch {
             status = error.localizedDescription
         }
+    }
+}
+
+private struct LocalEpubFile: Identifiable, Hashable {
+    let url: URL
+    private let documentsURL: URL
+
+    init(url: URL, documentsURL: URL) {
+        self.url = url
+        self.documentsURL = documentsURL
+    }
+
+    var id: String { url.path }
+
+    var displayName: String {
+        url.deletingPathExtension().lastPathComponent
+    }
+
+    var locationName: String {
+        if url.deletingLastPathComponent() == documentsURL {
+            return "ON MY IPHONE / JUSTREAD"
+        }
+        return "ON MY IPHONE / JUSTREAD / \(url.deletingLastPathComponent().lastPathComponent.uppercased())"
     }
 }
 

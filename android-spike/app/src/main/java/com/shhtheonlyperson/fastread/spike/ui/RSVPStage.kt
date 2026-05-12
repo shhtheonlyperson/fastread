@@ -25,6 +25,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.core.RSVPEngine
@@ -36,6 +37,7 @@ fun RSVPStage(
     token: String,
     focusStyle: FocusIndicatorStyle = FocusIndicatorStyle.Dot,
     isDark: Boolean = false,
+    minHeight: Dp = 180.dp,
     modifier: Modifier = Modifier,
 ) {
     val split = RSVPEngine.splitForFocus(token)
@@ -45,7 +47,7 @@ fun RSVPStage(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 180.dp)
+            .heightIn(min = minHeight)
             .background(bg)
             .semantics {
                 contentDescription = token

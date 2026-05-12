@@ -1,6 +1,7 @@
 .build/
 .DS_Store
 .claude/
+.codex/
 *.log
 .env*
 AuthKey_*.p8
@@ -13,6 +14,7 @@ xcuserdata/
 # Convenience copy for EpubE2ETests — see Tests/FastReadCoreTests/EpubE2ETests.swift.
 # Real EPUBs are typically copyrighted; never commit them.
 /test.epub
+/books/
 
 # Maestro flow screenshots get dumped at the repo root by the
 # `takeScreenshot` step. Run logs live under ~/.maestro/tests/.

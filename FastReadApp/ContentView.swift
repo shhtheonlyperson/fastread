@@ -63,6 +63,21 @@ struct ContentView: View {
         .animation(.easeOut(duration: 0.18), value: selectedTab)
         .animation(.easeInOut(duration: 0.3), value: showingSplash)
         .focusModeCover(isPresented: $showingFocusMode, store: store)
+        .onAppear {
+            updateOrientation(for: selectedTab)
+        }
+        .onChange(of: selectedTab) { _, tab in
+            updateOrientation(for: tab)
+        }
+        .onDisappear {
+            updateOrientation(for: .home)
+        }
+    }
+
+    private func updateOrientation(for tab: AppTab) {
+#if os(iOS)
+        OrientationSupport.allowReaderLandscape(tab == .reader)
+#endif
     }
 }
 
@@ -70,38 +85,47 @@ private struct JustReadTabBar: View {
     @Binding var selection: AppTab
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
-            ForEach(AppTab.allCases) { tab in
-                Button {
-                    selection = tab
-                } label: {
-                    VStack(spacing: 3) {
-                        TabGlyph(tab: tab, color: selection == tab ? JRColor.terracotta : JRColor.inkQuiet)
-                        Text(tab.label.uppercased())
-                            .font(JRFont.mono(10, weight: .medium))
-                            .tracking(0.6)
-                            .foregroundStyle(selection == tab ? JRColor.terracotta : JRColor.inkQuiet)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [JRColor.paper.opacity(0), JRColor.paper],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 18)
+            .allowsHitTesting(false)
+
+            HStack(alignment: .bottom, spacing: 0) {
+                ForEach(AppTab.allCases) { tab in
+                    Button {
+                        selection = tab
+                    } label: {
+                        VStack(spacing: 3) {
+                            TabGlyph(tab: tab, color: selection == tab ? JRColor.terracotta : JRColor.inkQuiet)
+                            Text(tab.label.uppercased())
+                                .font(JRFont.mono(10, weight: .medium))
+                                .tracking(0.6)
+                                .foregroundStyle(selection == tab ? JRColor.terracotta : JRColor.inkQuiet)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 28)
+            .background(JRColor.paper)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(JRColor.rule.opacity(0.75))
+                    .frame(height: 0.5)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 28)
-        .background(
-            LinearGradient(
-                colors: [JRColor.paper, JRColor.paper.opacity(0)],
-                startPoint: .bottom,
-                endPoint: .top
-            )
-            .ignoresSafeArea(edges: .bottom)
-        )
+        .background(JRColor.paper.ignoresSafeArea(edges: .bottom))
     }
 }
 

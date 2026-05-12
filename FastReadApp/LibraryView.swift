@@ -25,7 +25,7 @@ struct LibraryView: View {
                     .padding(.top, 28)
                     .padding(.horizontal, 16)
             }
-            .padding(.bottom, 112)
+            .padding(.bottom, 148)
         }
         .background(JRColor.paper)
         .confirmationDialog(

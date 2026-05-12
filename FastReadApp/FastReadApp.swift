@@ -5,6 +5,9 @@ import UIKit
 
 @main
 struct FastReadApp: App {
+#if canImport(UIKit)
+    @UIApplicationDelegateAdaptor(FastReadOrientationDelegate.self) private var orientationDelegate
+#endif
     @StateObject private var store: ReadingStore
 
     init() {
@@ -21,6 +24,41 @@ struct FastReadApp: App {
         }
     }
 }
+
+#if canImport(UIKit)
+@MainActor
+private final class FastReadOrientationDelegate: NSObject, UIApplicationDelegate {
+    static var supportedOrientations: UIInterfaceOrientationMask = .portrait
+
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        Self.supportedOrientations
+    }
+}
+
+@MainActor
+enum OrientationSupport {
+    static func allowReaderLandscape(_ isAllowed: Bool) {
+        let mask: UIInterfaceOrientationMask = isAllowed
+            ? [.portrait, .landscapeLeft, .landscapeRight]
+            : .portrait
+        FastReadOrientationDelegate.supportedOrientations = mask
+
+        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask))
+        }
+    }
+}
+
+private extension UIWindowScene {
+    var keyWindow: UIWindow? {
+        windows.first { $0.isKeyWindow }
+    }
+}
+#endif
 
 private enum UITestSupport {
     static func applyLaunchOverrides() {

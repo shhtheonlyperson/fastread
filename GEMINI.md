@@ -1,5 +1,17 @@
 # FastRead Assistant Notes
 
+## Release Shorthand
+
+If the user says `bump release`, treat it as:
+
+- sync to the latest `origin/main` / `main` state first;
+- bump the store build number/version code as needed for the next release;
+- release the mobile app from that latest main state;
+- prioritize iOS/TestFlight, then Android internal testing if the Play service-account JSON is available;
+- verify store acceptance, not just local build success.
+
+Do not ask whether this means web, desktop, docs, or package publishing. In this repo, `bump release` means mobile release.
+
 ## iOS TestFlight Release
 
 Before attempting any iOS/TestFlight release, read `docs/TESTFLIGHT.md`.
