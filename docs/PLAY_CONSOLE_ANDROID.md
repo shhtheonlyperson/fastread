@@ -6,7 +6,7 @@ End-to-end procedure for taking the local `android-spike/` Gradle project to Goo
 
 These match what shipped. Update on every release.
 
-- Application ID: `com.shhtheonlyperson.fastread.android`
+- Application ID: `com.shhtheonlyperson.fastread`
 - Kotlin namespace: `com.shhtheonlyperson.fastread.spike` (intentional — directory churn deferred to the full KMP port)
 - Min SDK: **34** (Android 14, Pixel 8 launch line)
 - Target SDK: **35**
@@ -23,7 +23,7 @@ These match what shipped. Update on every release.
 
 ```
 App name:        JustRead Speed Reader
-Package name:    com.shhtheonlyperson.fastread.android
+Package name:    com.shhtheonlyperson.fastread
 App or game:     App
 Free or paid:    Free
 Default language: Chinese (Traditional, Taiwan), or fall back to English (United States) if zh-TW isn't selectable

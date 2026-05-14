@@ -21,7 +21,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.shhtheonlyperson.fastread.android"
+        applicationId = "com.shhtheonlyperson.fastread"
         // Pixel 8 launched with Android 14 (API 34) — that's our floor
         // because we depend on the latest ICU rev for Trad-Chinese
         // word segmentation and the current Compose Material 3 render
