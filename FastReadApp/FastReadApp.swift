@@ -90,6 +90,16 @@ private enum UITestSupport {
                 .flatMap { i in i + 1 < args.count ? args[i + 1] : nil }) ?? "Test note"
             store.addDraftArticle(text: text, title: title, source: "Maestro")
         }
+        // -FASTREAD_SEED_USER_DICT entries are NUL-or-comma-separated
+        // user-dictionary entries to apply at boot. Lets Maestro flows
+        // verify dictionary-driven tokenization without driving the
+        // Settings sheet, which is iOS-26-flaky for some sheet bindings.
+        if let idx = args.firstIndex(of: "-FASTREAD_SEED_USER_DICT"),
+           idx + 1 < args.count {
+            for raw in args[idx + 1].split(separator: ",") {
+                store.addToUserDictionary(String(raw))
+            }
+        }
 #endif
     }
 

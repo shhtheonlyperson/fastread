@@ -90,11 +90,20 @@ fi
 
 echo "→ using simulator $DEVICE_NAME ($DEVICE_UDID)"
 
-# Build the simulator .app if we don't already have one we can install.
+# Build the simulator .app if we don't already have a usable one. The
+# bundle dir alone isn't enough — a previous interrupted build can
+# leave a .app shell without the Mach-O executable inside, and
+# `simctl install` then fails with "bundle executable missing". Drop
+# the cache and rebuild whenever the executable is absent.
 DERIVED="${FASTREAD_DERIVED:-/tmp/fastread-derived}"
 APP_PATH="$DERIVED/Build/Products/Debug-iphonesimulator/JustRead.app"
-if [ ! -d "$APP_PATH" ]; then
-  echo "→ building Debug FastRead.app for iOS simulator…"
+if [ ! -x "$APP_PATH/JustRead" ]; then
+  if [ -d "$APP_PATH" ]; then
+    echo "→ stale .app at $APP_PATH (no executable inside); rebuilding…"
+    rm -rf "$DERIVED"
+  else
+    echo "→ building Debug FastRead.app for iOS simulator…"
+  fi
   xcodebuild \
     -project FastRead.xcodeproj \
     -scheme FastRead \
@@ -102,6 +111,10 @@ if [ ! -d "$APP_PATH" ]; then
     -derivedDataPath "$DERIVED" \
     -configuration Debug \
     build >/dev/null
+fi
+if [ ! -x "$APP_PATH/JustRead" ]; then
+  echo "❌ build did not produce $APP_PATH/JustRead — check the FastRead target's MACH_O_TYPE / SKIP_INSTALL." >&2
+  exit 1
 fi
 
 BUNDLE_ID="com.shhtheonlyperson.fastread"
@@ -116,10 +129,14 @@ xcrun simctl install "$DEVICE_UDID" "$APP_PATH"
 flow_launch_args() {
   case "$1" in
     user-dictionary)
+      # Name leads the sentence so the FIRST RSVP frame is the OOV
+      # name. With the dictionary seeded, 楊家明 stays whole; without
+      # it, ICU+ChunkShaper splits it as 楊家 | 明去.
       printf '%s\0' \
         "-FASTREAD_RESET_LIBRARY" \
-        "-FASTREAD_SEED_DRAFT_TEXT" "黃士旗去吃飯與星巴克碰面。" \
-        "-FASTREAD_SEED_DRAFT_TITLE" "User dict smoke"
+        "-FASTREAD_SEED_DRAFT_TEXT" "楊家明去學校上課。" \
+        "-FASTREAD_SEED_DRAFT_TITLE" "User dict smoke" \
+        "-FASTREAD_SEED_USER_DICT" "楊家明"
       ;;
     *)
       printf '%s\0' "-FASTREAD_RESET_LIBRARY"
