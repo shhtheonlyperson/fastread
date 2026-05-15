@@ -1,12 +1,51 @@
-# JustRead — Chrome Web Store submission checklist
+# JustRead — Chrome Web Store
 
-Single doc for the actual submission flow. Open
-<https://chrome.google.com/webstore/devconsole> in one tab, this file in
-another, and walk top-to-bottom.
+This doc is the submission checklist plus the live-listing reference.
 
-> **Account to use:** `shh@theonlyperson.com` (Web Store Developer fee
-> already paid — confirmed 2026-05-15). Sign into the dashboard with
-> this Google account.
+## Current listing state (as of 2026-05-15)
+
+- **Item ID:** `jlphjjnghcblidffelhhiooeghjblfed`
+- **Name:** `JustRead — Reader View + Speed Reading`
+- **Publisher account:** `shh@theonlyperson.com` (Web Store Developer fee paid here)
+- **Contact email (verified):** `shh@theonlyperson.com`
+- **Privacy policy URL:** `https://www.theonlyperson.com/privacy` (source: [`store-assets/PRIVACY.md`](store-assets/PRIVACY.md))
+- **Category:** Tools (under Productivity) — visibility public, all regions, free
+- **Status URL (bookmark):** [Status tab](https://chrome.google.com/webstore/devconsole/CHROME_DEVELOPER_ID_PLACEHOLDER/jlphjjnghcblidffelhhiooeghjblfed/edit/status)
+- **Live URL (post-approval):** `https://chromewebstore.google.com/detail/jlphjjnghcblidffelhhiooeghjblfed`
+- **Submitted:** 2026-05-15. Status: **Pending review**. Local tag: `chrome-ext-v1.0.0-submitted`.
+
+## What to watch while in review
+
+| Status tab banner | What it means |
+|---|---|
+| `This draft is pending review.` | Sitting in Google's queue. |
+| `This draft is in review.` | Reviewer is actively looking. |
+| `This draft was rejected.` | Reasons appear on the same page; also emailed to the contact address. |
+| (Draft empty, Published populated) | Approved + live at the URL above. |
+
+Google emails the contact address (`shh@theonlyperson.com`) on every status change. Sender is typically `noreply-chromewebstore@google.com`.
+
+## If the review bounces
+
+Most likely two reasons; both are addressable without changing the extension code:
+
+1. **Broad host permissions need clearer justification.** Re-paste the `<all_urls>` justification verbatim from [`store-assets/listing-en.md`](store-assets/listing-en.md) into the reviewer reply form.
+2. **Single-purpose policy.** Won't happen unless we add features outside reader/RSVP later.
+
+If a code change is needed, bump `chrome-ext/package.json` version (e.g. `1.0.0` → `1.0.1`), `bun run zip`, drag the new zip onto the dashboard's Package tab, fix the flagged setting, and Submit again.
+
+## Resubmission gotchas (learned 2026-05-15 — keep these in mind)
+
+The Chrome Web Store has three quirks that bite automation:
+
+- **Dropzones (icon + screenshots) reject every programmatic upload path.** `setInputFiles`, `DataTransfer` + synthesized `DragEvent('drop')`, CDP-level injection — none take. The page validates `event.isTrusted` and only a real OS-level user gesture passes. Plan to drag the icon and screenshots from Finder yourself.
+- **Save Draft is per-tab.** Switching from Privacy → Distribution before saving Privacy wipes the Privacy fields. Pattern: fill a tab → Save → verify by re-snapshotting → only then navigate.
+- **"Submit for review" modal action is labeled "Submit For Review" (capital F, R), not "Publish".** A separate "Publish" button publishes a previously-staged build using a stored publish-time that defaults to the Unix epoch; clicking it surfaces a "Publish time has expired" error.
+- **Adding the contact email pauses the flow** until you click the verification link Google emails to that address.
+
+> **Account note:** `shh@theonlyperson.com` is the developer account.
+> `shh@theonlyperson.com` does NOT have the Developer fee paid (confirmed
+> 2026-05-15). Always sign into the dashboard with the gmail account.
 
 ---
 
