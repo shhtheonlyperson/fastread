@@ -51,10 +51,21 @@ public/
   icons/             128/48/16 png (TODO: ship real icons)
 ```
 
-## TODO before publishing
+## Publishing to the Chrome Web Store
 
-- [ ] Add real icons in `public/icons/`
-- [ ] Add a site allowlist/blocklist UI in options
-- [ ] Persist last-read position per URL
-- [ ] Wire `_locales` strings into UI (currently only manifest + popup hard-coded English)
-- [ ] Unit tests for `tokenize` / `RsvpEngine`
+See `CHROME_WEB_STORE.md` for the full submission checklist. Listing
+copy, privacy policy markdown, and 1280×800 screenshots are pre-rendered
+in `store-assets/`.
+
+Bonus scripts:
+
+- `bun run icons` — regenerate the toolbar icons (16/48/128 PNG) from the
+  SVG in `scripts/build-icons.ts`.
+- `bun run capture` — re-take the four submission screenshots against the
+  local fixtures.
+
+## Known follow-ups (post-v1)
+
+- Site allowlist / blocklist UI in options (data layer exists, no UI yet)
+- Persist last-read position per URL
+- Submit to Firefox Add-ons via `web-ext`

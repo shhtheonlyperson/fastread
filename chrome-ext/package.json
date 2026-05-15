@@ -1,6 +1,6 @@
 {
   "name": "justread-chrome",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,8 @@
     "test:watch": "vitest",
     "e2e": "bun run build && playwright test",
     "e2e:install": "playwright install chromium",
+    "icons": "bun run scripts/build-icons.ts",
+    "capture": "bun run build && bun run scripts/capture-screenshots.ts",
     "zip": "bun run build && cd dist && zip -r ../justread-chrome.zip ."
   },
   "dependencies": {

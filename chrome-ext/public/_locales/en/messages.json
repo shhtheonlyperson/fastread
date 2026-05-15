@@ -1,6 +1,6 @@
 {
-  "extName":            { "message": "JustRead — Reader View + Fast Read" },
-  "extDescription":     { "message": "Strip clutter from any article and speed-read with RSVP." },
+  "extName":            { "message": "JustRead — Reader View + Speed Reading" },
+  "extDescription":     { "message": "Strip the clutter from any web article and speed-read it with RSVP. Light/dark, serif/sans, h/j/k/l keyboard." },
   "appName":            { "message": "JustRead" },
   "articleDetected":    { "message": "Article detected" },
   "openReader":         { "message": "Open Reader" },
@@ -55,5 +55,5 @@
   "themeSystem":        { "message": "System" },
   "fontSerif":          { "message": "Serif" },
   "fontSans":           { "message": "Sans" },
-  "version":            { "message": "v1.0" }
+  "version":            { "message": "v1.0.0" }
 }

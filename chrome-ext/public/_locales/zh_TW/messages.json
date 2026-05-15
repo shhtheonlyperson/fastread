@@ -1,6 +1,6 @@
 {
-  "extName":            { "message": "簡讀 — 閱讀模式 + 快讀" },
-  "extDescription":     { "message": "去除網頁雜訊，並以 RSVP 方式快速閱讀。" },
+  "extName":            { "message": "簡讀 — 閱讀模式 + 速讀" },
+  "extDescription":     { "message": "去除網頁雜訊，把文章變成乾淨的閱讀視圖，並以 RSVP 速讀。淺色／深色、襯線／無襯線、h/j/k/l 鍵盤快捷鍵。" },
   "appName":            { "message": "簡讀" },
   "articleDetected":    { "message": "已偵測到文章" },
   "openReader":         { "message": "開啟閱讀模式" },
@@ -55,5 +55,5 @@
   "themeSystem":        { "message": "跟隨系統" },
   "fontSerif":          { "message": "襯線" },
   "fontSans":           { "message": "無襯線" },
-  "version":            { "message": "v1.0" }
+  "version":            { "message": "v1.0.0" }
 }
