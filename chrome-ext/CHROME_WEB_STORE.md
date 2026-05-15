@@ -4,10 +4,9 @@ Single doc for the actual submission flow. Open
 <https://chrome.google.com/webstore/devconsole> in one tab, this file in
 another, and walk top-to-bottom.
 
-> **Account note from the user (2026-05-15):** try the Developer account
-> registered to `shh@theonlyperson.com` first. If that account doesn't
-> exist or doesn't have the one-time $5 fee paid, fall back to
-> `shh@theonlyperson.com`.
+> **Account to use:** `shh@theonlyperson.com` (Web Store Developer fee
+> already paid — confirmed 2026-05-15). Sign into the dashboard with
+> this Google account.
 
 ---
 
