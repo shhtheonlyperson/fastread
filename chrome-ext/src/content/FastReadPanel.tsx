@@ -38,6 +38,17 @@ export function FastReadPanel({ article, settings, locale, onExitToReader, onExi
 
   useEffect(() => { engineRef.current?.setWpm(settings.wpm); }, [settings.wpm]);
 
+  // Track the latest WPM in a ref so the keydown handler sees fresh
+  // values without the useEffect having to re-install on every change.
+  // Without this, rapid j/k presses are lost: the handler captures the
+  // prop value at install time, and the second press fires before the
+  // effect cleanup+reinstall has run with the new prop, so the second
+  // press re-applies the same delta to the same start value (a no-op).
+  const wpmRef = useRef(settings.wpm);
+  useEffect(() => { wpmRef.current = settings.wpm; }, [settings.wpm]);
+  const indexRef = useRef(0);
+  useEffect(() => { indexRef.current = index; }, [index]);
+
   const togglePlay = () => {
     const eng = engineRef.current; if (!eng) return;
     eng.toggle();
@@ -45,8 +56,9 @@ export function FastReadPanel({ article, settings, locale, onExitToReader, onExi
   };
 
   const adjustWpm = (delta: number) => {
-    const next = Math.min(1200, Math.max(150, settings.wpm + delta));
+    const next = Math.min(1200, Math.max(150, wpmRef.current + delta));
     setSettings({ wpm: next });
+    wpmRef.current = next; // optimistic — keeps batched presses coherent.
   };
 
   /* Keyboard — installed on window per spec. Don't fire when typing
@@ -74,7 +86,7 @@ export function FastReadPanel({ article, settings, locale, onExitToReader, onExi
           e.preventDefault(); adjustWpm(-25); return;
         case 'Escape': {
           e.preventDefault();
-          const idx = paragraphIndexFor(article.textContent, index);
+          const idx = paragraphIndexFor(article.textContent, indexRef.current);
           onExitToReader(idx);
           return;
         }
@@ -82,8 +94,14 @@ export function FastReadPanel({ article, settings, locale, onExitToReader, onExi
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+    // Listener stays installed for the panel's lifetime. wpm is read
+    // through wpmRef so we don't need it as a dep; `index` and
+    // `article.textContent` are read inside `paragraphIndexFor`, which
+    // is fine to capture lazily (the closure sees `index` from the
+    // surrounding render via React; we accept the staleness because Esc
+    // only needs an approximate paragraph position).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.wpm, index, article.textContent]);
+  }, []);
 
   /* Compute sentence context — pull words around the current sentence. */
   const sentence = useMemo(() => buildSentence(tokens, current?.sentenceIndex ?? 0), [tokens, current?.sentenceIndex]);

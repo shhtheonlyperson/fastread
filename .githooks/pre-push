@@ -13,3 +13,4 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
 scripts/verify-ios-performance.sh
+scripts/verify-chrome-ext.sh

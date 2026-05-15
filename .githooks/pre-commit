@@ -11,3 +11,4 @@ cd "$ROOT_DIR"
 
 bash scripts/check-source-guardrails.sh
 swift test
+scripts/verify-chrome-ext.sh
