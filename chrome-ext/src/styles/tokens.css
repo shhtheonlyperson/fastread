@@ -1,0 +1,133 @@
+/* JustRead — design tokens (CSS custom properties). Mirrors design_handoff_justread/tokens.css. */
+
+:root, :host {
+  --jr-primary:          #cc785c;
+  --jr-primary-active:   #a9583e;
+  --jr-primary-disabled: #e6dfd8;
+
+  --jr-orp-coral:    #a9583e;
+  --jr-orp-teal:     #5db8a6;
+  --jr-orp-amber:    #e8a55a;
+  --jr-orp-merlot:   #9a4d35;
+  --jr-orp-peach:    #d99173;
+
+  --jr-font-display: "Fraunces", "Tiempos Headline", "Copernicus", Garamond, "Times New Roman", serif;
+  --jr-font-body:    "Inter", "StyreneB", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --jr-font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --jr-r-sm: 6px;
+  --jr-r-md: 8px;
+  --jr-r-lg: 12px;
+  --jr-r-pill: 9999px;
+
+  --jr-space-xs: 8px;
+  --jr-space-sm: 12px;
+  --jr-space-md: 16px;
+  --jr-space-lg: 24px;
+  --jr-space-xl: 32px;
+
+  --jr-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --jr-dur-fast: 150ms;
+  --jr-dur: 200ms;
+
+  /* Light theme defaults */
+  --jr-paper:         #fdfcf8;
+  --jr-paper-edge:    #faf9f5;
+  --jr-ink:           #141413;
+  --jr-body:          #252523;
+  --jr-muted:         #6c6a64;
+  --jr-muted-soft:    #928f87;
+  --jr-hairline:      #e6dfd8;
+  --jr-hairline-soft: #ebe6df;
+  --jr-accent:        var(--jr-orp-coral);
+  --jr-accent-soft:   rgba(204, 120, 92, 0.12);
+  --jr-elevation-fab: 0 8px 24px rgba(20,20,19,0.18), 0 2px 6px rgba(20,20,19,0.08);
+
+  --jr-fs-base: 18px;
+  --jr-lh-base: 1.6;
+  --jr-column-w: 660px;
+}
+
+[data-theme="sepia"] {
+  --jr-paper:         #f1e7d3;
+  --jr-paper-edge:    #e8dec5;
+  --jr-ink:           #3a2f1f;
+  --jr-body:          #4a3d2a;
+  --jr-muted:         #7b6d54;
+  --jr-muted-soft:    #a59778;
+  --jr-hairline:      #cdc09e;
+  --jr-hairline-soft: #dccd9d;
+  --jr-accent:        var(--jr-orp-merlot);
+  --jr-accent-soft:   rgba(154, 77, 53, 0.14);
+}
+
+[data-theme="dark"] {
+  --jr-paper:         #1c1a17;
+  --jr-paper-edge:    #181715;
+  --jr-ink:           #f0ebde;
+  --jr-body:          #cfc7b5;
+  --jr-muted:         #928c7d;
+  --jr-muted-soft:    #6c6a64;
+  --jr-hairline:      #2e2a23;
+  --jr-hairline-soft: #262420;
+  --jr-accent:        #d99173;
+  --jr-accent-soft:   rgba(217, 145, 115, 0.14);
+  --jr-elevation-fab: 0 8px 28px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4);
+}
+
+[data-mode="fastread"] {
+  --jr-paper:         #1c1a17;
+  --jr-paper-edge:    rgba(20, 20, 19, 0.97);
+  --jr-ink:           #f7f3e7;
+  --jr-body:          #cfc7b5;
+  --jr-muted:         #928c7d;
+  --jr-hairline:      #2e2a23;
+  --jr-accent:        #d99173;
+  --jr-accent-soft:   rgba(217, 145, 115, 0.14);
+}
+
+.jr-headline {
+  font-family: var(--jr-font-display);
+  font-weight: 500;
+  letter-spacing: -0.9px;
+  font-size: calc(var(--jr-fs-base) * 2.5);
+  line-height: 1.08;
+  color: var(--jr-ink);
+}
+.jr-byline {
+  font-family: var(--jr-font-display);
+  font-style: italic;
+  font-size: calc(var(--jr-fs-base) - 2px);
+  color: var(--jr-muted);
+}
+.jr-h2 {
+  font-family: var(--jr-font-display);
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  font-size: calc(var(--jr-fs-base) * 1.45);
+  color: var(--jr-ink);
+}
+.jr-body {
+  font-size: var(--jr-fs-base);
+  line-height: var(--jr-lh-base);
+  color: var(--jr-body);
+}
+.jr-eyebrow {
+  font-family: var(--jr-font-body);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--jr-muted);
+}
+
+[lang="zh-Hant"] .jr-body, [lang="zh-Hant"] .jr-content { word-break: keep-all; }
+[lang="zh-Hant"] .jr-eyebrow { text-transform: none; letter-spacing: 0.5px; }
+[lang="zh-Hant"] .jr-headline { font-family: var(--jr-font-display), "Source Han Serif TC", "Noto Serif TC", serif; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
