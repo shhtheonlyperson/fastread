@@ -12,7 +12,7 @@ Play Console is the source of truth. Update this section after each release atte
 - Target SDK: **35**
 - Latest signed AAB: `android-spike/app/build/outputs/bundle/release/app-release.aab`
 - Latest live internal-testing release observed in Play Console: `0.2.1` (versionCode 4), released May 4, 2026 at 12:25 PM.
-- Current local release candidate: `0.2.1` (versionCode 7), built and `bundletool validate` passed on May 15, 2026.
+- Current local release candidate: `0.2.1` (versionCode 8), built and `bundletool validate` passed on May 16, 2026.
 - Upload keystore: `android-spike/upload-keystore.jks` (gitignored, never commit)
 - Keystore properties: `android-spike/keystore.properties` (gitignored)
 - Play Console currently expects upload key SHA-1:
@@ -21,7 +21,7 @@ Play Console is the source of truth. Update this section after each release atte
   `REPLACEMENT_UPLOAD_KEY_SHA1`
 - Local `android-spike/upload-keystore.jks` SHA-256:
   `26:7A:61:85:52:5B:4B:2C:AD:79:7E:89:23:AA:BD:15:66:14:C7:E9:C0:82:0F:A4:D6:D2:B9:A4:BA:79:76:18`
-- May 15, 2026 release attempt: Fastlane API upload with `legacy-play-uploader@example.iam.gserviceaccount.com` failed with `caller does not have permission`; browser upload rejected the AAB because of the SHA-1 mismatch above. Android is not released until the original upload keystore is recovered or Play upload-key reset is completed.
+- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB, but Android was not uploaded because the repo-local Play service-account JSON was missing and the local upload keystore still signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1`, while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`. Android is not released until the original upload keystore is recovered or Play upload-key reset is completed.
 
 ## 1. Create the app in Play Console (one time)
 
