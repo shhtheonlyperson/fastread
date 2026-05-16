@@ -4,18 +4,24 @@ End-to-end procedure for taking the local `android-spike/` Gradle project to Goo
 
 ## Current state of truth
 
-These match what shipped. Update on every release.
+Play Console is the source of truth. Update this section after each release attempt.
 
 - Application ID: `com.shhtheonlyperson.fastread`
 - Kotlin namespace: `com.shhtheonlyperson.fastread.spike` (intentional — directory churn deferred to the full KMP port)
 - Min SDK: **34** (Android 14, Pixel 8 launch line)
 - Target SDK: **35**
 - Latest signed AAB: `android-spike/app/build/outputs/bundle/release/app-release.aab`
-- Latest version: `0.2.1` (versionCode 6)
+- Latest live internal-testing release observed in Play Console: `0.2.1` (versionCode 4), released May 4, 2026 at 12:25 PM.
+- Current local release candidate: `0.2.1` (versionCode 7), built and `bundletool validate` passed on May 15, 2026.
 - Upload keystore: `android-spike/upload-keystore.jks` (gitignored, never commit)
 - Keystore properties: `android-spike/keystore.properties` (gitignored)
-- **Upload key SHA-256:**
+- Play Console currently expects upload key SHA-1:
+  `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`
+- Local `android-spike/upload-keystore.jks` currently signs with SHA-1:
+  `REPLACEMENT_UPLOAD_KEY_SHA1`
+- Local `android-spike/upload-keystore.jks` SHA-256:
   `26:7A:61:85:52:5B:4B:2C:AD:79:7E:89:23:AA:BD:15:66:14:C7:E9:C0:82:0F:A4:D6:D2:B9:A4:BA:79:76:18`
+- May 15, 2026 release attempt: Fastlane API upload with `legacy-play-uploader@example.iam.gserviceaccount.com` failed with `caller does not have permission`; browser upload rejected the AAB because of the SHA-1 mismatch above. Android is not released until the original upload keystore is recovered or Play upload-key reset is completed.
 
 ## 1. Create the app in Play Console (one time)
 
@@ -52,11 +58,7 @@ When creating the release in step 4, Play Console asks how you want to sign the 
 
 - Or simpler — at app creation, choose **"Let Play App Signing generate the app signing key for me"** AND let Google manage everything. In that case you upload AABs signed with `upload-keystore.jks` and Play re-signs them with the app signing key it generated. This is what we do.
 
-After Play Console accepts the upload key, verify the SHA-256 it shows matches the one above:
-
-```
-26:7A:61:85:52:5B:4B:2C:AD:79:7E:89:23:AA:BD:15:66:14:C7:E9:C0:82:0F:A4:D6:D2:B9:A4:BA:79:76:18
-```
+After Play Console accepts the upload key, verify the SHA-1 it shows matches the current Play Console expectation above. If you are intentionally resetting the upload key, verify it changes to the replacement certificate's SHA-1 before uploading again.
 
 If it doesn't match, you uploaded the wrong keystore — double-check `keystore.properties` points at the file you're looking at.
 
@@ -167,7 +169,7 @@ The Play **app signing key** never leaves Google's HSM, so a lost upload key is 
 | Symptom | Fix |
 | --- | --- |
 | `Failed to read key justread from store ... Given final block not properly padded` during `bundleRelease` | PKCS12 keystores must use the same password for store and key. `keystore.properties` `keyPassword` should equal `storePassword`. |
-| Play Console rejects the AAB with "Bundle was not signed correctly" | Check `keystore.properties` points at `upload-keystore.jks`. Run `keytool -list -v -keystore upload-keystore.jks` and compare SHA-256 with the one Play Console shows under App signing. |
+| Play Console rejects the AAB with "signed with the wrong key" | Stop and compare SHA-1. On May 15, 2026 Play expected `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`, while local `upload-keystore.jks` signed as `REPLACEMENT_UPLOAD_KEY_SHA1`. Recover the original upload keystore or request an upload-key reset; do not keep uploading the same AAB. |
 | `Google Play credential must be a Google Cloud service-account JSON key` | Fastlane is reading a Firebase `google-services.json` or an OAuth client file. Re-download the right file from Play Console → API access. |
 | Service account auth fails with `403` | Permission propagation lag. Wait 5 min and retry. If still failing, re-grant in Play Console → API access. |
 
