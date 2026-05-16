@@ -12,6 +12,10 @@ If the user says `bump release`, treat it as:
 
 Do not ask whether this means web, desktop, docs, or package publishing. In this repo, `bump release` means mobile release.
 
+## Android Play Release
+
+Before any Android release build/upload, run `scripts/check-android-release-credentials.sh`. When creating or re-downloading the FastRead Play service-account JSON, immediately install it with `scripts/install-android-play-service-account.sh ~/Downloads/<downloaded-key>.json`; do not leave it in Downloads or a repo checkout. For off-machine backup, run the installer with `FASTREAD_PLAY_SERVICE_ACCOUNT_1PASSWORD_VAULT=<vault>` and approve the 1Password prompt.
+
 ## iOS TestFlight Release
 
 Before attempting any iOS/TestFlight release, read `docs/TESTFLIGHT.md`.

@@ -85,6 +85,23 @@ The canonical machine-local service-account path is:
 ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json
 ```
 
+Do not leave the downloaded JSON in `~/Downloads` or inside a repo checkout. Install it immediately with:
+
+```bash
+scripts/install-android-play-service-account.sh ~/Downloads/<downloaded-key>.json
+```
+
+That script validates the key shape, copies it to the canonical path, sets `0600` permissions, writes a local backup under `~/.config/shh/play-service-accounts/backups/`, and records a non-secret checksum manifest next to the canonical JSON. This is the durable path; clean worktrees and repo resets should not affect it.
+
+For an off-machine backup, add a 1Password vault name and approve the 1Password prompt:
+
+```bash
+FASTREAD_PLAY_SERVICE_ACCOUNT_1PASSWORD_VAULT="Private" \
+  scripts/install-android-play-service-account.sh ~/Downloads/<downloaded-key>.json
+```
+
+This stores the JSON as a 1Password document named `FastRead Google Play service-account JSON`.
+
 Fastlane also accepts `FASTREAD_PLAY_SERVICE_ACCOUNT_JSON`, `SUPPLY_JSON_KEY`, `PLAY_STORE_JSON_KEY`, and the legacy gitignored repo-local paths under `android-spike/`.
 
 The preflight expects the service-account email to contain `fastread` so a `shos`/other-app key is not reused by accident. If you intentionally use a shared Play uploader, grant that account access to the FastRead Play app first and run with `FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1`.
@@ -96,13 +113,14 @@ The preflight expects the service-account email to contain `fastread` so a `shos
 4. Back in Play Console → API access, click **Create new service account**.
 5. Cloud console opens. Create a service account named `fastread-publisher`. Skip optional roles. Click **Create**.
 6. After creation, click the service account → **Keys → Add key → Create new key → JSON**. Browser downloads the JSON.
-7. Move the JSON to the canonical machine-local path:
+7. Install the JSON into the canonical machine-local path:
 
-   ```
-   ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json
+   ```bash
+   scripts/install-android-play-service-account.sh ~/Downloads/<downloaded-key>.json
+   scripts/check-android-release-credentials.sh
    ```
 
-   Do not commit it. A gitignored repo-local copy at `android-spike/google-service-account.fastread.json` also works, but the canonical path survives clean worktrees and prevents this blocker from recurring.
+   Do not commit it. A gitignored repo-local copy at `android-spike/google-service-account.fastread.json` is only a fallback; the installer-managed canonical path survives clean worktrees and prevents this blocker from recurring.
 
 8. Back in Play Console → API access, find the new service account in the list and click **Manage Play Console permissions**. Grant:
 

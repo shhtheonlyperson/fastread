@@ -9,6 +9,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/android-spike"
+PREFERRED_SERVICE_ACCOUNT_PATH="$HOME/.config/shh/play-service-accounts/fastread-google-play-service-account.json"
+PREFERRED_SERVICE_ACCOUNT_MANIFEST="${PREFERRED_SERVICE_ACCOUNT_PATH%.json}.manifest"
 EXPECTED_UPLOAD_SHA1="${FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1:-FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1}"
 FAILED=0
 
@@ -36,7 +38,7 @@ for env_name in FASTREAD_PLAY_SERVICE_ACCOUNT_JSON SUPPLY_JSON_KEY PLAY_STORE_JS
   fi
 done
 service_account_candidates+=(
-  "$HOME/.config/shh/play-service-accounts/fastread-google-play-service-account.json"
+  "$PREFERRED_SERVICE_ACCOUNT_PATH"
   "$HOME/.config/shh/play-service-accounts/google-service-account.fastread.json"
   "$HOME/.config/shh/play-service-accounts/google-play-service-account.fastread.json"
   "$ANDROID_DIR/google-service-account.fastread.json"
@@ -53,6 +55,8 @@ done
 
 if [ -z "$service_account_path" ]; then
   fail "Missing fastread Play service-account JSON. Preferred path: ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json"
+  log "If you have a downloaded key, install and back it up with:"
+  log "scripts/install-android-play-service-account.sh /path/to/downloaded-service-account.json"
 else
   if ! service_account_email="$(
     ruby -rjson -e '
@@ -70,6 +74,11 @@ else
     fail "Invalid FastRead Play service-account JSON at $service_account_path. Use a fastread-publisher key, or set FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1 only after granting a shared account access to the FastRead Play app."
   else
     log "Play service-account JSON found: $service_account_path ($service_account_email)"
+    if [ "$service_account_path" = "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ ! -f "$PREFERRED_SERVICE_ACCOUNT_MANIFEST" ]; then
+      log "Canonical JSON is installed without a manifest. Re-run scripts/install-android-play-service-account.sh on the source JSON to create a local backup + checksum marker."
+    elif [ "$service_account_path" != "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ -z "${FASTREAD_PLAY_SERVICE_ACCOUNT_JSON:-}${SUPPLY_JSON_KEY:-}${PLAY_STORE_JSON_KEY:-}" ]; then
+      log "Using a legacy fallback JSON. Install it to the canonical path with scripts/install-android-play-service-account.sh so clean worktrees do not lose it again."
+    fi
   fi
 fi
 
