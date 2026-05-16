@@ -16,12 +16,14 @@ default_platform(:android)
 #   $SUPPLY_JSON_KEY
 #   $PLAY_STORE_JSON_KEY
 #   ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json
+#   ~/.config/shh/play-service-accounts/shos-google-play-service-account.json
 #   ~/.config/shh/play-service-accounts/google-service-account.fastread.json
 #   ~/.config/shh/play-service-accounts/google-play-service-account.fastread.json
 #   android-spike/google-service-account.fastread.json
 #   android-spike/google-play-service-account.fastread.json
 
 EXPECTED_FASTREAD_UPLOAD_SHA1 = "FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1"
+DEFAULT_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS = "legacy-play-uploader@example.iam.gserviceaccount.com"
 
 platform :android do
   private_lane :ensure_java_home do
@@ -68,6 +70,7 @@ platform :android do
       repo_root = File.expand_path("..", __dir__)
       candidates = [
         File.expand_path("~/.config/shh/play-service-accounts/fastread-google-play-service-account.json"),
+        File.expand_path("~/.config/shh/play-service-accounts/shos-google-play-service-account.json"),
         File.expand_path("~/.config/shh/play-service-accounts/google-service-account.fastread.json"),
         File.expand_path("~/.config/shh/play-service-accounts/google-play-service-account.fastread.json"),
         "google-service-account.fastread.json",
@@ -103,8 +106,9 @@ platform :android do
     unless parsed["type"] == "service_account" && parsed["client_email"].end_with?(".gserviceaccount.com") && parsed["private_key"].include?("BEGIN PRIVATE KEY")
       UI.user_error!("Google Play credential must be a Google Cloud service-account JSON key, not Firebase google-services.json or an OAuth client file.")
     end
-    unless parsed["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1"
-      UI.user_error!("Google Play service-account email should be FastRead-specific. Got #{parsed['client_email']}. Create/use a fastread-publisher service account, or set FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1 only after granting this shared account access to the FastRead Play app.")
+    allowed_shared = (ENV["FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS"] || DEFAULT_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS).split(",").map(&:strip)
+    unless parsed["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1" || allowed_shared.include?(parsed["client_email"])
+      UI.user_error!("Google Play service-account email should be FastRead-specific or an allowlisted shared uploader. Got #{parsed['client_email']}. Grant the shared account access to the FastRead Play app before using it.")
     end
 
     json_key

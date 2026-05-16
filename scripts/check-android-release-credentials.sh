@@ -12,6 +12,8 @@ ANDROID_DIR="$ROOT_DIR/android-spike"
 PREFERRED_SERVICE_ACCOUNT_PATH="$HOME/.config/shh/play-service-accounts/fastread-google-play-service-account.json"
 PREFERRED_SERVICE_ACCOUNT_MANIFEST="${PREFERRED_SERVICE_ACCOUNT_PATH%.json}.manifest"
 EXPECTED_UPLOAD_SHA1="${FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1:-FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1}"
+DEFAULT_SHARED_SERVICE_ACCOUNT_EMAIL="legacy-play-uploader@example.iam.gserviceaccount.com"
+PLAY_PACKAGE="${FASTREAD_PLAY_PACKAGE:-com.shhtheonlyperson.fastread}"
 FAILED=0
 
 log() {
@@ -39,6 +41,7 @@ for env_name in FASTREAD_PLAY_SERVICE_ACCOUNT_JSON SUPPLY_JSON_KEY PLAY_STORE_JS
 done
 service_account_candidates+=(
   "$PREFERRED_SERVICE_ACCOUNT_PATH"
+  "$HOME/.config/shh/play-service-accounts/shos-google-play-service-account.json"
   "$HOME/.config/shh/play-service-accounts/google-service-account.fastread.json"
   "$HOME/.config/shh/play-service-accounts/google-play-service-account.fastread.json"
   "$ANDROID_DIR/google-service-account.fastread.json"
@@ -65,19 +68,68 @@ else
       missing = %w[type client_email private_key token_uri].select { |key| data[key].to_s.empty? }
       abort("missing required fields: #{missing.join(", ")}") unless missing.empty?
       abort("not a Google service-account JSON") unless data["type"] == "service_account" && data["client_email"].to_s.end_with?(".gserviceaccount.com") && data["private_key"].to_s.include?("BEGIN PRIVATE KEY")
-      unless data["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1"
+      allowed_shared = ENV.fetch("FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS", "legacy-play-uploader@example.iam.gserviceaccount.com").split(",").map(&:strip)
+      unless data["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1" || allowed_shared.include?(data["client_email"])
         abort("service-account email is not FastRead-specific: #{data["client_email"]}")
       end
       puts data["client_email"]
     ' "$service_account_path"
   )"; then
-    fail "Invalid FastRead Play service-account JSON at $service_account_path. Use a fastread-publisher key, or set FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1 only after granting a shared account access to the FastRead Play app."
+    fail "Invalid FastRead Play service-account JSON at $service_account_path. Use a fastread-publisher key, or grant an allowlisted shared account access to the FastRead Play app. Default shared account: $DEFAULT_SHARED_SERVICE_ACCOUNT_EMAIL"
   else
     log "Play service-account JSON found: $service_account_path ($service_account_email)"
-    if [ "$service_account_path" = "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ ! -f "$PREFERRED_SERVICE_ACCOUNT_MANIFEST" ]; then
+    if [ "$service_account_path" = "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ ! -L "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ ! -f "$PREFERRED_SERVICE_ACCOUNT_MANIFEST" ]; then
       log "Canonical JSON is installed without a manifest. Re-run scripts/install-android-play-service-account.sh on the source JSON to create a local backup + checksum marker."
     elif [ "$service_account_path" != "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ -z "${FASTREAD_PLAY_SERVICE_ACCOUNT_JSON:-}${SUPPLY_JSON_KEY:-}${PLAY_STORE_JSON_KEY:-}" ]; then
       log "Using a legacy fallback JSON. Install it to the canonical path with scripts/install-android-play-service-account.sh so clean worktrees do not lose it again."
+    fi
+
+    if [ "${FASTREAD_SKIP_PLAY_API_CHECK:-0}" != "1" ]; then
+      if api_result="$(
+        ruby -rjson -rnet/http -ropenssl -rbase64 -ruri -e '
+          def b64(value)
+            Base64.urlsafe_encode64(value).delete("=")
+          end
+
+          key_path = ARGV.fetch(0)
+          package_name = ARGV.fetch(1)
+          data = JSON.parse(File.read(key_path))
+          now = Time.now.to_i
+          claims = {
+            iss: data["client_email"],
+            scope: "https://www.googleapis.com/auth/androidpublisher",
+            aud: data["token_uri"],
+            iat: now,
+            exp: now + 3600
+          }
+          unsigned = "#{b64({ alg: "RS256", typ: "JWT" }.to_json)}.#{b64(claims.to_json)}"
+          rsa = OpenSSL::PKey::RSA.new(data["private_key"])
+          jwt = "#{unsigned}.#{b64(rsa.sign(OpenSSL::Digest::SHA256.new, unsigned))}"
+          token_res = Net::HTTP.post_form(URI(data["token_uri"]), "grant_type" => "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion" => jwt)
+          abort("token #{token_res.code}: #{token_res.body}") unless token_res.code == "200"
+          access_token = JSON.parse(token_res.body).fetch("access_token")
+
+          create_uri = URI("https://androidpublisher.googleapis.com/androidpublisher/v3/applications/#{package_name}/edits")
+          create_req = Net::HTTP::Post.new(create_uri)
+          create_req["Authorization"] = "Bearer #{access_token}"
+          create_req["Content-Type"] = "application/json"
+          create_req.body = "{}"
+          create_res = Net::HTTP.start(create_uri.hostname, create_uri.port, use_ssl: true) { |http| http.request(create_req) }
+          create_body = JSON.parse(create_res.body) rescue {}
+          abort("edit insert #{create_res.code}: #{create_body.dig("error", "message") || create_res.body}") unless create_res.code.start_with?("2") && create_body["id"]
+
+          delete_uri = URI("https://androidpublisher.googleapis.com/androidpublisher/v3/applications/#{package_name}/edits/#{create_body["id"]}")
+          delete_req = Net::HTTP::Delete.new(delete_uri)
+          delete_req["Authorization"] = "Bearer #{access_token}"
+          delete_res = Net::HTTP.start(delete_uri.hostname, delete_uri.port, use_ssl: true) { |http| http.request(delete_req) }
+          abort("edit delete #{delete_res.code}: #{delete_res.body}") unless delete_res.code == "204"
+          puts "edit insert/delete OK"
+        ' "$service_account_path" "$PLAY_PACKAGE"
+      )"; then
+        log "Play API access verified for $PLAY_PACKAGE: $api_result"
+      else
+        fail "Play API access check failed for $PLAY_PACKAGE using $service_account_path"
+      fi
     fi
   fi
 fi
@@ -127,7 +179,7 @@ else
       elif [ "$actual_sha1" != "$EXPECTED_UPLOAD_SHA1" ]; then
         fail "Upload keystore SHA1 mismatch. Play expects $EXPECTED_UPLOAD_SHA1; local keystore signs with $actual_sha1."
         log "Use the original upload keystore, or request a Play upload-key reset with:"
-        log "keytool -exportcert -rfc -alias ${key_alias:-justread} -keystore $store_path -file /tmp/fastread-upload-certificate.pem"
+        log "scripts/export-android-upload-reset-certificate.sh"
       else
         log "Upload keystore SHA1 matches Play Console expectation."
       fi

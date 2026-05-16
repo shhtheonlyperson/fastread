@@ -35,6 +35,8 @@ Environment:
                                            Override the 1Password document title.
   FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1
                                            Allow a shared non-fastread service account after Play permissions are granted.
+  FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS
+                                           Comma-separated allowlist for shared uploader emails.
 USAGE
 }
 
@@ -63,7 +65,8 @@ metadata="$(
            data["private_key"].to_s.include?("BEGIN PRIVATE KEY")
       abort("not a Google Cloud service-account JSON key")
     end
-    unless data["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1"
+    allowed_shared = ENV.fetch("FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS", "legacy-play-uploader@example.iam.gserviceaccount.com").split(",").map(&:strip)
+    unless data["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1" || allowed_shared.include?(data["client_email"])
       abort("service-account email is not FastRead-specific: #{data["client_email"]}")
     end
     puts [data["client_email"], data["project_id"].to_s].join("\t")

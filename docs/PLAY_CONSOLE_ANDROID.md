@@ -21,7 +21,7 @@ Play Console is the source of truth. Update this section after each release atte
   `REPLACEMENT_UPLOAD_KEY_SHA1`
 - Local `android-spike/upload-keystore.jks` SHA-256:
   `26:7A:61:85:52:5B:4B:2C:AD:79:7E:89:23:AA:BD:15:66:14:C7:E9:C0:82:0F:A4:D6:D2:B9:A4:BA:79:76:18`
-- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB, but Android was not uploaded because the repo-local Play service-account JSON was missing and the local upload keystore still signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1`, while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`. Android is not released until the original upload keystore is recovered or Play upload-key reset is completed.
+- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB. The Play service-account blocker is fixed: the shared uploader `legacy-play-uploader@example.iam.gserviceaccount.com` is granted to JustRead and passes Android Publisher API edit insert/delete. Android is still not released until the original upload keystore is recovered or Play upload-key reset is completed, because local `android-spike/upload-keystore.jks` signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1` while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`.
 
 ## 1. Create the app in Play Console (one time)
 
@@ -85,6 +85,14 @@ The canonical machine-local service-account path is:
 ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json
 ```
 
+On this machine, that path may be a symlink to the shared uploader:
+
+```text
+~/.config/shh/play-service-accounts/shos-google-play-service-account.json
+```
+
+That shared account is intentionally allowlisted in the scripts and has Play Console access to JustRead. The preflight does a live Android Publisher API edit insert/delete against `com.shhtheonlyperson.fastread`, so missing Play permissions fail before any build or upload.
+
 Do not leave the downloaded JSON in `~/Downloads` or inside a repo checkout. Install it immediately with:
 
 ```bash
@@ -102,9 +110,9 @@ FASTREAD_PLAY_SERVICE_ACCOUNT_1PASSWORD_VAULT="Private" \
 
 This stores the JSON as a 1Password document named `FastRead Google Play service-account JSON`.
 
-Fastlane also accepts `FASTREAD_PLAY_SERVICE_ACCOUNT_JSON`, `SUPPLY_JSON_KEY`, `PLAY_STORE_JSON_KEY`, and the legacy gitignored repo-local paths under `android-spike/`.
+Fastlane also accepts `FASTREAD_PLAY_SERVICE_ACCOUNT_JSON`, `SUPPLY_JSON_KEY`, `PLAY_STORE_JSON_KEY`, the shared `shos` machine-local fallback, and the legacy gitignored repo-local paths under `android-spike/`.
 
-The preflight expects the service-account email to contain `fastread` so a `shos`/other-app key is not reused by accident. If you intentionally use a shared Play uploader, grant that account access to the FastRead Play app first and run with `FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1`.
+The preflight expects the service-account email to contain `fastread` or match `FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS` (default: `legacy-play-uploader@example.iam.gserviceaccount.com`). If you intentionally use another shared Play uploader, grant that account access to the FastRead Play app first and set the allowlist explicitly.
 
 1. Open [Play Console → Setup → API access](https://play.google.com/console/u/0/developers/api-access).
 2. Link or create a Google Cloud project. Naming doesn't matter — `fastread-publisher` is fine.
@@ -202,6 +210,12 @@ If `upload-keystore.jks` is destroyed without a backup:
 1. Generate a new upload keystore (any password, just something you'll remember).
 2. Open Play Console → App → Setup → App signing → **Request upload key reset**.
 3. Attach a small certificate-only PEM exported from the new keystore.
+   The helper reads `android-spike/keystore.properties` and avoids printing passwords:
+
+   ```bash
+   scripts/export-android-upload-reset-certificate.sh
+   ```
+
 4. Wait ~24h for Google to manually verify and swap the upload key.
 
 The Play **app signing key** never leaves Google's HSM, so a lost upload key is not the end of the world — it's only used to re-sign new uploads, not to authenticate the published artefact on devices.
@@ -213,7 +227,7 @@ The Play **app signing key** never leaves Google's HSM, so a lost upload key is 
 | `Failed to read key justread from store ... Given final block not properly padded` during `bundleRelease` | PKCS12 keystores must use the same password for store and key. `keystore.properties` `keyPassword` should equal `storePassword`. |
 | Play Console rejects the AAB with "signed with the wrong key" | Stop and compare SHA-1. On May 15, 2026 Play expected `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`, while local `upload-keystore.jks` signed as `REPLACEMENT_UPLOAD_KEY_SHA1`. Recover the original upload keystore or request an upload-key reset; do not keep uploading the same AAB. |
 | `Google Play credential must be a Google Cloud service-account JSON key` | Fastlane is reading a Firebase `google-services.json` or an OAuth client file. Re-download the right file from Play Console → API access. |
-| Service account auth fails with `403` | Permission propagation lag. Wait 5 min and retry. If still failing, re-grant in Play Console → API access. |
+| Service account auth fails with `403` | Permission propagation lag or missing app permission. Wait 5 min and retry. If still failing, re-grant `View app information`, `Release apps to testing tracks`, and `Manage testing tracks and edit tester lists` in Play Console → Users and permissions for `com.shhtheonlyperson.fastread`. |
 
 ## 8. Files that must never be committed
 

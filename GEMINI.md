@@ -14,7 +14,7 @@ Do not ask whether this means web, desktop, docs, or package publishing. In this
 
 ## Android Play Release
 
-Before any Android release build/upload, run `scripts/check-android-release-credentials.sh`. When creating or re-downloading the FastRead Play service-account JSON, immediately install it with `scripts/install-android-play-service-account.sh ~/Downloads/<downloaded-key>.json`; do not leave it in Downloads or a repo checkout. For off-machine backup, run the installer with `FASTREAD_PLAY_SERVICE_ACCOUNT_1PASSWORD_VAULT=<vault>` and approve the 1Password prompt.
+Before any Android release build/upload, run `scripts/check-android-release-credentials.sh`. The canonical JSON may intentionally be a symlink to the allowlisted shared uploader `legacy-play-uploader@example.iam.gserviceaccount.com`; the preflight verifies live Android Publisher API edit access. When creating or re-downloading a FastRead-specific Play service-account JSON, immediately install it with `scripts/install-android-play-service-account.sh ~/Downloads/<downloaded-key>.json`; do not leave it in Downloads or a repo checkout. For off-machine backup, run the installer with `FASTREAD_PLAY_SERVICE_ACCOUNT_1PASSWORD_VAULT=<vault>` and approve the 1Password prompt.
 
 ## iOS TestFlight Release
 
