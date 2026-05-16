@@ -11,18 +11,18 @@ Play Console is the source of truth. Update this section after each release atte
 - Min SDK: **34** (Android 14, Pixel 8 launch line)
 - Target SDK: **35**
 - Latest signed AAB: `android-spike/app/build/outputs/bundle/release/app-release.aab`
-- Latest live internal-testing release observed in Play Console: `0.2.1` (versionCode 4), released May 4, 2026 at 12:25 PM.
-- Current local release candidate: `0.2.1` (versionCode 8), built and `bundletool validate` passed on May 16, 2026.
+- Latest live internal-testing release observed through the Play Developer API: `0.2.1` (versionCode 8), `completed`, uploaded May 16, 2026.
+- Current local release candidate: `0.2.1` (versionCode 8), built and uploaded to Play internal testing on May 16, 2026.
 - Upload keystore: `android-spike/upload-keystore.jks` (gitignored, never commit)
 - Keystore properties: `android-spike/keystore.properties` (gitignored)
 - Play Console currently expects upload key SHA-1:
   `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`
 - Local `android-spike/upload-keystore.jks` currently signs with SHA-1:
-  `REPLACEMENT_UPLOAD_KEY_SHA1`
+  `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`
 - Local `android-spike/upload-keystore.jks` SHA-256:
-  `26:7A:61:85:52:5B:4B:2C:AD:79:7E:89:23:AA:BD:15:66:14:C7:E9:C0:82:0F:A4:D6:D2:B9:A4:BA:79:76:18`
-- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB. The Play service-account release blocker is fixed for API edit creation: the shared uploader is granted to JustRead and passes Android Publisher API edit insert/delete. The default allowlist now accepts the canonical `play-uploader@example.iam.gserviceaccount.com` and the legacy `legacy-play-uploader@example.iam.gserviceaccount.com`. Android is still not released until the original upload keystore is recovered or Play upload-key reset is completed, because local `android-spike/upload-keystore.jks` signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1` while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`.
-- Play store listing icon is also guarded now. `scripts/sync-play-store-icon.sh --check` currently detects that the `en-US` listing has no icon. `--apply` prepares the correct `android-spike/play-assets/justread-icon-512.png`, but Play rejects commit until the service account has `CAN_MANAGE_PUBLIC_LISTING` / **Edit store listing information** permission.
+  `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA256`
+- May 16, 2026 release attempt: the original upload keystore was recovered from the old EAS project `30524a6b-d9f1-40a1-b75a-43e289b49812` (`huang47` / `fastread` / production build credentials). Its SHA-1 matches Play's current upload key, so the pending upload-key reset was canceled in Play Console. Fastlane then built and uploaded versionCode 8 to the internal track with `release_status: completed`.
+- Play store listing icon is guarded by `scripts/sync-play-store-icon.sh --check`; the current `en-US` icon matches `android-spike/play-assets/justread-icon-512.png`.
 
 ## 1. Create the app in Play Console (one time)
 
@@ -215,7 +215,23 @@ If you want to upload but not auto-promote, use `bundle exec fastlane draft` —
 
 ## 6. Recovering from a lost upload key
 
-If `upload-keystore.jks` is destroyed without a backup:
+If `upload-keystore.jks` is missing, first search EAS before requesting or waiting for a reset:
+
+```bash
+cd /tmp/fastread-eas-old
+npx --yes eas-cli@latest credentials -p android
+# choose production -> credentials.json -> Download credentials from EAS
+```
+
+The recovered production EAS keystore should have alias `UPLOAD_KEY_ALIAS_PLACEHOLDER`, SHA-1 `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`, and SHA-256 `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA256`.
+
+Keep local keystore backups under:
+
+```text
+~/.config/shh/android-keystores/
+```
+
+If the original upload key really is destroyed and no EAS credential exists:
 
 1. Generate a new upload keystore (any password, just something you'll remember).
 2. Open Play Console → App → Setup → App signing → **Request upload key reset**.
@@ -235,10 +251,10 @@ The Play **app signing key** never leaves Google's HSM, so a lost upload key is 
 | Symptom | Fix |
 | --- | --- |
 | `Failed to read key justread from store ... Given final block not properly padded` during `bundleRelease` | PKCS12 keystores must use the same password for store and key. `keystore.properties` `keyPassword` should equal `storePassword`. |
-| Play Console rejects the AAB with "signed with the wrong key" | Stop and compare SHA-1. On May 15, 2026 Play expected `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`, while local `upload-keystore.jks` signed as `REPLACEMENT_UPLOAD_KEY_SHA1`. Recover the original upload keystore or request an upload-key reset; do not keep uploading the same AAB. |
+| Play Console rejects the AAB with "signed with the wrong key" | Stop and compare SHA-1. Play currently expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`. The recovered EAS keystore matches that. If local `upload-keystore.jks` signs as `REPLACEMENT_UPLOAD_KEY_SHA1`, it is the canceled reset replacement key, not the active Play upload key. |
 | `Google Play credential must be a Google Cloud service-account JSON key` | Fastlane is reading a Firebase `google-services.json` or an OAuth client file. Re-download the right file from Play Console → API access. |
 | Service account auth fails with `403` | Permission propagation lag or missing app permission. Wait 5 min and retry. If still failing, re-grant `View app information`, `Release apps to testing tracks`, and `Manage testing tracks and edit tester lists` in Play Console → Users and permissions for `com.shhtheonlyperson.fastread`. |
-| `Play icon upload was prepared but commit was denied` | Grant the service account **Edit store listing information** / `CAN_MANAGE_PUBLIC_LISTING`, then rerun `scripts/sync-play-store-icon.sh --apply`. |
+| `Play icon upload was prepared but commit was denied` | Grant the service account **Edit store listing information** / `CAN_MANAGE_PUBLIC_LISTING`, then rerun `scripts/sync-play-store-icon.sh --apply`. After the release, remove unrelated temporary account-level permissions and keep only app-level release/store-presence permissions. |
 
 ## 8. Files that must never be committed
 
