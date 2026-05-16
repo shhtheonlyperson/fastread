@@ -39,10 +39,6 @@ ensure_clean() {
 
 ensure_auth() {
   [[ -f "$ASC_KEY_PATH" ]] || fail "missing ASC API key at $ASC_KEY_PATH"
-  xcrun altool --list-providers \
-    --api-key "$ASC_KEY_ID" \
-    --api-issuer "$ASC_ISSUER_ID" \
-    --p8-file-path "$ASC_KEY_PATH" >/dev/null
 }
 
 unlock_keychain() {
@@ -59,7 +55,7 @@ unlock_keychain() {
 project_setting() {
   local key="$1"
   xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -showBuildSettings \
-    | awk -F'= ' -v k="$key" '$1 ~ k {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}'
+    | awk -F'= ' -v k="$key" '{lhs=$1; gsub(/^[ \t]+|[ \t]+$/, "", lhs); if (lhs == k) {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}}'
 }
 
 asc_latest_build_number() {
