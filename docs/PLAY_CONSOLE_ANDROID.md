@@ -21,7 +21,7 @@ Play Console is the source of truth. Update this section after each release atte
   `REPLACEMENT_UPLOAD_KEY_SHA1`
 - Local `android-spike/upload-keystore.jks` SHA-256:
   `26:7A:61:85:52:5B:4B:2C:AD:79:7E:89:23:AA:BD:15:66:14:C7:E9:C0:82:0F:A4:D6:D2:B9:A4:BA:79:76:18`
-- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB. The Play service-account release blocker is fixed: the shared uploader `legacy-play-uploader@example.iam.gserviceaccount.com` is granted to JustRead and passes Android Publisher API edit insert/delete. Android is still not released until the original upload keystore is recovered or Play upload-key reset is completed, because local `android-spike/upload-keystore.jks` signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1` while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`.
+- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB. The Play service-account release blocker is fixed for API edit creation: the shared uploader is granted to JustRead and passes Android Publisher API edit insert/delete. The default allowlist now accepts the canonical `play-uploader@example.iam.gserviceaccount.com` and the legacy `legacy-play-uploader@example.iam.gserviceaccount.com`. Android is still not released until the original upload keystore is recovered or Play upload-key reset is completed, because local `android-spike/upload-keystore.jks` signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1` while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`.
 - Play store listing icon is also guarded now. `scripts/sync-play-store-icon.sh --check` currently detects that the `en-US` listing has no icon. `--apply` prepares the correct `android-spike/play-assets/justread-icon-512.png`, but Play rejects commit until the service account has `CAN_MANAGE_PUBLIC_LISTING` / **Edit store listing information** permission.
 
 ## 1. Create the app in Play Console (one time)
@@ -93,7 +93,7 @@ On this machine, that path may be a symlink to the shared uploader:
 ~/.config/shh/play-service-accounts/shos-google-play-service-account.json
 ```
 
-That shared account is intentionally allowlisted in the scripts and has Play Console access to JustRead. The preflight does a live Android Publisher API edit insert/delete against `com.shhtheonlyperson.fastread`, so missing Play permissions fail before any build or upload.
+Shared uploader accounts are intentionally allowlisted in the scripts and must have Play Console access to JustRead. The canonical shared uploader is `play-uploader@example.iam.gserviceaccount.com`; the legacy fallback is `legacy-play-uploader@example.iam.gserviceaccount.com`. The preflight does a live Android Publisher API edit insert/delete against `com.shhtheonlyperson.fastread`, so missing Play permissions fail before any build or upload.
 
 The store listing icon has a separate permission gate. Run this after granting **Edit store listing information** / `CAN_MANAGE_PUBLIC_LISTING`:
 
@@ -121,7 +121,7 @@ This stores the JSON as a 1Password document named `FastRead Google Play service
 
 Fastlane also accepts `FASTREAD_PLAY_SERVICE_ACCOUNT_JSON`, `SUPPLY_JSON_KEY`, `PLAY_STORE_JSON_KEY`, the shared `shos` machine-local fallback, and the legacy gitignored repo-local paths under `android-spike/`.
 
-The preflight expects the service-account email to contain `fastread` or match `FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS` (default: `legacy-play-uploader@example.iam.gserviceaccount.com`). If you intentionally use another shared Play uploader, grant that account access to the FastRead Play app first and set the allowlist explicitly.
+The preflight expects the service-account email to contain `fastread` or match `FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS` (default: `play-uploader@example.iam.gserviceaccount.com` plus the legacy `legacy-play-uploader@example.iam.gserviceaccount.com`). If you intentionally use another shared Play uploader, grant that account access to the FastRead Play app first and set the allowlist explicitly.
 
 1. Open [Play Console → Setup → API access](https://play.google.com/console/u/0/developers/api-access).
 2. Link or create a Google Cloud project. Naming doesn't matter — `fastread-publisher` is fine.

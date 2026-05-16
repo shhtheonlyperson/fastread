@@ -23,7 +23,7 @@ default_platform(:android)
 #   android-spike/google-play-service-account.fastread.json
 
 EXPECTED_FASTREAD_UPLOAD_SHA1 = "FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1"
-DEFAULT_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS = "legacy-play-uploader@example.iam.gserviceaccount.com"
+DEFAULT_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS = "legacy-play-uploader@example.iam.gserviceaccount.com,play-uploader@example.iam.gserviceaccount.com"
 
 platform :android do
   private_lane :ensure_java_home do
