@@ -4,6 +4,10 @@ export type ChunkSize = 1 | 2 | 3;
 export type OrpAccent = 'coral' | 'merlot' | 'teal' | 'amber';
 export type LocalePref = 'en' | 'zh_TW';
 
+export const WPM_MIN = 150;
+export const WPM_MAX = 1500;
+export const WPM_STEP = 25;
+
 export interface Settings {
   theme: Theme;
   font: FontFamily;

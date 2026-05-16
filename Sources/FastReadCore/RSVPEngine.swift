@@ -6,6 +6,11 @@ public enum RSVPEngine {
     /// chunking for the same input. Persisted tokens whose recorded
     /// `tokenizerVersion` doesn't match are discarded and recomputed.
     public static let version: Int = 1
+    public static let defaultWPM: Double = 450
+    public static let minimumSafeWPM: Double = 100
+    public static let minimumUserWPM: Double = 300
+    public static let maximumWPM: Double = 1_500
+    public static let wpmStep: Double = 25
 
     public struct FocusSplit: Equatable {
         public let before: String
@@ -331,8 +336,8 @@ public enum RSVPEngine {
     }
 
     private static func safeWPM(_ wpm: Double) -> Double {
-        let raw = wpm.isFinite && wpm != 0 ? wpm : 450
-        return clamp(raw, min: 100, max: 1200)
+        let raw = wpm.isFinite && wpm != 0 ? wpm : defaultWPM
+        return clamp(raw, min: minimumSafeWPM, max: maximumWPM)
     }
 
     private static func endsWithPunctuationPause(_ token: String) -> Bool {

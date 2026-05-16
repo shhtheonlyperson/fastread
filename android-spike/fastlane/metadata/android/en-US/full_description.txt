@@ -1,6 +1,6 @@
 JustRead is a focused RSVP (Rapid Serial Visual Presentation) speed reader. Words flash one at a time, anchored on a single highlighted letter so your eyes stay still while you read.
 
-Paste an article or write your own. JustRead splits the text into reading chunks aware of both English and Traditional Chinese word boundaries, then plays them back at your chosen pace from 300 to 1000 words per minute. Names and proper nouns can be added to a personal dictionary so they stay together as one chunk instead of being split character by character — useful for Chinese names like 黃士旗 that no general-purpose tokeniser knows about.
+Paste an article or write your own. JustRead splits the text into reading chunks aware of both English and Traditional Chinese word boundaries, then plays them back at your chosen pace from 300 to 1500 words per minute. Names and proper nouns can be added to a personal dictionary so they stay together as one chunk instead of being split character by character — useful for Chinese names like 黃士旗 that no general-purpose tokeniser knows about.
 
 The interface is paper-toned and editorial, with a single terracotta accent for the focus letter and the play control. Everything stays on-device.
 

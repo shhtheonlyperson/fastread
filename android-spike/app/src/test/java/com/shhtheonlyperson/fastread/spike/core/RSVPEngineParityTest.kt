@@ -15,6 +15,12 @@ import java.io.File
 class RSVPEngineParityTest {
     private val corpusFile = File("../../Tests/Fixtures/parity-corpus.json")
 
+    @Test
+    fun timingClampSupports1500Wpm() {
+        assertEquals(40, RSVPEngine.duration("read", 10_000.0, punctuationPause = false))
+        assertEquals(1.0, RSVPEngine.estimateMinutes(1500, 10_000.0), 0.0)
+    }
+
     // The JVM's java.text.BreakIterator is NOT ICU-backed; only Android's
     // runtime is. So this same engine produces Swift-equivalent tokens on
     // a Pixel 8 emulator but coarser tokens on the desktop JVM. To run

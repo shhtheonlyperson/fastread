@@ -2,6 +2,9 @@ import { createRoot } from 'react-dom/client';
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import {
   DEFAULTS,
+  WPM_MAX,
+  WPM_MIN,
+  WPM_STEP,
   getSettings,
   setSettings,
   type Settings,
@@ -122,7 +125,7 @@ function Options() {
                 <span className="label">{tr('defaultWpm')}</span>
                 <span className="value">
                   <input
-                    type="range" min={150} max={900} step={25}
+                    type="range" min={WPM_MIN} max={WPM_MAX} step={WPM_STEP}
                     value={s.wpm}
                     onChange={e => update({ wpm: Number(e.target.value) })}
                   />

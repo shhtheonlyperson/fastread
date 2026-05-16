@@ -95,7 +95,7 @@ fun PacePill(value: Int, selected: Boolean, onTap: () -> Unit) {
             .clip(RoundedCornerShape(3.dp))
             .background(bg)
             .clickable(onClick = onTap)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 10.dp, vertical = 10.dp)
             .testTag("pace-$value"),
     ) {
         Text(

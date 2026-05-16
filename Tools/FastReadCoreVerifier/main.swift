@@ -52,7 +52,7 @@ expect(RSVPEngine.duration(for: "read\")", wpm: 600, punctuationPause: true) > b
 
 expect(RSVPEngine.estimateMinutes(wordCount: 900, wpm: 900) == 1, "ETA should divide words by wpm")
 expect(RSVPEngine.duration(for: "read", wpm: 0, punctuationPause: false) == 133, "invalid wpm should default to 450")
-expect(RSVPEngine.duration(for: "read", wpm: 10_000, punctuationPause: false) == 50, "wpm should clamp at 1200")
+expect(RSVPEngine.duration(for: "read", wpm: 10_000, punctuationPause: false) == 40, "wpm should clamp at 1500")
 
 let middleContext = RSVPEngine.contextWindow(tokenCount: 1_000, currentIndex: 500)
 expect(middleContext.lowerBound == 482, "context window should include bounded tokens before the current word")

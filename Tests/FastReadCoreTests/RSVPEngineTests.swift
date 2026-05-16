@@ -106,12 +106,12 @@ final class RSVPEngineTests: XCTestCase {
         XCTAssertGreaterThan(RSVPEngine.duration(for: "讀。", wpm: 600, punctuationPause: true), 150)
         XCTAssertGreaterThan(RSVPEngine.duration(for: "internationalization", wpm: 600, punctuationPause: false), base)
         XCTAssertEqual(RSVPEngine.duration(for: "read", wpm: 0, punctuationPause: false), 133)
-        XCTAssertEqual(RSVPEngine.duration(for: "read", wpm: 10_000, punctuationPause: false), 50)
+        XCTAssertEqual(RSVPEngine.duration(for: "read", wpm: 10_000, punctuationPause: false), 40)
     }
 
     func testEstimateMinutesUsesClampedWPM() {
         XCTAssertEqual(RSVPEngine.estimateMinutes(wordCount: 900, wpm: 900), 1)
-        XCTAssertEqual(RSVPEngine.estimateMinutes(wordCount: 1200, wpm: 10_000), 1)
+        XCTAssertEqual(RSVPEngine.estimateMinutes(wordCount: 1500, wpm: 10_000), 1)
     }
 
     func testContextWindowStaysBoundedAndClamped() {

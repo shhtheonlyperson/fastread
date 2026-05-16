@@ -630,8 +630,8 @@ public final class ReadingStore: ObservableObject {
     }
 
     private static func normalizedWPM(_ value: Double) -> Double {
-        let clamped = RSVPEngine.clamp(value, min: 300, max: 1_000)
-        return (Double(((clamped - 300) / 25).rounded()) * 25) + 300
+        let clamped = RSVPEngine.clamp(value, min: RSVPEngine.minimumUserWPM, max: RSVPEngine.maximumWPM)
+        return (Double(((clamped - RSVPEngine.minimumUserWPM) / RSVPEngine.wpmStep).rounded()) * RSVPEngine.wpmStep) + RSVPEngine.minimumUserWPM
     }
 
     private func tokens(for article: ReadingArticle) -> [String] {

@@ -187,7 +187,7 @@ final class ReadingStoreTests: XCTestCase {
         store.setWPM(50)
         XCTAssertEqual(store.wpm, 300)
         store.setWPM(99_999)
-        XCTAssertEqual(store.wpm, 1_000)
+        XCTAssertEqual(store.wpm, 1_500)
         store.setWPM(450)
         XCTAssertEqual(store.wpm, 450)
         store.setWPM(463)

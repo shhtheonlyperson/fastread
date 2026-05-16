@@ -167,10 +167,11 @@ describe('durationMs', () => {
     expect(b).toBeGreaterThan(a);
     expect(b / a).toBeGreaterThan(1.5); // 1.65 multiplier
   });
-  it('clamps WPM into [100, 1200]', () => {
+  it('clamps WPM into [100, 1500]', () => {
     const at100 = durationMs('cat', 100);
     const atZero = durationMs('cat', 0);    // → safeWPM picks 450, smaller delay
-    const atHuge = durationMs('cat', 99999); // clamped to 1200
+    const atHuge = durationMs('cat', 99999); // clamped to 1500
+    expect(atHuge).toBe(40);
     expect(at100).toBeGreaterThan(atHuge);
     expect(atZero).toBeLessThan(at100);
   });

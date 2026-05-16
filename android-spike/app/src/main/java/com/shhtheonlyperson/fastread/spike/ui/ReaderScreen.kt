@@ -196,7 +196,7 @@ fun ReaderScreen(
 
         SectionLabel("PACE")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (target in listOf(300, 450, 600, 800, 1000)) {
+            for (target in listOf(300, 450, 600, 900, 1200, 1500)) {
                 PacePill(value = target, selected = wpm == target) {
                     wpm = target
                     onWpmChange(target)
@@ -228,7 +228,7 @@ fun ReaderScreen(
 
     if (autoSweepSeconds != null) {
         LaunchedEffect(Unit) {
-            for (target in listOf(600, 800, 1000, 1200)) {
+            for (target in listOf(600, 800, 1000, 1200, 1500)) {
                 wpm = target
                 onWpmChange(target)
                 index = 0

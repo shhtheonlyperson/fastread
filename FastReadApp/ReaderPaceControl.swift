@@ -30,7 +30,7 @@ struct ReaderPaceControl: View {
                         store.previewWPM(next)
                     }
                 ),
-                in: 300...1_000,
+                in: RSVPEngine.minimumUserWPM...RSVPEngine.maximumWPM,
                 onEditingChanged: { isEditing in
                     if !isEditing {
                         store.setWPM(paceDraft ?? store.wpm)
@@ -43,9 +43,9 @@ struct ReaderPaceControl: View {
             HStack {
                 Text("300")
                 Spacer()
-                Text("650")
+                Text("900")
                 Spacer()
-                Text("1000")
+                Text("1500")
             }
             .font(JRFont.mono(10))
             .tracking(0.6)
@@ -55,7 +55,7 @@ struct ReaderPaceControl: View {
     }
 
     private func snappedWPM(_ value: Double) -> Double {
-        let clamped = RSVPEngine.clamp(value, min: 300, max: 1_000)
-        return (Double(((clamped - 300) / 25).rounded()) * 25) + 300
+        let clamped = RSVPEngine.clamp(value, min: RSVPEngine.minimumUserWPM, max: RSVPEngine.maximumWPM)
+        return (Double(((clamped - RSVPEngine.minimumUserWPM) / RSVPEngine.wpmStep).rounded()) * RSVPEngine.wpmStep) + RSVPEngine.minimumUserWPM
     }
 }

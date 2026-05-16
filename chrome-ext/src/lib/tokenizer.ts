@@ -253,7 +253,7 @@ export function endsWithPunctuationPause(token: string): boolean {
 
 function safeWPM(wpm: number): number {
   const raw = Number.isFinite(wpm) && wpm !== 0 ? wpm : 450;
-  return Math.min(1200, Math.max(100, raw));
+  return Math.min(1500, Math.max(100, raw));
 }
 
 export function durationMs(token: string, wpm: number, punctuationPause = true): number {

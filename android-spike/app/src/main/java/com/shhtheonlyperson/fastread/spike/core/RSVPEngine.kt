@@ -15,6 +15,9 @@ object RSVPEngine {
     /// stored `tokenizerVersion` no longer matches this value. Kept in
     /// lock-step with Sources/FastReadCore/RSVPEngine.swift.
     const val VERSION: Int = 1
+    const val DEFAULT_WPM: Double = 450.0
+    const val MINIMUM_SAFE_WPM: Double = 100.0
+    const val MAXIMUM_WPM: Double = 1500.0
 
     data class FocusSplit(val before: String, val focus: String, val after: String)
 
@@ -275,8 +278,8 @@ object RSVPEngine {
     private fun isASCIIPunctuationPause(c: Char): Boolean = c in setOf('.', ',', '!', '?', ';', ':')
 
     private fun safeWPM(wpm: Double): Double {
-        val raw = if (wpm.isFinite() && wpm != 0.0) wpm else 450.0
-        return raw.coerceIn(100.0, 1200.0)
+        val raw = if (wpm.isFinite() && wpm != 0.0) wpm else DEFAULT_WPM
+        return raw.coerceIn(MINIMUM_SAFE_WPM, MAXIMUM_WPM)
     }
 
     private fun endsWithPunctuationPause(token: String): Boolean {

@@ -21,7 +21,7 @@ The journey is documented commit-by-commit:
 
 Linguistically correct word segmentation is the **wrong** target for RSVP.
 
-RSVP flashes one chunk at a time at 200–1000+ words per minute. The eye has 50–200 ms to register each chunk and the brain has even less. What works is **rhythmic chunking**: 2–4 character clusters that the eye-brain pipeline can recognise as a single Gestalt — *not* the dictionary word boundaries that NLTokenizer / ICU / jieba all converge on.
+RSVP flashes one chunk at a time at 200–1500 words per minute. The eye has 40–200 ms to register each chunk and the brain has even less. What works is **rhythmic chunking**: 2–4 character clusters that the eye-brain pipeline can recognise as a single Gestalt — *not* the dictionary word boundaries that NLTokenizer / ICU / jieba all converge on.
 
 Concrete example. `黃士旗去吃飯`:
 

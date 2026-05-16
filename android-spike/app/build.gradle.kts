@@ -29,7 +29,7 @@ android {
         // separate parity story we don't want to own for v1.
         minSdk = 34
         targetSdk = 35
-        versionCode = 7
+        versionCode = 8
         versionName = "0.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -34,11 +34,15 @@ rewrite.
   M3 host). Emulator is generally **slower** than real Pixel 8
   silicon because of virtualisation overhead — real-device numbers
   will improve from here.
-- **Sweep**: `perf-sweep.sh` taps the WPM pill + START + STOP via
-  `adb shell input tap`, captures logcat, parses with
-  `perf-report.py`. ~25 s per WPM, first 5 samples dropped as warmup.
+- **Sweep**: `perf-sweep.sh` starts the in-app auto-sweep via launch
+  intent, captures logcat, parses with `perf-report.py`. ~25 s per
+  WPM, first 5 samples dropped as warmup.
 
 ## Results
+
+Historical sweep below covered 600 / 800 / 1000 / 1200 WPM. The app now
+supports 1500 WPM; rerun `perf-sweep.sh` to add a measured 1500 row
+before using this report as release evidence for that ceiling.
 
 ```
  WPM  samples  avg_jitter     p50     p95     p99     max   >16ms   >33ms

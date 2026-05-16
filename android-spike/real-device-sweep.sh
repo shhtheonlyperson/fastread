@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build, install, and run the auto-sweep on a connected real device.
 # No tap automation needed — the spike app picks up `sweep_seconds`
-# from the launch intent and cycles 600 / 800 / 1000 / 1200 wpm in-app.
+# from the launch intent and cycles 600 / 800 / 1000 / 1200 / 1500 wpm in-app.
 #
 # Usage:
 #   ./real-device-sweep.sh                 # auto-pick the first non-emulator
@@ -47,9 +47,9 @@ adb -s "$SERIAL" install -r "$APK" | tail -1
 adb -s "$SERIAL" shell am force-stop "$PACKAGE" >/dev/null
 adb -s "$SERIAL" logcat -c
 adb -s "$SERIAL" shell am start -n "$ACTIVITY" --ei sweep_seconds "$SECONDS_PER_WPM" >/dev/null
-echo "→ sweep running ($SECONDS_PER_WPM s × 4 WPMs ≈ $((SECONDS_PER_WPM * 4 + 5))s)"
+echo "→ sweep running ($SECONDS_PER_WPM s × 5 WPMs ≈ $((SECONDS_PER_WPM * 5 + 5))s)"
 
-# Wait for the marker the app emits when all four WPMs are done.
+# Wait for the marker the app emits when all WPMs are done.
 until adb -s "$SERIAL" logcat -d -s FastReadSpike:I 2>/dev/null | grep -q "AUTO_SWEEP_DONE"; do
   sleep 2
 done

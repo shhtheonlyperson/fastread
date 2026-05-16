@@ -16,7 +16,7 @@ JustRead turns any web article into a clean, distraction-free reading view — a
 
 • **Reader View** — Strip ads, sidebars, banners, comments, and every other piece of chrome. Just the article, in a quiet typographic column. Light, dark themes. Serif and sans typefaces. Adjustable font size, line height, and column width.
 
-• **Fast Read (RSVP)** — Rapid Serial Visual Presentation. One word flashes at a time, centered on the optimal recognition point so your eyes don't have to dart. Read at your own pace from 150 to 1200 words per minute. Skip by sentence, pause, scrub. The whole flow is keyboard-driven (vim-style h/j/k/l, plus arrow keys and Space).
+• **Fast Read (RSVP)** — Rapid Serial Visual Presentation. One word flashes at a time, centered on the optimal recognition point so your eyes don't have to dart. Read at your own pace from 150 to 1500 words per minute. Skip by sentence, pause, scrub. The whole flow is keyboard-driven (vim-style h/j/k/l, plus arrow keys and Space).
 
 **Why JustRead is different:**
 

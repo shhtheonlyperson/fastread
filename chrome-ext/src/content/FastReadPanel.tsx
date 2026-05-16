@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ExtractedArticle } from '../lib/extract';
 import { RsvpEngine, tokenize, groupTokens, type RsvpToken } from '../lib/rsvp';
-import { setSettings, type Settings } from '../lib/storage';
+import { setSettings, WPM_MAX, WPM_MIN, WPM_STEP, type Settings } from '../lib/storage';
 import { t, type Locale } from '../lib/i18n';
 import { IconPlay, IconPause, IconRewind, IconForward, IconMinus, IconPlus } from '../lib/icons';
 
@@ -56,7 +56,7 @@ export function FastReadPanel({ article, settings, locale, onExitToReader, onExi
   };
 
   const adjustWpm = (delta: number) => {
-    const next = Math.min(1200, Math.max(150, wpmRef.current + delta));
+    const next = Math.min(WPM_MAX, Math.max(WPM_MIN, wpmRef.current + delta));
     setSettings({ wpm: next });
     wpmRef.current = next; // optimistic — keeps batched presses coherent.
   };
@@ -80,10 +80,10 @@ export function FastReadPanel({ article, settings, locale, onExitToReader, onExi
           e.preventDefault(); engineRef.current?.skipSentence(1); return;
         case 'ArrowUp':
         case 'k': case 'K':
-          e.preventDefault(); adjustWpm(25); return;
+          e.preventDefault(); adjustWpm(WPM_STEP); return;
         case 'ArrowDown':
         case 'j': case 'J':
-          e.preventDefault(); adjustWpm(-25); return;
+          e.preventDefault(); adjustWpm(-WPM_STEP); return;
         case 'Escape': {
           e.preventDefault();
           const idx = paragraphIndexFor(article.textContent, indexRef.current);
@@ -213,13 +213,13 @@ export function FastReadPanel({ article, settings, locale, onExitToReader, onExi
             <div className="jr-fr-dial-row">
               <button
                 className="jr-fr-dial-btn"
-                onClick={() => adjustWpm(-25)}
+                onClick={() => adjustWpm(-WPM_STEP)}
                 aria-label="Decrease WPM"
               ><IconMinus size={12} /></button>
               <span className="jr-fr-dial-num">{settings.wpm}</span>
               <button
                 className="jr-fr-dial-btn"
-                onClick={() => adjustWpm(25)}
+                onClick={() => adjustWpm(WPM_STEP)}
                 aria-label="Increase WPM"
               ><IconPlus size={12} /></button>
             </div>

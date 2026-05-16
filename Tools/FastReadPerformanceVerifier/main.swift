@@ -146,7 +146,11 @@ expect(!extracted.contains("window.bad"), "HTML extractor should remove script c
 measure("apply 20k WPM slider updates", budget: 25) {
     var value = 550.0
     for index in 0..<20_000 {
-        value = RSVPEngine.clamp(300 + Double(index % 700) + 0.42, min: 300, max: 1_000)
+        value = RSVPEngine.clamp(
+            RSVPEngine.minimumUserWPM + Double(index % 1_200) + 0.42,
+            min: RSVPEngine.minimumUserWPM,
+            max: RSVPEngine.maximumWPM
+        )
     }
     expect(value > 300, "WPM updates should preserve continuous values")
 }
