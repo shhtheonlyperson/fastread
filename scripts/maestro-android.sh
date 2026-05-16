@@ -33,7 +33,7 @@ fi
 echo "→ device: $DEVICE_UDID"
 
 # Build + install debug APK.
-gradle -q :app:assembleDebug -p "$ROOT/android-spike" >/dev/null
+"$ROOT/android-spike/gradlew" -q :app:assembleDebug -p "$ROOT/android-spike" >/dev/null
 APK="$ROOT/android-spike/app/build/outputs/apk/debug/app-debug.apk"
 adb -s "$DEVICE_UDID" install -r "$APK" >/dev/null
 echo "→ installed $APK"

@@ -1,14 +1,40 @@
 # JustRead
 
-Local RSVP speed reader for iOS. Imports EPUBs from Files / share sheet, splits each word at the optimal recognition point, and plays them back at a tunable WPM with optional punctuation pauses.
+Local RSVP speed reader across three shipped surfaces:
 
-## Run
+- Native iOS app in `FastReadApp/` plus shared Swift core in `Sources/FastReadCore/`
+- Native Android project in `android-spike/`
+- Chrome extension companion in `chrome-ext/`
+
+The core reader imports EPUBs, plain text, and fetched HTML, splits each word/chunk at the optimal recognition point, and plays them back at a tunable WPM with optional punctuation pauses.
+
+## Run iOS
 
 ```bash
 open FastRead.xcodeproj
 ```
 
 In Xcode, select scheme **FastRead**, target an iPhone simulator or device, and run. The app target is `JustRead`. It bundles Fraunces / Inter / JetBrains Mono, app icons, persisted reader settings, and registers `org.idpf.epub-container` so EPUBs from any other app can be opened directly into the library.
+
+## Run Android
+
+```bash
+scripts/verify-android.sh
+cd android-spike
+./gradlew :app:assembleDebug
+```
+
+The Android app is a native Compose project. It is still intentionally named `android-spike/` because the package/source layout has not yet been promoted into a shared KMP module. Treat it as a first-class release surface, but do not assume feature parity unless the relevant Android verifier or Maestro flow has run.
+
+## Run Chrome Extension
+
+```bash
+cd chrome-ext
+bun install --frozen-lockfile
+bun run build
+```
+
+For local development, use `bun run dev`. For Web Store packaging, use `bun run zip` and follow `chrome-ext/CHROME_WEB_STORE.md`.
 
 ## Reader pipeline
 
@@ -28,9 +54,17 @@ The shared core lives in `Sources/FastReadCore/` (a SwiftPM library) and is comp
 
 ```bash
 swift test
+scripts/verify-chrome-ext.sh
+scripts/verify-android.sh
 ```
 
-Default run is fast (~2s, 57 tests). Coverage:
+Current fast local coverage:
+
+- SwiftPM core: 100 tests, with the external EPUB corpus gated behind env vars
+- Chrome extension: typecheck plus 103 Vitest tests
+- Android: Gradle JVM unit-test task; current JVM coverage exercises reader playback state and EPUB text extraction, while tokenizer parity remains ignored until it moves to Android instrumentation
+
+SwiftPM suite coverage:
 
 | Suite | What it checks |
 | --- | --- |
@@ -90,7 +124,12 @@ FASTREAD_RUN_EPUB_CORPUS=1 FASTREAD_EPUB_CORPUS_DIR=~/EPUBs swift test --filter 
 scripts/install-hooks.sh
 ```
 
-Wires `core.hooksPath = .githooks` so the tracked `pre-commit` (guardrails + `swift test`) and `pre-push` (the full verifier) hooks fire automatically. Re-run after a fresh clone.
+Wires `core.hooksPath = .githooks` so the tracked `pre-commit` and `pre-push` hooks fire automatically. Re-run after a fresh clone.
+
+- `pre-commit`: source guardrails, `swift test`, Chrome typecheck/Vitest
+- `pre-push`: iOS verifier, Chrome verifier, Android JVM unit tests
+
+See `docs/CODE_QUALITY.md` for the current verification matrix, known gaps, and refactor backlog.
 
 ## Pre-push gate (manual)
 
@@ -98,7 +137,7 @@ Wires `core.hooksPath = .githooks` so the tracked `pre-commit` (guardrails + `sw
 scripts/verify-ios-performance.sh
 ```
 
-Runs source-level guardrails, the Swift test suite, the headless verifier executables, and a Release simulator build without signing. CI mirrors this on every push to `main` and every pull request.
+Runs source-level guardrails, the Swift test suite, the headless verifier executables, a Release iOS build without signing, and simulator/UI flows when local fixtures/tools are available. CI mirrors the headless iOS, Chrome, and Android unit-test portions on every push to `main` and every pull request.
 
 ## Layout
 
@@ -110,5 +149,8 @@ Tests/FastReadCoreTests/   # XCTest
 Tests/Fixtures/            # HTML / EPUB / parity fixtures bundled into the test target
 Tools/FastReadCoreVerifier/        # headless executable verifier
 Tools/FastReadPerformanceVerifier/ # perf budget verifier
+android-spike/             # Native Android Compose app and Play release lane
+chrome-ext/                # Manifest V3 extension, unit tests, e2e, store assets
+docs/                      # Release and tokenizer runbooks
 Package.swift              # SwiftPM library + executables for headless test runs
 ```

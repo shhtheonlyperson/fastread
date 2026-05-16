@@ -20,9 +20,22 @@ struct AddSourceView: View {
 
                 VStack(alignment: .leading, spacing: 28) {
                     clipboardHero
-                    epubPicker
-                    localEpubPicker
-                    recentSources
+                    EpubSourcePickerView(
+                        localEpubs: localEpubs,
+                        isLoading: isLoading,
+                        onPick: {
+                            refreshLocalEpubs()
+                            showEpubPicker = true
+                        },
+                        onImport: importLocalEpub
+                    )
+                    RecentSourcesView(
+                        sources: store.recentSources,
+                        isLoading: isLoading,
+                        onSelect: { url in
+                            Task { await fetchURL(url) }
+                        }
+                    )
                 }
                 .padding(.horizontal, 24)
             }
@@ -52,79 +65,6 @@ struct AddSourceView: View {
         }
         types.append(.data)
         return types
-    }
-
-    private var epubPicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "EPUB book")
-            Button {
-                refreshLocalEpubs()
-                showEpubPicker = true
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "book.closed")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(JRColor.terracotta)
-                    Text("Pick EPUB")
-                        .font(JRFont.serif(18, weight: .semibold))
-                        .foregroundStyle(JRColor.ink)
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(JRColor.inkQuiet)
-                }
-                .padding(.vertical, 14)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(JRColor.paperStrong)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .disabled(isLoading)
-            .opacity(isLoading ? 0.55 : 1)
-        }
-    }
-
-    @ViewBuilder
-    private var localEpubPicker: some View {
-        if !localEpubs.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionLabel(text: "Files folder")
-                ForEach(localEpubs) { file in
-                    Button {
-                        importLocalEpub(file)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "doc.richtext")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(JRColor.terracotta)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(file.displayName)
-                                    .font(JRFont.serif(17, weight: .semibold))
-                                    .foregroundStyle(JRColor.ink)
-                                    .lineLimit(2)
-                                Text(file.locationName)
-                                    .font(JRFont.mono(10))
-                                    .tracking(0.6)
-                                    .foregroundStyle(JRColor.inkQuiet)
-                            }
-                            Spacer()
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(JRColor.inkQuiet)
-                        }
-                        .padding(.vertical, 14)
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(JRColor.paperStrong)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isLoading)
-                    .opacity(isLoading ? 0.55 : 1)
-                }
-            }
-        }
     }
 
     @MainActor
@@ -178,37 +118,7 @@ struct AddSourceView: View {
     }
 
     private func refreshLocalEpubs() {
-        localEpubs = Self.findLocalEpubs()
-    }
-
-    private static func findLocalEpubs() -> [LocalEpubFile] {
-        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return []
-        }
-
-        let searchRoots = [
-            documentsURL,
-            documentsURL.appendingPathComponent("Inbox", isDirectory: true)
-        ]
-        var files: [LocalEpubFile] = []
-
-        for root in searchRoots {
-            guard let urls = try? FileManager.default.contentsOfDirectory(
-                at: root,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            ) else {
-                continue
-            }
-
-            for url in urls where url.pathExtension.caseInsensitiveCompare("epub") == .orderedSame {
-                files.append(LocalEpubFile(url: url, documentsURL: documentsURL))
-            }
-        }
-
-        return files.sorted {
-            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
-        }
+        localEpubs = LocalEpubFile.discoverInAppDocuments()
     }
 
     private var masthead: some View {
@@ -247,53 +157,6 @@ struct AddSourceView: View {
         status.hasPrefix("Loaded") || status.hasPrefix("Clipboard")
             ? JRColor.terracotta
             : JRColor.inkQuiet
-    }
-
-    private var recentSources: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionLabel(text: "Recent web sources")
-                .padding(.bottom, 12)
-
-            if store.recentSources.isEmpty {
-                Text("Fetched links appear here.")
-                    .font(JRFont.sans(13))
-                    .lineSpacing(3)
-                    .foregroundStyle(JRColor.inkQuiet)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 12)
-                    .overlay(alignment: .top) {
-                        Rectangle()
-                            .fill(JRColor.rule)
-                            .frame(height: 0.5)
-                    }
-            } else {
-                ForEach(Array(store.recentSources.enumerated()), id: \.element.id) { index, item in
-                    Button {
-                        guard let itemURL = item.url else { return }
-                        Task { await fetchURL(itemURL) }
-                    } label: {
-                        HStack {
-                            Text(item.label)
-                                .font(JRFont.mono(13))
-                                .foregroundStyle(JRColor.ink)
-                            Spacer()
-                            Text(item.date)
-                                .font(JRFont.sans(12))
-                                .foregroundStyle(JRColor.inkQuiet)
-                        }
-                        .padding(.vertical, 12)
-                        .overlay(alignment: .top) {
-                            Rectangle()
-                                .fill(JRColor.rule)
-                                .frame(height: index == 0 ? 0.5 : 0.5)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(item.url == nil || isLoading)
-                    .opacity(isLoading ? 0.55 : 1)
-                }
-            }
-        }
     }
 
     @MainActor
@@ -339,212 +202,3 @@ struct AddSourceView: View {
         }
     }
 }
-
-private struct LocalEpubFile: Identifiable, Hashable {
-    let url: URL
-    private let documentsURL: URL
-
-    init(url: URL, documentsURL: URL) {
-        self.url = url
-        self.documentsURL = documentsURL
-    }
-
-    var id: String { url.path }
-
-    var displayName: String {
-        url.deletingPathExtension().lastPathComponent
-    }
-
-    var locationName: String {
-        if url.deletingLastPathComponent() == documentsURL {
-            return "ON MY IPHONE / JUSTREAD"
-        }
-        return "ON MY IPHONE / JUSTREAD / \(url.deletingLastPathComponent().lastPathComponent.uppercased())"
-    }
-}
-
-private struct ClipboardPasteButton: View {
-    let isLoading: Bool
-    let action: (String) -> Void
-
-    var body: some View {
-        ZStack {
-            card
-                .accessibilityHidden(true)
-
-            SystemPasteControl(isEnabled: !isLoading, action: action)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 92)
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .accessibilityLabel(isLoading ? "Fetching clipboard content" : "Paste from clipboard")
-        }
-        .disabled(isLoading)
-        .opacity(isLoading ? 0.72 : 1)
-    }
-
-    private var card: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(JRColor.terracotta.opacity(0.11))
-                Image(systemName: isLoading ? "arrow.triangle.2.circlepath" : "doc.on.clipboard")
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(JRColor.terracotta)
-            }
-            .frame(width: 48, height: 48)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(isLoading ? "Fetching" : "Paste from clipboard")
-                    .font(JRFont.serif(22, weight: .semibold))
-                    .tracking(-0.3)
-                    .foregroundStyle(JRColor.ink)
-                Text(isLoading ? "Preparing readable text" : "URL or text")
-                    .font(JRFont.mono(11, weight: .medium))
-                    .tracking(0.66)
-                    .foregroundStyle(JRColor.inkQuiet)
-                    .textCase(.uppercase)
-            }
-
-            Spacer(minLength: 8)
-
-            Image(systemName: "arrow.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(JRColor.inkQuiet)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
-        .background(JRColor.paperStrong)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .borderBeam(
-            border: JRColor.terracotta,
-            beam: [JRColor.terracotta, Color(hex: 0xDFA15D)],
-            beamBlur: 12,
-            cornerRadius: 6,
-            isEnabled: !isLoading
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-    }
-}
-
-#if canImport(UIKit)
-private struct SystemPasteControl: UIViewRepresentable {
-    let isEnabled: Bool
-    let action: (String) -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(action: action)
-    }
-
-    func makeUIView(context: Context) -> UIPasteControl {
-        let configuration = UIPasteControl.Configuration()
-        configuration.displayMode = .labelOnly
-        configuration.baseBackgroundColor = .clear
-        configuration.baseForegroundColor = .clear
-        configuration.cornerRadius = 6
-
-        let control = UIPasteControl(configuration: configuration)
-        control.target = context.coordinator.target
-        control.isEnabled = isEnabled
-        control.alpha = 0.011
-        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        control.setContentHuggingPriority(.defaultLow, for: .vertical)
-        return control
-    }
-
-    func updateUIView(_ control: UIPasteControl, context: Context) {
-        context.coordinator.target.action = action
-        control.target = context.coordinator.target
-        control.isEnabled = isEnabled
-    }
-
-    @MainActor
-    final class Coordinator {
-        let target: PasteTarget
-
-        init(action: @escaping (String) -> Void) {
-            target = PasteTarget(action: action)
-        }
-    }
-
-    @MainActor
-    final class PasteTarget: UIResponder {
-        var action: (String) -> Void
-
-        init(action: @escaping (String) -> Void) {
-            self.action = action
-            super.init()
-            pasteConfiguration = UIPasteConfiguration(acceptableTypeIdentifiers: Self.acceptedTypeIdentifiers)
-        }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        func canPasteItemProviders(_ itemProviders: [NSItemProvider]) -> Bool {
-            itemProviders.contains { provider in
-                Self.acceptedTypeIdentifiers.contains { provider.hasItemConformingToTypeIdentifier($0) }
-            }
-        }
-
-        override func paste(itemProviders: [NSItemProvider]) {
-            guard let (provider, typeIdentifier) = firstAcceptedProvider(in: itemProviders) else {
-                action("")
-                return
-            }
-
-            provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { item, _ in
-                let value: String
-                if let string = item as? String {
-                    value = string
-                } else if let url = item as? URL {
-                    if typeIdentifier == UTType.url.identifier {
-                        value = url.absoluteString
-                    } else {
-                        value = (try? String(contentsOf: url, encoding: .utf8)) ?? url.absoluteString
-                    }
-                } else if let data = item as? Data {
-                    value = String(data: data, encoding: .utf8) ?? ""
-                } else if let nsString = item as? NSString {
-                    value = nsString as String
-                } else {
-                    value = ""
-                }
-
-                DispatchQueue.main.async {
-                    self.action(value)
-                }
-            }
-        }
-
-        private static let acceptedTypeIdentifiers = [
-            UTType.plainText.identifier,
-            UTType.text.identifier,
-            UTType.url.identifier
-        ]
-
-        private func firstAcceptedProvider(in providers: [NSItemProvider]) -> (NSItemProvider, String)? {
-            for provider in providers {
-                for typeIdentifier in Self.acceptedTypeIdentifiers where provider.hasItemConformingToTypeIdentifier(typeIdentifier) {
-                    return (provider, typeIdentifier)
-                }
-            }
-            return nil
-        }
-    }
-}
-#else
-private struct SystemPasteControl: View {
-    let isEnabled: Bool
-    let action: (String) -> Void
-
-    var body: some View {
-        Button {
-            action("")
-        } label: {
-            Color.clear
-        }
-        .disabled(!isEnabled)
-    }
-}
-#endif

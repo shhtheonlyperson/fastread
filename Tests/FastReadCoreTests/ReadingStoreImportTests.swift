@@ -9,7 +9,6 @@ import XCTest
 final class ReadingStoreImportTests: XCTestCase {
     private func makeArticle(from document: Document, source: String, sourceURL: String? = nil) -> ReadingArticle {
         let flattened = Document.flattenText(document)
-        let tokens = RSVPEngine.tokenize(flattened)
         let title = document.title.isEmpty ? "Pasted text" : document.title
         let author = document.author.isEmpty ? "You" : document.author
         return ReadingArticle(

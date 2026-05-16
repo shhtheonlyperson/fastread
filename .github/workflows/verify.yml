@@ -30,3 +30,46 @@ jobs:
 
       - name: Build Release iOS app
         run: xcodebuild -project FastRead.xcodeproj -scheme FastRead -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+
+  chrome-extension:
+    name: Chrome extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: Install dependencies
+        working-directory: chrome-ext
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: chrome-ext
+        run: bun run typecheck
+
+      - name: Run unit tests
+        working-directory: chrome-ext
+        run: bun run test
+
+  android-unit:
+    name: Android unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Run Android unit tests
+        working-directory: android-spike
+        run: ./gradlew :app:testDebugUnitTest

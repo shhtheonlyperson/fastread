@@ -15,6 +15,10 @@
 		C8A2F31E5E4D4C9F8B127A50 /* ChunkShaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A2F31E5E4D4C9F8B127A51 /* ChunkShaper.swift */; };
 		15552BB9DA20A949BB01CD56 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0E00466B5860507CB216E6 /* Models.swift */; };
 		1D831D8C8E97EEBC9578AEF3 /* AddSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E2F445EF5E719C926A5E96 /* AddSourceView.swift */; };
+		AA2000000000000000000028 /* ClipboardPasteButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000018 /* ClipboardPasteButton.swift */; };
+		AA2000000000000000000026 /* EpubSourcePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000016 /* EpubSourcePickerView.swift */; };
+		AA2000000000000000000024 /* FocusModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000014 /* FocusModeView.swift */; };
+		AA2000000000000000000029 /* LocalEpubFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000019 /* LocalEpubFile.swift */; };
 		29D48A3F31278EA97CBE6371 /* StorageMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA151E47FA34E4D70C3359E /* StorageMigration.swift */; };
 		30CA92F0603EA2D7158F76CD /* FastReadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2F0D4E6952343248C33C18 /* FastReadApp.swift */; };
 		3B1504118F1AFCC69395E166 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAA2C730EF5DD241AE55DE84 /* DesignSystem.swift */; };
@@ -24,6 +28,11 @@
 		70E54D5C4C0F47A8B4E7B6ED /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7CF4167B359970DDB28258 /* SplashView.swift */; };
 		7CB49841C59032CB5F913F25 /* EpubImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79F590968E0568FC2894518 /* EpubImporter.swift */; };
 		8364EF87A840310DC649D51D /* UrlIngest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7824B9896AB1602B9EEBD45E /* UrlIngest.swift */; };
+		AA2000000000000000000021 /* PlaybackTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000011 /* PlaybackTiming.swift */; };
+		AA2000000000000000000022 /* ReaderPaceControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000012 /* ReaderPaceControl.swift */; };
+		AA2000000000000000000023 /* ReaderStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000013 /* ReaderStageView.swift */; };
+		AA2000000000000000000025 /* ReaderTOCDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000015 /* ReaderTOCDrawer.swift */; };
+		AA2000000000000000000027 /* RecentSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000017 /* RecentSourcesView.swift */; };
 		AA10000000000000000000A2 /* FastReadHappyPathUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* FastReadHappyPathUITests.swift */; };
 		95D09B32C7D345423240EBC0 /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD8F34083BFBDE1B7AE4876 /* ReaderView.swift */; };
 		9C3A110D9B4B17450C51270E /* JetBrainsMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CABEBE25C323EE596FDDC42A /* JetBrainsMono.ttf */; };
@@ -41,6 +50,10 @@
 		1C0E00466B5860507CB216E6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		23E876C05B5261D9849302AA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		24E2F445EF5E719C926A5E96 /* AddSourceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSourceView.swift; sourceTree = "<group>"; };
+		AA2000000000000000000018 /* ClipboardPasteButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardPasteButton.swift; sourceTree = "<group>"; };
+		AA2000000000000000000016 /* EpubSourcePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpubSourcePickerView.swift; sourceTree = "<group>"; };
+		AA2000000000000000000014 /* FocusModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusModeView.swift; sourceTree = "<group>"; };
+		AA2000000000000000000019 /* LocalEpubFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalEpubFile.swift; sourceTree = "<group>"; };
 		34601800AA37205EEEB84674 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		38B1E41A59263BDDBD274708 /* ReadingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingStore.swift; sourceTree = "<group>"; };
 		52F41E8DAF83EC046777FBAA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -48,6 +61,11 @@
 		7ECE7A05ED2A054D3E4A9BE3 /* FastRead.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FastRead.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8530D677A6E5C8091F891F68 /* Importers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Importers.swift; sourceTree = "<group>"; };
 		8E7CF4167B359970DDB28258 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		AA2000000000000000000011 /* PlaybackTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTiming.swift; sourceTree = "<group>"; };
+		AA2000000000000000000012 /* ReaderPaceControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPaceControl.swift; sourceTree = "<group>"; };
+		AA2000000000000000000013 /* ReaderStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderStageView.swift; sourceTree = "<group>"; };
+		AA2000000000000000000015 /* ReaderTOCDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTOCDrawer.swift; sourceTree = "<group>"; };
+		AA2000000000000000000017 /* RecentSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentSourcesView.swift; sourceTree = "<group>"; };
 		98798242F669C12BF85C749E /* ReadingArticle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingArticle.swift; sourceTree = "<group>"; };
 		9ADE6B2CF9774E32ADEF766C /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
 		9BA151E47FA34E4D70C3359E /* StorageMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageMigration.swift; sourceTree = "<group>"; };
@@ -110,12 +128,20 @@
 				B934EC1FBD2E3A69EE6A5ADB /* Resources */,
 				24E2F445EF5E719C926A5E96 /* AddSourceView.swift */,
 				34601800AA37205EEEB84674 /* Assets.xcassets */,
+				AA2000000000000000000018 /* ClipboardPasteButton.swift */,
 				23E876C05B5261D9849302AA /* ContentView.swift */,
 				DAA2C730EF5DD241AE55DE84 /* DesignSystem.swift */,
+				AA2000000000000000000016 /* EpubSourcePickerView.swift */,
 				AC2F0D4E6952343248C33C18 /* FastReadApp.swift */,
+				AA2000000000000000000014 /* FocusModeView.swift */,
 				52F41E8DAF83EC046777FBAA /* Info.plist */,
 				FEED61BDDD8732C345E85E72 /* LibraryView.swift */,
+				AA2000000000000000000019 /* LocalEpubFile.swift */,
+				AA2000000000000000000012 /* ReaderPaceControl.swift */,
+				AA2000000000000000000013 /* ReaderStageView.swift */,
+				AA2000000000000000000015 /* ReaderTOCDrawer.swift */,
 				FDD8F34083BFBDE1B7AE4876 /* ReaderView.swift */,
+				AA2000000000000000000017 /* RecentSourcesView.swift */,
 				00C0A24C05104D4F78878634 /* SettingsView.swift */,
 				8E7CF4167B359970DDB28258 /* SplashView.swift */,
 				EE2A1F36E0B2E2A8AF8F22F7 /* StatsView.swift */,
@@ -130,6 +156,7 @@
 				D79F590968E0568FC2894518 /* EpubImporter.swift */,
 				8530D677A6E5C8091F891F68 /* Importers.swift */,
 				1C0E00466B5860507CB216E6 /* Models.swift */,
+				AA2000000000000000000011 /* PlaybackTiming.swift */,
 				98798242F669C12BF85C749E /* ReadingArticle.swift */,
 				38B1E41A59263BDDBD274708 /* ReadingStore.swift */,
 				FA4B7F5A93890ABF14673F1C /* RSVPEngine.swift */,
@@ -255,19 +282,28 @@
 			buildActionMask = 2147483647;
 			files = (
 				1D831D8C8E97EEBC9578AEF3 /* AddSourceView.swift in Sources */,
+				AA2000000000000000000028 /* ClipboardPasteButton.swift in Sources */,
 				577F4392A5CBDB6AE414E217 /* ContentView.swift in Sources */,
 				3B1504118F1AFCC69395E166 /* DesignSystem.swift in Sources */,
 				0C265CD8831A4E689904BAC3 /* Document.swift in Sources */,
+				AA2000000000000000000026 /* EpubSourcePickerView.swift in Sources */,
 				7CB49841C59032CB5F913F25 /* EpubImporter.swift in Sources */,
 				30CA92F0603EA2D7158F76CD /* FastReadApp.swift in Sources */,
+				AA2000000000000000000024 /* FocusModeView.swift in Sources */,
 				BFF358F640B6F726A42D1D86 /* Importers.swift in Sources */,
 				9FE51353B9131D0A8F8118F2 /* LibraryView.swift in Sources */,
+				AA2000000000000000000029 /* LocalEpubFile.swift in Sources */,
 				15552BB9DA20A949BB01CD56 /* Models.swift in Sources */,
+				AA2000000000000000000021 /* PlaybackTiming.swift in Sources */,
 				0D60DE15C487A9CE6E5EDE59 /* RSVPEngine.swift in Sources */,
 				C8A2F31E5E4D4C9F8B127A50 /* ChunkShaper.swift in Sources */,
+				AA2000000000000000000022 /* ReaderPaceControl.swift in Sources */,
+				AA2000000000000000000023 /* ReaderStageView.swift in Sources */,
+				AA2000000000000000000025 /* ReaderTOCDrawer.swift in Sources */,
 				95D09B32C7D345423240EBC0 /* ReaderView.swift in Sources */,
 				09AD17DA1A143CDDE10A3F10 /* ReadingArticle.swift in Sources */,
 				056374111C5ECA1B6ABAD815 /* ReadingStore.swift in Sources */,
+				AA2000000000000000000027 /* RecentSourcesView.swift in Sources */,
 				E06CA5AB72831174EEB11CA6 /* SettingsView.swift in Sources */,
 				70E54D5C4C0F47A8B4E7B6ED /* SplashView.swift in Sources */,
 				F1E31B2FBA1E18E04C340372 /* StatsView.swift in Sources */,
@@ -351,7 +387,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = QLJ9ZM278S;
 				INFOPLIST_FILE = FastReadApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -430,7 +466,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = QLJ9ZM278S;
 				INFOPLIST_FILE = FastReadApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

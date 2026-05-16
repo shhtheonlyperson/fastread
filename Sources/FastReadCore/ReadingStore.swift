@@ -355,11 +355,8 @@ public final class ReadingStore: ObservableObject {
         playbackTask?.cancel()
         guard isPlaying, !currentTokens.isEmpty else { return }
 
-        let delay = RSVPEngine.duration(
-            for: currentToken,
-            wpm: wpm,
-            punctuationPause: punctuationPause
-        )
+        let timing = PlaybackTiming(wpm: wpm, punctuationPause: punctuationPause)
+        let delay = timing.durationMilliseconds(for: currentToken)
 
         playbackTask = Task { @MainActor [weak self] in
             do {
@@ -391,13 +388,13 @@ public final class ReadingStore: ObservableObject {
     private func advanceFromTimer() {
         guard isPlaying else { return }
 
-        if currentIndex >= currentTokens.count - 1 {
+        guard let nextIndex = PlaybackTiming.nextIndex(after: currentIndex, tokenCount: currentTokens.count) else {
             pause()
             return
         }
 
         updateSelectedArticle { article in
-            article.wordIndex += 1
+            article.wordIndex = nextIndex
         }
         recordReadWords(1)
         scheduleNext()

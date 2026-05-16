@@ -138,6 +138,20 @@ final class ReadingStoreTests: XCTestCase {
         XCTAssertFalse(store.isPlaying)
     }
 
+    func testMarkReadUpdatesStatsOnce() {
+        let store = makeStore()
+        store.addDraftArticle(text: Self.longBody(40), title: "Finishable")
+
+        store.markRead()
+        store.markRead()
+
+        XCTAssertEqual(store.stats.today.articles, 1)
+        XCTAssertEqual(store.stats.totalArticles, 1)
+        XCTAssertEqual(store.stats.streak, 1)
+        XCTAssertEqual(store.stats.avgWPM, Int(store.wpm.rounded()))
+        XCTAssertEqual(store.stats.bestWPM, Int(store.wpm.rounded()))
+    }
+
     // MARK: - Playback toggling
 
     func testPlayRequiresMoreThanOneToken() {
@@ -223,6 +237,35 @@ final class ReadingStoreTests: XCTestCase {
         XCTAssertEqual(reborn.articles.count, 1)
         XCTAssertEqual(reborn.articles[0].title, "Persisted")
         XCTAssertEqual(reborn.currentArticle?.wordIndex, 7, "wordIndex survives a UserDefaults round trip")
+    }
+
+    func testRecentSourcesDropsClipboardAndDeduplicatesByURL() {
+        let store = makeStore()
+        store.addDraftArticle(text: Self.longBody(20), title: "Clipboard", source: "Clipboard")
+        store.addFetchedArticle(
+            title: "First",
+            source: "Example",
+            text: Self.longBody(20),
+            url: "https://example.com/post"
+        )
+        store.addFetchedArticle(
+            title: "Duplicate",
+            source: "Example duplicate",
+            text: Self.longBody(20),
+            url: "https://EXAMPLE.com/post"
+        )
+        store.addFetchedArticle(
+            title: "Second",
+            source: "Other",
+            text: Self.longBody(20),
+            url: "https://other.example/post"
+        )
+
+        XCTAssertEqual(store.recentSources.map(\.url), [
+            "https://other.example/post",
+            "https://EXAMPLE.com/post",
+        ])
+        XCTAssertFalse(store.recentSources.contains { $0.label == "Clipboard" })
     }
 
     // MARK: - Section / front matter glue

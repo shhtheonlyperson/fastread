@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Source-level guardrails for the iOS-only repo. Catches a small set of
-# regression patterns that have bitten us before and that are cheaper to
-# enforce as a grep than as a full XCTest.
+# Source-level guardrails for the native iOS app/core. Catches a small
+# set of regression patterns that have bitten us before and that are
+# cheaper to enforce as a grep than as a full XCTest.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

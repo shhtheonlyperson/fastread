@@ -25,7 +25,10 @@ public enum EpubError: Error, Equatable {
 
 public enum EpubParser {
     public static func readEntries(from data: Data) throws -> [String: Data] {
-        guard let archive = try? Archive(data: data, accessMode: .read) else {
+        let archive: Archive
+        do {
+            archive = try Archive(data: data, accessMode: .read)
+        } catch {
             throw EpubError.invalidArchive
         }
         var out: [String: Data] = [:]

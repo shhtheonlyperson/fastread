@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Local pre-push gate. Runs source guardrails, the Swift unit + parity
 # tests, the headless verifiers, a Release simulator build with signing
-# disabled, and the FastReadUITests happy-path XCUITest. Mirrored by CI
-# in .github/workflows.
+# disabled, and the FastReadUITests happy-path XCUITest when the EPUB
+# fixture is available. CI mirrors the headless iOS build/test/perf
+# portion; local pre-push may run the simulator-only flows too.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

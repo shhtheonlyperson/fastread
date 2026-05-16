@@ -36,6 +36,36 @@ final class UrlIngestTests: XCTestCase {
         XCTAssertEqual(result.title, "Sample Article")
     }
 
+    func testFetchAcceptsPlainTextWithoutContentType() async throws {
+        let text = String(repeating: "Plain text article body with enough readable words for the importer. ", count: 4)
+        StubURLProtocol.handler = { _ in
+            (Self.httpResponse(status: 200, headers: [:], url: URL(string: "https://example.com/plain")!), Data(text.utf8))
+        }
+
+        let result = try await ArticleLoader.fetch(urlString: "example.com/plain", session: session)
+
+        XCTAssertEqual(result.source, "example.com")
+        XCTAssertEqual(result.url, "https://example.com/plain")
+        XCTAssertGreaterThan(result.wordCount, 20)
+        XCTAssertTrue(result.text.contains("Plain text article body"))
+    }
+
+    func testFetchFallsBackToLatin1() async throws {
+        let html = """
+        <html><head><title>Latin1</title></head><body><article><p>Café résumé naïve façade. \(String(repeating: "More readable words. ", count: 8))</p></article></body></html>
+        """
+        let data = html.data(using: .isoLatin1)!
+        StubURLProtocol.handler = { _ in
+            (Self.httpResponse(status: 200, headers: ["Content-Type": "text/html; charset=iso-8859-1"]), data)
+        }
+
+        let result = try await ArticleLoader.fetch(urlString: "https://example.com/latin1", session: session)
+
+        XCTAssertEqual(result.title, "Latin1")
+        XCTAssertTrue(result.text.contains("Café résumé"))
+        XCTAssertGreaterThan(result.wordCount, 20)
+    }
+
     func test404ThrowsHttpError() async {
         StubURLProtocol.handler = { _ in
             (Self.httpResponse(status: 404, headers: ["Content-Type": "text/html"]), Data("not found".utf8))
@@ -96,6 +126,12 @@ final class UrlIngestTests: XCTestCase {
         }
     }
 
+    func testBlankURLThrowsInvalidURL() async {
+        await assertThrows(ArticleFetchError.invalidURL) {
+            _ = try await ArticleLoader.fetch(urlString: "   ", session: self.session)
+        }
+    }
+
     // MARK: - Helpers
 
     private func assertThrows(
@@ -127,7 +163,7 @@ final class UrlIngestTests: XCTestCase {
     }
 }
 
-private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
+private final class StubURLProtocol: URLProtocol {
     typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)
     private static let lock = NSLock()
     nonisolated(unsafe) private static var _handler: Handler?

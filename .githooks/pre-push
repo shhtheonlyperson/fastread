@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Pre-push gate: full verifier — source guardrails, unit + integration
-# Swift tests, headless verifier executables, a Release iOS build
-# without signing, and the FastReadUITests happy-path XCUITest on the
-# pinned iPhone 17 Pro simulator. Mirrors what CI runs on every push to
-# main and every pull request.
+# Pre-push gate: full verifier — source guardrails, Swift tests,
+# headless verifier executables, a Release iOS build without signing,
+# optional simulator/UI flows, and Chrome extension checks. CI mirrors
+# the headless iOS, Chrome, and Android unit portions.
 #
 # Skip with `git push --no-verify` only when the user has explicitly
 # asked you to.
@@ -14,3 +13,4 @@ cd "$ROOT_DIR"
 
 scripts/verify-ios-performance.sh
 scripts/verify-chrome-ext.sh
+scripts/verify-android.sh

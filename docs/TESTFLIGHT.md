@@ -147,9 +147,9 @@ On May 8, 2026, build `24` initially showed `MISSING_EXPORT_COMPLIANCE`. Setting
 
 Internal TestFlight groups cannot be assigned through `POST /v1/builds/{id}/relationships/betaGroups`; Apple returns `Builds cannot be assigned to this internal group`. Treat a `VALID` uploaded build as the CLI completion point, then verify group availability in App Store Connect UI if needed.
 
-End-to-end steps for taking the current `main` build of JustRead to TestFlight from the command line. Assumes a working iOS Distribution certificate is reachable through Xcode (sign in once via Xcode → Settings → Accounts if you haven't on this machine).
+End-to-end steps for taking the current `main` iOS build of JustRead to TestFlight from the command line. Assumes a working iOS Distribution certificate is reachable through Xcode (sign in once via Xcode → Settings → Accounts if you haven't on this machine).
 
-The repo is iOS-only; there is no Expo / EAS pipeline. Distribution goes through `xcodebuild archive` + `xcrun altool`.
+The iOS distribution path is native Xcode only; there is no Expo / EAS pipeline. The repo also contains Android and Chrome extension targets, but TestFlight distribution goes through `xcodebuild archive` + `xcrun altool`.
 
 ---
 
