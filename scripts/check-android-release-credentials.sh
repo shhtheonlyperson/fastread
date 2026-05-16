@@ -131,6 +131,15 @@ else
         fail "Play API access check failed for $PLAY_PACKAGE using $service_account_path"
       fi
     fi
+
+    if [ "${FASTREAD_SKIP_PLAY_ICON_CHECK:-0}" != "1" ]; then
+      if icon_result="$("$ROOT_DIR/scripts/sync-play-store-icon.sh" --check 2>&1)"; then
+        log "Play store listing icon verified: $icon_result"
+      else
+        fail "Play store listing icon check failed."
+        printf '%s\n' "$icon_result" >&2
+      fi
+    fi
   fi
 fi
 

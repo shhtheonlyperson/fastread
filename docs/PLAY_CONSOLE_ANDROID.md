@@ -21,7 +21,8 @@ Play Console is the source of truth. Update this section after each release atte
   `REPLACEMENT_UPLOAD_KEY_SHA1`
 - Local `android-spike/upload-keystore.jks` SHA-256:
   `26:7A:61:85:52:5B:4B:2C:AD:79:7E:89:23:AA:BD:15:66:14:C7:E9:C0:82:0F:A4:D6:D2:B9:A4:BA:79:76:18`
-- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB. The Play service-account blocker is fixed: the shared uploader `legacy-play-uploader@example.iam.gserviceaccount.com` is granted to JustRead and passes Android Publisher API edit insert/delete. Android is still not released until the original upload keystore is recovered or Play upload-key reset is completed, because local `android-spike/upload-keystore.jks` signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1` while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`.
+- May 16, 2026 release attempt: Fastlane `verify` produced a valid versionCode 8 AAB. The Play service-account release blocker is fixed: the shared uploader `legacy-play-uploader@example.iam.gserviceaccount.com` is granted to JustRead and passes Android Publisher API edit insert/delete. Android is still not released until the original upload keystore is recovered or Play upload-key reset is completed, because local `android-spike/upload-keystore.jks` signs with SHA-1 `REPLACEMENT_UPLOAD_KEY_SHA1` while Play expects `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`.
+- Play store listing icon is also guarded now. `scripts/sync-play-store-icon.sh --check` currently detects that the `en-US` listing has no icon. `--apply` prepares the correct `android-spike/play-assets/justread-icon-512.png`, but Play rejects commit until the service account has `CAN_MANAGE_PUBLIC_LISTING` / **Edit store listing information** permission.
 
 ## 1. Create the app in Play Console (one time)
 
@@ -78,6 +79,7 @@ The preflight checks both gates before a long build:
 
 - Play service-account JSON exists and is a real Google Cloud service-account key.
 - `android-spike/keystore.properties` points at an upload keystore whose SHA-1 matches Play Console.
+- Play store listing icon matches `android-spike/play-assets/justread-icon-512.png`.
 
 The canonical machine-local service-account path is:
 
@@ -92,6 +94,13 @@ On this machine, that path may be a symlink to the shared uploader:
 ```
 
 That shared account is intentionally allowlisted in the scripts and has Play Console access to JustRead. The preflight does a live Android Publisher API edit insert/delete against `com.shhtheonlyperson.fastread`, so missing Play permissions fail before any build or upload.
+
+The store listing icon has a separate permission gate. Run this after granting **Edit store listing information** / `CAN_MANAGE_PUBLIC_LISTING`:
+
+```bash
+scripts/sync-play-store-icon.sh --apply
+scripts/sync-play-store-icon.sh --check
+```
 
 Do not leave the downloaded JSON in `~/Downloads` or inside a repo checkout. Install it immediately with:
 
@@ -136,6 +145,7 @@ The preflight expects the service-account email to contain `fastread` or match `
    View app information
    Release apps to testing tracks
    Manage testing tracks and edit tester lists
+   Edit store listing information
    ```
 
    Don't grant production permissions until you actually want to ship to production.
@@ -228,6 +238,7 @@ The Play **app signing key** never leaves Google's HSM, so a lost upload key is 
 | Play Console rejects the AAB with "signed with the wrong key" | Stop and compare SHA-1. On May 15, 2026 Play expected `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`, while local `upload-keystore.jks` signed as `REPLACEMENT_UPLOAD_KEY_SHA1`. Recover the original upload keystore or request an upload-key reset; do not keep uploading the same AAB. |
 | `Google Play credential must be a Google Cloud service-account JSON key` | Fastlane is reading a Firebase `google-services.json` or an OAuth client file. Re-download the right file from Play Console → API access. |
 | Service account auth fails with `403` | Permission propagation lag or missing app permission. Wait 5 min and retry. If still failing, re-grant `View app information`, `Release apps to testing tracks`, and `Manage testing tracks and edit tester lists` in Play Console → Users and permissions for `com.shhtheonlyperson.fastread`. |
+| `Play icon upload was prepared but commit was denied` | Grant the service account **Edit store listing information** / `CAN_MANAGE_PUBLIC_LISTING`, then rerun `scripts/sync-play-store-icon.sh --apply`. |
 
 ## 8. Files that must never be committed
 

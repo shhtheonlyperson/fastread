@@ -181,6 +181,10 @@ platform :android do
     File.expand_path("app/build/outputs/bundle/release/app-release.aab", File.expand_path("..", __dir__))
   end
 
+  private_lane :sync_play_store_icon do
+    sh(File.expand_path("../../scripts/sync-play-store-icon.sh", __dir__), "--apply")
+  end
+
   desc "Build and validate the Android app bundle without uploading to Play Console"
   lane :verify do
     aab_path = build_release_bundle
@@ -202,6 +206,7 @@ platform :android do
   desc "Build and upload the Android app bundle to Play Console internal testing"
   lane :internal do
     release_preflight
+    sync_play_store_icon
     json_key = play_json_key_path
     aab_path = build_release_bundle
     upload_to_play_store(
@@ -219,6 +224,7 @@ platform :android do
   desc "Build and upload the Android app bundle as a draft (first-time upload before Play Console accepts the package id)"
   lane :draft do
     release_preflight
+    sync_play_store_icon
     json_key = play_json_key_path
     aab_path = build_release_bundle
     upload_to_play_store(
