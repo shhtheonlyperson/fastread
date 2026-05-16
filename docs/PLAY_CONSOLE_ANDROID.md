@@ -64,7 +64,30 @@ If it doesn't match, you uploaded the wrong keystore — double-check `keystore.
 
 ## 3. Set up the service account for fastlane (one time)
 
-This unlocks `fastlane android internal` for every subsequent release. Without it you'd be dragging the AAB into the browser each time.
+This unlocks `fastlane android internal` for every subsequent release. Without it you'd be dragging the AAB into the browser each time. This is separate from the upload keystore: a valid service-account JSON lets Fastlane call Play APIs, but Play will still reject an AAB signed by the wrong upload key.
+
+Run this before any Android release build:
+
+```bash
+scripts/check-android-release-credentials.sh
+# or
+cd android-spike && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle exec fastlane release_preflight
+```
+
+The preflight checks both gates before a long build:
+
+- Play service-account JSON exists and is a real Google Cloud service-account key.
+- `android-spike/keystore.properties` points at an upload keystore whose SHA-1 matches Play Console.
+
+The canonical machine-local service-account path is:
+
+```text
+~/.config/shh/play-service-accounts/fastread-google-play-service-account.json
+```
+
+Fastlane also accepts `FASTREAD_PLAY_SERVICE_ACCOUNT_JSON`, `SUPPLY_JSON_KEY`, `PLAY_STORE_JSON_KEY`, and the legacy gitignored repo-local paths under `android-spike/`.
+
+The preflight expects the service-account email to contain `fastread` so a `shos`/other-app key is not reused by accident. If you intentionally use a shared Play uploader, grant that account access to the FastRead Play app first and run with `FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1`.
 
 1. Open [Play Console → Setup → API access](https://play.google.com/console/u/0/developers/api-access).
 2. Link or create a Google Cloud project. Naming doesn't matter — `fastread-publisher` is fine.
@@ -73,13 +96,13 @@ This unlocks `fastlane android internal` for every subsequent release. Without i
 4. Back in Play Console → API access, click **Create new service account**.
 5. Cloud console opens. Create a service account named `fastread-publisher`. Skip optional roles. Click **Create**.
 6. After creation, click the service account → **Keys → Add key → Create new key → JSON**. Browser downloads the JSON.
-7. Move the JSON to:
+7. Move the JSON to the canonical machine-local path:
 
    ```
-   android-spike/google-service-account.fastread.json
+   ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json
    ```
 
-   This path is gitignored. Do not commit it. It alone is enough to publish builds for this app.
+   Do not commit it. A gitignored repo-local copy at `android-spike/google-service-account.fastread.json` also works, but the canonical path survives clean worktrees and prevents this blocker from recurring.
 
 8. Back in Play Console → API access, find the new service account in the list and click **Manage Play Console permissions**. Grant:
 
@@ -136,6 +159,7 @@ Data deletion URL:     Not applicable, no developer-collected data.
 ## 5. Subsequent releases (fastlane)
 
 ```bash
+scripts/check-android-release-credentials.sh
 cd android-spike
 
 # bump versionCode + versionName in app/build.gradle.kts.
@@ -148,7 +172,7 @@ bundle exec fastlane internal
 The `internal` lane:
 
 1. Builds + signs `app-release.aab` with the upload key from `keystore.properties`.
-2. Uploads to the **internal** track via the Google Play Developer API using `google-service-account.fastread.json`.
+2. Uploads to the **internal** track via the Google Play Developer API using the canonical service-account JSON or explicit env var.
 3. Promotes the release to `release_status: completed` so internal testers see it within a few minutes.
 
 If you want to upload but not auto-promote, use `bundle exec fastlane draft` — it leaves the release in draft so you can finish editing in Play Console before pressing Rollout.

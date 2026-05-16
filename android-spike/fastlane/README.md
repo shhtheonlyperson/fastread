@@ -23,6 +23,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Build and validate the Android app bundle without uploading to Play Console
 
+### android release_preflight
+
+```sh
+[bundle exec] fastlane android release_preflight
+```
+
+Check Play API credential and upload signing key before building or uploading
+
 ### android internal
 
 ```sh

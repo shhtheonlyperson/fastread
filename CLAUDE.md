@@ -31,6 +31,7 @@ Key pitfalls:
 - Do not trust `docs/PLAY_CONSOLE_ANDROID.md` or local Gradle metadata blindly; Play Console is the source of truth for package name and signing key.
 - Before upload, inspect the built AAB manifest and confirm package/version: `bundletool dump manifest --bundle=android-spike/app/build/outputs/bundle/release/app-release.aab`.
 - Before upload, compare the local upload keystore SHA1/SHA256 to the Play Console expected upload certificate.
+- Before any Android release build/upload, run `scripts/check-android-release-credentials.sh`. The canonical machine-local Play service-account JSON path is `~/.config/shh/play-service-accounts/fastread-google-play-service-account.json`; repo-local JSON copies are only a fallback.
 - If Play rejects the AAB with "signed with the wrong key", stop. Do not keep uploading, generate another keystore, or call the release done. Find the original upload keystore or request an upload-key reset.
 - On 2026-05-14, Play expected SHA1 `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1`; the local `android-spike/upload-keystore.jks` signed with SHA1 `REPLACEMENT_UPLOAD_KEY_SHA1`, so Android upload was blocked pending original-key recovery or Play upload-key reset.
 - If requesting an upload-key reset, export the replacement cert with `keytool -exportcert -rfc -alias justread -keystore android-spike/upload-keystore.jks -file /tmp/fastread-upload-certificate.pem`.

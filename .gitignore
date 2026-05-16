@@ -35,4 +35,5 @@ android-spike/local.properties
 android-spike/upload-keystore.jks
 android-spike/keystore.properties
 android-spike/google-service-account*.json
+android-spike/google-play-service-account*.json
 android-spike/fastlane/report.xml

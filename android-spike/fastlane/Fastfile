@@ -15,8 +15,13 @@ default_platform(:android)
 #   $FASTREAD_PLAY_SERVICE_ACCOUNT_JSON
 #   $SUPPLY_JSON_KEY
 #   $PLAY_STORE_JSON_KEY
+#   ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json
+#   ~/.config/shh/play-service-accounts/google-service-account.fastread.json
+#   ~/.config/shh/play-service-accounts/google-play-service-account.fastread.json
 #   android-spike/google-service-account.fastread.json
 #   android-spike/google-play-service-account.fastread.json
+
+EXPECTED_FASTREAD_UPLOAD_SHA1 = "FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1"
 
 platform :android do
   private_lane :ensure_java_home do
@@ -60,12 +65,17 @@ platform :android do
   private_lane :play_json_key_path do
     explicit_path = ENV["FASTREAD_PLAY_SERVICE_ACCOUNT_JSON"] || ENV["SUPPLY_JSON_KEY"] || ENV["PLAY_STORE_JSON_KEY"]
     if explicit_path.to_s.empty?
-      [
+      repo_root = File.expand_path("..", __dir__)
+      candidates = [
+        File.expand_path("~/.config/shh/play-service-accounts/fastread-google-play-service-account.json"),
+        File.expand_path("~/.config/shh/play-service-accounts/google-service-account.fastread.json"),
+        File.expand_path("~/.config/shh/play-service-accounts/google-play-service-account.fastread.json"),
         "google-service-account.fastread.json",
         "google-play-service-account.fastread.json"
-      ].map { |path| File.absolute_path(path, File.expand_path("..", __dir__)) }
-        .find { |path| File.exist?(path) } ||
-        File.absolute_path("google-service-account.fastread.json", File.expand_path("..", __dir__))
+      ].map { |path| path.start_with?("/") ? path : File.absolute_path(path, repo_root) }
+
+      candidates.find { |path| File.exist?(path) } ||
+        File.expand_path("~/.config/shh/play-service-accounts/fastread-google-play-service-account.json")
     else
       File.absolute_path(explicit_path, File.expand_path("..", __dir__))
     end
@@ -74,7 +84,7 @@ platform :android do
   private_lane :ensure_play_json_key do
     json_key = play_json_key_path
     unless File.exist?(json_key)
-      UI.user_error!("Missing Google Play service-account JSON at #{File.expand_path(json_key)}. Set FASTREAD_PLAY_SERVICE_ACCOUNT_JSON to a valid key path or place the key at android-spike/google-service-account.fastread.json.")
+      UI.user_error!("Missing Google Play service-account JSON. Put it at ~/.config/shh/play-service-accounts/fastread-google-play-service-account.json, set FASTREAD_PLAY_SERVICE_ACCOUNT_JSON, or place a gitignored copy at android-spike/google-service-account.fastread.json.")
     end
 
     require "json"
@@ -93,8 +103,71 @@ platform :android do
     unless parsed["type"] == "service_account" && parsed["client_email"].end_with?(".gserviceaccount.com") && parsed["private_key"].include?("BEGIN PRIVATE KEY")
       UI.user_error!("Google Play credential must be a Google Cloud service-account JSON key, not Firebase google-services.json or an OAuth client file.")
     end
+    unless parsed["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1"
+      UI.user_error!("Google Play service-account email should be FastRead-specific. Got #{parsed['client_email']}. Create/use a fastread-publisher service account, or set FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1 only after granting this shared account access to the FastRead Play app.")
+    end
 
     json_key
+  end
+
+  private_lane :ensure_upload_key_matches_play do
+    ensure_java_home
+
+    require "open3"
+
+    android_root = File.expand_path("..", __dir__)
+    properties_path = File.join(android_root, "keystore.properties")
+    UI.user_error!("Missing keystore properties at #{properties_path}") unless File.exist?(properties_path)
+
+    properties = {}
+    File.readlines(properties_path, chomp: true).each do |line|
+      next if line.strip.empty? || line.strip.start_with?("#")
+      key, value = line.split("=", 2)
+      properties[key] = value if key && value
+    end
+
+    store_file = properties["storeFile"]
+    store_password = properties["storePassword"]
+    key_alias = properties["keyAlias"] || "justread"
+
+    missing = []
+    missing << "storeFile" if store_file.to_s.empty?
+    missing << "storePassword" if store_password.to_s.empty?
+    missing << "keyAlias" if key_alias.to_s.empty?
+    UI.user_error!("keystore.properties is missing #{missing.join(', ')}") unless missing.empty?
+
+    store_path = if store_file.start_with?("/")
+                   store_file
+                 else
+                   # Gradle resolves `file(...)` in app/build.gradle.kts relative
+                   # to the app module directory, not the Android root.
+                   File.expand_path(store_file, File.join(android_root, "app"))
+                 end
+    UI.user_error!("Upload keystore not found at #{store_path}") unless File.exist?(store_path)
+
+    keytool = ENV["JAVA_HOME"].to_s.empty? ? "keytool" : File.join(ENV["JAVA_HOME"], "bin", "keytool")
+    stdout, stderr, status = Open3.capture3(
+      keytool,
+      "-list",
+      "-v",
+      "-keystore",
+      store_path,
+      "-alias",
+      key_alias,
+      "-storepass",
+      store_password
+    )
+    UI.user_error!("Unable to inspect upload keystore: #{stderr}") unless status.success?
+
+    actual_sha1 = stdout[/SHA1:\s*([A-F0-9:]+)/, 1]
+    UI.user_error!("Unable to read SHA1 fingerprint from #{store_path}") if actual_sha1.to_s.empty?
+
+    expected_sha1 = ENV["FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1"] || EXPECTED_FASTREAD_UPLOAD_SHA1
+    unless actual_sha1 == expected_sha1
+      UI.user_error!("Upload keystore SHA1 mismatch. Play expects #{expected_sha1}, but #{store_path} signs with #{actual_sha1}. Recover the original upload keystore or request a Play upload-key reset before uploading.")
+    end
+
+    UI.success("Upload keystore SHA1 matches Play Console expectation")
   end
 
   private_lane :build_release_bundle do
@@ -115,9 +188,17 @@ platform :android do
     UI.success("Built #{aab_path}")
   end
 
+  desc "Check Play API credential and upload signing key before building or uploading"
+  lane :release_preflight do
+    ensure_play_json_key
+    ensure_upload_key_matches_play
+    UI.success("Android release credentials are ready")
+  end
+
   desc "Build and upload the Android app bundle to Play Console internal testing"
   lane :internal do
-    json_key = ensure_play_json_key
+    release_preflight
+    json_key = play_json_key_path
     aab_path = build_release_bundle
     upload_to_play_store(
       json_key: json_key,
@@ -133,7 +214,8 @@ platform :android do
 
   desc "Build and upload the Android app bundle as a draft (first-time upload before Play Console accepts the package id)"
   lane :draft do
-    json_key = ensure_play_json_key
+    release_preflight
+    json_key = play_json_key_path
     aab_path = build_release_bundle
     upload_to_play_store(
       json_key: json_key,
