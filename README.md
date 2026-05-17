@@ -8,6 +8,15 @@ Local RSVP speed reader across three shipped surfaces:
 
 The core reader imports EPUBs, plain text, and fetched HTML, splits each word/chunk at the optimal recognition point, and plays them back at a tunable WPM with optional punctuation pauses.
 
+## Product Links
+
+- Public product page: <https://www.theonlyperson.com/fastread>
+- iOS beta: <https://www.theonlyperson.com/justread/testflight>
+- Chrome extension privacy policy: <https://www.theonlyperson.com/fastread/chrome/privacy>
+- Chrome extension terms: <https://www.theonlyperson.com/fastread/chrome/terms>
+
+This repo is the source of truth for the product surfaces. The public page uses release assets from `chrome-ext/store-assets/` and `android-spike/play-assets/` so marketing copy stays tied to the shipped app, not a separate mockup.
+
 ## Run iOS
 
 ```bash
