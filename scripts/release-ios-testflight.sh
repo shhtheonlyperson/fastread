@@ -205,7 +205,7 @@ unlock_keychain
 
 local_build="$(project_setting CURRENT_PROJECT_VERSION)"
 remote_build="$(asc_latest_build_number)"
-next_build=$(( local_build > remote_build ? local_build + 1 : remote_build + 1 ))
+next_build=$(( local_build > remote_build ? local_build : remote_build + 1 ))
 
 log "Current local build: $local_build; latest ASC build: $remote_build; next: $next_build"
 set_build_number "$next_build"
