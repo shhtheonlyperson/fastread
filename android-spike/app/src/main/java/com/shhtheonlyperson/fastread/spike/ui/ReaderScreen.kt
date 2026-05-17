@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -33,45 +35,41 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.core.ReaderPlaybackState
 import com.shhtheonlyperson.fastread.spike.core.RSVPEngine
 import com.shhtheonlyperson.fastread.spike.data.Persistence
+import com.shhtheonlyperson.fastread.spike.data.ReadingArticle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.ceil
 
 private const val TAG = "FastReadSpike"
 
 @Composable
 fun ReaderScreen(
-    article: String,
-    initialWpm: Int,
-    initialIndex: Int,
-    dictionary: List<String>,
+    article: ReadingArticle?,
     store: Persistence,
-    onWpmChange: (Int) -> Unit,
-    onIndexChange: (Int) -> Unit,
     onBack: () -> Unit,
     autoSweepSeconds: Int? = null,
 ) {
-    val tokens = remember(article, dictionary.toList()) {
-        val cached = store.tokens
-        if (cached != null && store.tokenizerVersion == RSVPEngine.VERSION) {
-            cached
-        } else {
-            val fresh = RSVPEngine.tokenize(article, userDictionary = dictionary)
-            store.tokens = fresh
-            store.tokenizerVersion = RSVPEngine.VERSION
-            fresh
-        }
+    if (article == null) {
+        EmptyReader(onBack = onBack)
+        return
     }
-    var wpm by remember { mutableIntStateOf(initialWpm) }
-    var index by remember { mutableIntStateOf(ReaderPlaybackState(initialIndex, tokens.size).normalizedIndex) }
-    var isPlaying by remember { mutableStateOf(autoSweepSeconds != null) }
-    var jitterAvg by remember { mutableStateOf(0.0) }
+
+    val tokens = remember(article.id, article.tokens, article.tokenizerVersion, store.dictionary) {
+        store.tokensFor(article)
+    }
+    var index by remember(article.id, tokens.size) {
+        mutableIntStateOf(ReaderPlaybackState(article.wordIndex, tokens.size).normalizedIndex)
+    }
+    var isPlaying by remember(article.id) { mutableStateOf(autoSweepSeconds != null) }
+    var jitterAvg by remember { mutableDoubleStateOf(0.0) }
     var jitterMax by remember { mutableLongStateOf(0L) }
     var samples by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -81,7 +79,7 @@ fun ReaderScreen(
         job?.cancel()
         job = null
         isPlaying = false
-        onIndexChange(index)
+        store.setCurrentIndex(index)
     }
 
     fun start(resetMetrics: Boolean = false) {
@@ -91,13 +89,18 @@ fun ReaderScreen(
             jitterMax = 0L
             samples = 0
         }
+        if (tokens.size <= 1) return
         isPlaying = true
-        if (autoSweepSeconds != null) Log.i(TAG, "RUN_START wpm=$wpm tokens=${tokens.size}")
+        if (autoSweepSeconds != null) Log.i(TAG, "RUN_START wpm=${store.wpm} tokens=${tokens.size}")
         job = scope.launch {
             var lastSwap = System.nanoTime()
             while (ReaderPlaybackState(index, tokens.size).nextIndex() != null) {
                 val token = tokens[index]
-                val targetMs = RSVPEngine.duration(token, wpm.toDouble()).toLong()
+                val targetMs = RSVPEngine.duration(
+                    token,
+                    store.wpm.toDouble(),
+                    punctuationPause = store.punctuationPause,
+                ).toLong()
                 delay(targetMs)
                 val now = System.nanoTime()
                 val actualMs = (now - lastSwap) / 1_000_000.0
@@ -115,12 +118,14 @@ fun ReaderScreen(
                             "jitter=${jitter}ms tok=\"$token\"",
                     )
                 }
-                index = ReaderPlaybackState(index, tokens.size).nextIndex() ?: index
+                val next = ReaderPlaybackState(index, tokens.size).nextIndex() ?: index
+                index = next
+                store.setCurrentIndex(next, recordReadWord = true)
                 samples += 1
             }
             isPlaying = false
             if (autoSweepSeconds != null) {
-                Log.i(TAG, "RUN_END wpm=$wpm samples=$samples avgJitter=${"%.2f".format(jitterAvg)} maxJitter=$jitterMax")
+                Log.i(TAG, "RUN_END wpm=${store.wpm} samples=$samples avgJitter=${"%.2f".format(jitterAvg)} maxJitter=$jitterMax")
             }
         }
     }
@@ -128,43 +133,33 @@ fun ReaderScreen(
     fun playFromCurrent() {
         if (ReaderPlaybackState(index, tokens.size).isAtEnd) {
             index = 0
-            onIndexChange(0)
+            store.setCurrentIndex(0)
         }
         start()
     }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     var wasLandscape by remember { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
 
     LaunchedEffect(isLandscape) {
-        if (wasLandscape && !isLandscape) {
-            stop()
-        }
+        if (wasLandscape && !isLandscape) stop()
         wasLandscape = isLandscape
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            stop()
-        }
+    DisposableEffect(article.id) {
+        onDispose { stop() }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(JRColor.paper)
             .padding(horizontal = 16.dp)
             .padding(top = if (isLandscape) 24.dp else 60.dp)
-            .then(if (isLandscape) Modifier else Modifier.verticalScroll(scrollState)),
+            .then(if (isLandscape) Modifier else Modifier.verticalScroll(rememberScrollState())),
         verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.clickable { stop(); onBack() }.testTag("back-button"),
-            ) {
-                SectionLabel("‹ EDIT")
-            }
-        }
+        Header(article = article, compact = isLandscape, onBack = { stop(); onBack() })
 
         Box(
             modifier = Modifier
@@ -176,7 +171,7 @@ fun ReaderScreen(
         ) {
             RSVPStage(
                 token = tokens.getOrElse(index) { "" },
-                focusStyle = FocusIndicatorStyle.Dot,
+                focusStyle = store.focusIndicator,
                 minHeight = if (isLandscape) 112.dp else 180.dp,
                 modifier = Modifier.blur(if (isPlaying) 0.dp else 1.2.dp),
             )
@@ -186,26 +181,26 @@ fun ReaderScreen(
             }
         }
 
-        Text(
-            "${index + 1} / ${tokens.size}",
-            color = JRColor.inkQuiet,
-            fontSize = 11.sp,
-            fontFamily = JRFont.mono,
-            letterSpacing = 0.66.sp,
+        ProgressScrubber(
+            index = index,
+            tokenCount = tokens.size,
+            minutesLeft = minutesRemaining(tokens.size, index, store.wpm),
+            onScrub = { progress ->
+                stop()
+                index = store.scrubTo(progress)
+            },
         )
 
         SectionLabel("PACE")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (target in listOf(300, 450, 600, 900, 1200, 1500)) {
-                PacePill(value = target, selected = wpm == target) {
-                    wpm = target
-                    onWpmChange(target)
+                PacePill(value = target, selected = store.wpm == target) {
+                    store.setWPM(target)
                     if (isPlaying) start()
                 }
             }
         }
 
-        Spacer(Modifier.height(4.dp))
         PrimaryButton(
             label = if (isPlaying) "PAUSE" else if (index >= tokens.size - 1) "RESTART" else "PLAY",
             onTap = {
@@ -214,6 +209,14 @@ fun ReaderScreen(
             },
             testTag = if (isPlaying) "pause-button" else "play-button",
         )
+
+        if (index >= tokens.size - 1 && tokens.isNotEmpty()) {
+            DoneStrip(tokenCount = tokens.size, wpm = store.wpm) {
+                stop()
+                store.markRead()
+                index = tokens.lastIndex
+            }
+        }
 
         if (autoSweepSeconds != null) {
             Text(
@@ -224,15 +227,16 @@ fun ReaderScreen(
                 modifier = Modifier.testTag("stats"),
             )
         }
+
+        Spacer(Modifier.height(96.dp))
     }
 
     if (autoSweepSeconds != null) {
-        LaunchedEffect(Unit) {
+        LaunchedEffect(article.id) {
             for (target in listOf(600, 800, 1000, 1200, 1500)) {
-                wpm = target
-                onWpmChange(target)
+                store.setWPM(target)
                 index = 0
-                onIndexChange(0)
+                store.setCurrentIndex(0)
                 Log.i(TAG, "AUTO_SWEEP_BEGIN wpm=$target seconds=$autoSweepSeconds")
                 start(resetMetrics = true)
                 delay(autoSweepSeconds * 1000L)
@@ -244,3 +248,125 @@ fun ReaderScreen(
         }
     }
 }
+
+@Composable
+private fun Header(article: ReadingArticle, compact: Boolean, onBack: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 8.dp)) {
+        Box(modifier = Modifier.clickable(onClick = onBack).testTag("back-button")) {
+            SectionLabel("‹ LIBRARY")
+        }
+        Text(
+            article.title,
+            color = JRColor.ink,
+            fontSize = if (compact) 18.sp else 22.sp,
+            fontFamily = JRFont.serif,
+            fontWeight = FontWeight.Medium,
+            lineHeight = if (compact) 21.sp else 26.sp,
+            maxLines = if (compact) 1 else 2,
+        )
+        Text(
+            "${article.source} · ${article.author} · ${article.date}",
+            color = JRColor.inkQuiet,
+            fontSize = 12.sp,
+            fontFamily = JRFont.sans,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ProgressScrubber(
+    index: Int,
+    tokenCount: Int,
+    minutesLeft: Double,
+    onScrub: (Float) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Slider(
+            value = if (tokenCount <= 1) 0f else index.toFloat() / (tokenCount - 1).toFloat(),
+            onValueChange = onScrub,
+            valueRange = 0f..1f,
+        )
+        Row {
+            Text(
+                "${index + 1} / ${maxOf(tokenCount, 1)}",
+                color = JRColor.inkQuiet,
+                fontSize = 11.sp,
+                fontFamily = JRFont.mono,
+                letterSpacing = 0.66.sp,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (minutesLeft < 1) "${ceil(minutesLeft * 60).toInt()}s left" else "${"%.1f".format(minutesLeft)}m left",
+                color = JRColor.inkQuiet,
+                fontSize = 11.sp,
+                fontFamily = JRFont.mono,
+                letterSpacing = 0.66.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DoneStrip(tokenCount: Int, wpm: Int, onMarkRead: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(JRColor.paperDeep.copy(alpha = 0.72f))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Done · $tokenCount words in ${ceil(tokenCount.toDouble() / wpm.toDouble()).toInt()} minutes",
+            color = JRColor.inkQuiet,
+            fontSize = 11.sp,
+            fontFamily = JRFont.mono,
+            letterSpacing = 0.66.sp,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "Mark read",
+            color = JRColor.paper,
+            fontSize = 13.sp,
+            fontFamily = JRFont.sans,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .background(JRColor.terracotta)
+                .clickable(onClick = onMarkRead)
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+        )
+    }
+}
+
+@Composable
+private fun EmptyReader(onBack: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(JRColor.paper)
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        SectionLabel("READER")
+        Text(
+            "Nothing queued.",
+            color = JRColor.ink,
+            fontSize = 36.sp,
+            fontFamily = JRFont.serif,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            "Add text, fetch a URL, or import an EPUB first. The reader preserves saved article progress locally.",
+            color = JRColor.inkMid,
+            fontSize = 14.sp,
+            fontFamily = JRFont.sans,
+            lineHeight = 20.sp,
+        )
+        SecondaryButton(label = "Back to library", onTap = onBack, testTag = "back-empty-reader")
+    }
+}
+
+private fun minutesRemaining(tokenCount: Int, index: Int, wpm: Int): Double =
+    maxOf(tokenCount - index, 0).toDouble() / wpm.toDouble()

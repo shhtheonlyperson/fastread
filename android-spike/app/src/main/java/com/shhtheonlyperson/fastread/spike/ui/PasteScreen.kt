@@ -1,7 +1,9 @@
 package com.shhtheonlyperson.fastread.spike.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
@@ -24,14 +27,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.data.LocalEpubFile
+import com.shhtheonlyperson.fastread.spike.data.RecentSource
 
 @Composable
 fun PasteScreen(
-    article: String,
-    onArticleChange: (String) -> Unit,
-    onRead: () -> Unit,
-    onSettings: () -> Unit,
+    input: String,
+    onInputChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    isLoading: Boolean,
     status: String,
+    recentSources: List<RecentSource>,
+    onRecentSource: (RecentSource) -> Unit,
     localEpubs: List<LocalEpubFile>,
     onRefreshLocalEpubs: () -> Unit,
     onPickEpub: () -> Unit,
@@ -42,61 +48,120 @@ fun PasteScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 60.dp).verticalScroll(rememberScrollState()),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(JRColor.paper)
+            .padding(horizontal = 16.dp)
+            .padding(top = 60.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        SectionLabel("JUSTREAD")
+        SectionLabel("NEW READING")
         Text(
             "Capture\nyour next read.",
             color = JRColor.ink,
-            fontSize = 30.sp,
+            fontSize = 32.sp,
             fontWeight = FontWeight.Medium,
             fontFamily = JRFont.serif,
-            lineHeight = 34.sp,
+            lineHeight = 35.sp,
         )
 
-        SectionLabel("PASTE TEXT")
-        BasicTextField(
-            value = article,
-            onValueChange = onArticleChange,
+        SectionLabel("TEXT OR URL")
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(240.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .background(JRColor.paperStrong)
-                .padding(14.dp)
-                .testTag("paste-text-field"),
-            textStyle = TextStyle(
-                color = JRColor.ink,
-                fontSize = 16.sp,
-                fontFamily = JRFont.serif,
-                lineHeight = 22.sp,
-            ),
-            cursorBrush = SolidColor(JRColor.terracotta),
+                .padding(14.dp),
+        ) {
+            BasicTextField(
+                value = input,
+                onValueChange = onInputChange,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("paste-text-field"),
+                textStyle = TextStyle(
+                    color = JRColor.ink,
+                    fontSize = 16.sp,
+                    fontFamily = JRFont.serif,
+                    lineHeight = 22.sp,
+                ),
+                cursorBrush = SolidColor(JRColor.terracotta),
+            )
+            if (input.isBlank()) {
+                Text(
+                    "Paste article text or a URL.",
+                    color = JRColor.inkQuiet,
+                    fontSize = 15.sp,
+                    fontFamily = JRFont.serif,
+                )
+            }
+        }
+
+        PrimaryButton(
+            label = if (isLoading) "LOADING" else "ADD TO LIBRARY",
+            onTap = { if (!isLoading) onSubmit() },
+            testTag = "read-button",
         )
 
         SectionLabel("EPUB BOOK")
-        SecondaryButton(label = "Pick EPUB", onTap = onPickEpub, testTag = "pick-epub-button")
+        SecondaryButton(label = "Pick EPUB", onTap = { if (!isLoading) onPickEpub() }, testTag = "pick-epub-button")
 
         if (status.isNotBlank()) {
             Text(
                 status.uppercase(),
-                color = JRColor.inkQuiet,
+                color = if (status.startsWith("Loaded")) JRColor.terracotta else JRColor.inkQuiet,
                 fontSize = 11.sp,
                 fontFamily = JRFont.mono,
                 letterSpacing = 0.66.sp,
             )
         }
 
-        if (localEpubs.isNotEmpty()) {
-            SectionLabel("FILES FOLDER")
-            localEpubs.forEach { file ->
-                LocalEpubButton(file = file, onTap = { onImportLocalEpub(file) })
+        if (recentSources.isNotEmpty()) {
+            SectionLabel("RECENT SOURCES")
+            recentSources.forEach { source ->
+                RecentSourceButton(source = source, onTap = { onRecentSource(source) })
             }
         }
 
-        PrimaryButton(label = "READ", onTap = onRead, testTag = "read-button")
-        SecondaryButton(label = "Custom words", onTap = onSettings, testTag = "settings-button")
-        Spacer(Modifier.height(48.dp))
+        if (localEpubs.isNotEmpty()) {
+            SectionLabel("FILES FOLDER")
+            localEpubs.forEach { file ->
+                LocalEpubButton(file = file, onTap = { if (!isLoading) onImportLocalEpub(file) })
+            }
+        }
+
+        Spacer(Modifier.height(96.dp))
+    }
+}
+
+@Composable
+private fun RecentSourceButton(source: RecentSource, onTap: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(JRColor.paperStrong)
+            .clickable(onClick = onTap)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                source.label,
+                color = JRColor.ink,
+                fontSize = 17.sp,
+                fontFamily = JRFont.serif,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                source.date.uppercase(),
+                color = JRColor.inkQuiet,
+                fontSize = 10.sp,
+                fontFamily = JRFont.mono,
+                letterSpacing = 0.6.sp,
+            )
+        }
     }
 }

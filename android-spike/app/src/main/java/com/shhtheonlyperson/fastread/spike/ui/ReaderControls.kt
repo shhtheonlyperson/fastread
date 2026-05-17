@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,10 +23,10 @@ import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.data.LocalEpubFile
 
 @Composable
-fun SectionLabel(text: String) {
+fun SectionLabel(text: String, color: Color = JRColor.inkQuiet) {
     Text(
         text,
-        color = JRColor.inkQuiet,
+        color = color,
         fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
         fontFamily = JRFont.sans,

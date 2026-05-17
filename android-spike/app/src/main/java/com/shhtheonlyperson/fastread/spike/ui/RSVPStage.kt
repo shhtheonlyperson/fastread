@@ -29,8 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.core.RSVPEngine
-
-enum class FocusIndicatorStyle { Dot, Line, Crosshair }
+import com.shhtheonlyperson.fastread.spike.data.FocusIndicatorStyle
 
 @Composable
 fun RSVPStage(
