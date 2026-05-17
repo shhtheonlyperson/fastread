@@ -13,7 +13,7 @@
 
 ## Current source of truth
 
-Use this section first. It reflects the successful May 16, 2026 upload and supersedes older assumptions in this file.
+Use this section first. It reflects the successful May 16, 2026 PDT upload and supersedes older assumptions in this file.
 
 - App Store Connect app: `JustRead Speed Reader`
 - ASC app id: `ASC_APP_ID_PLACEHOLDER`
@@ -24,13 +24,14 @@ Use this section first. It reflects the successful May 16, 2026 upload and super
 - Active ASC API key id: `ASC_KEY_ID_PLACEHOLDER`
 - Active key path: `~/.appstoreconnect/private_keys/AuthKey_ASC_KEY_ID_PLACEHOLDER.p8`
 - Stale/revoked key id to avoid: `REVOKED_ASC_KEY_ID_PLACEHOLDER`
-- Current TestFlight version line: `0.2.1`
-- Latest successfully uploaded build: `32`
-- Latest delivery/build UUID: `6420a091-f44a-4ad1-890e-732b4ef541b1` — build 32 is the 1,500 WPM support release from commit `854e2be`, including iOS, Android, and Chrome parity plus refreshed store/version metadata.
+- Current TestFlight version line: `0.2.3`
+- Latest successfully uploaded build: `34`
+- Latest delivery/build UUID: `fe74d249-8d91-4018-b990-e5242cd4254e` — build 34 is the Claude design-system parity release from commit `b513edb`, including the UI alignment from `7ec6084`.
 - Active distribution cert id: `DISTRIBUTION_CERT_ID_PLACEHOLDER` (issued 2026-05-09, replaces revoked `5853F89C…`)
 - Active provisioning profile UUID: `PROVISIONING_PROFILE_UUID_PLACEHOLDER`
-- Builds `26`, `27`, `28`, `29`, `30`, `31`, and `32` all reached `IN_BETA_TESTING` directly because `Info.plist` declares `ITSAppUsesNonExemptEncryption=NO`; no manual export-compliance patch was needed.
-- Android counterpart source is now at `0.2.1` versionCode `8`; the signed AAB validates locally at `android-spike/app/build/outputs/bundle/release/app-release.aab`, but Play upload is blocked by upload-key mismatch and missing repo-local service-account JSON (see [`docs/PLAY_CONSOLE_ANDROID.md`](PLAY_CONSOLE_ANDROID.md)).
+- Builds `26`, `27`, `28`, `29`, `30`, `31`, `32`, `33`, and `34` all reached `IN_BETA_TESTING` directly because `Info.plist` declares `ITSAppUsesNonExemptEncryption=NO`; no manual export-compliance patch was needed.
+- Android counterpart source is now at `0.2.3` versionCode `10`; the signed AAB validates locally at `android-spike/app/build/outputs/bundle/release/app-release.aab` and Play internal testing reports release `0.2.3`, versionCode `10`, status `completed` (see [`docs/PLAY_CONSOLE_ANDROID.md`](PLAY_CONSOLE_ANDROID.md)).
+- If `scripts/release-ios-testflight.sh` prints a successful upload/build-status JSON and then exits on `Expected delivery ID argument is missing, --delivery-id`, treat the upload as not fully verified yet. Run `/Users/shh/proj/tools/mobile-release-state.sh --json` and require JustRead to report `VALID / IN_BETA_TESTING`.
 - If `errSecInternalComponent` shows up during CodeSign, the dedicated `fastread-build.keychain-db` has auto-locked; unlock it (`security unlock-keychain -p fastread …`) and re-grant the partition list. See §"May 9, 2026 — login keychain CDSA hang gotcha" below.
 - If `xcrun altool` rejects an upload with `ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE` and `previousBundleVersion: N`, that build number is already registered on ASC even if it never reached your TestFlight UI — bump `CURRENT_PROJECT_VERSION` to `N+1` and re-archive. Build 28 burned this way on 2026-05-11.
 
