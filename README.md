@@ -1,6 +1,6 @@
 # JustRead
 
-Local RSVP speed reader across three shipped surfaces:
+Local-first reader and RSVP speed reader across three shipped surfaces:
 
 - Native iOS app in `FastReadApp/` plus shared Swift core in `Sources/FastReadCore/`
 - Native Android project in `android-spike/`
@@ -8,14 +8,54 @@ Local RSVP speed reader across three shipped surfaces:
 
 The core reader imports EPUBs, plain text, and fetched HTML, splits each word/chunk at the optimal recognition point, and plays them back at a tunable WPM with optional punctuation pauses.
 
+<p>
+  <a href="https://www.theonlyperson.com/fastread">Product page</a>
+  ·
+  <a href="https://testflight.apple.com/v1/invite/322b792658c14a46944b6359e0347f1baa74194b7abe44ab8f1c10d11412301719348b0ab?ct=QLJ9ZM278S&advp=10000&platform=ios">iOS TestFlight</a>
+  ·
+  <a href="https://chromewebstore.google.com/detail/jlphjjnghcblidffelhhiooeghjblfed">Chrome Web Store</a>
+  ·
+  <a href="docs/CODE_QUALITY.md">Verification matrix</a>
+</p>
+
+![JustRead reader surface](chrome-ext/store-assets/screenshots/01-reader-light.png)
+
+## What it does
+
+JustRead is for long-form reading that gets lost in noisy app chrome. It turns source text into a clean reading surface, then lets you switch into RSVP playback when you want a fixed pace.
+
+| Surface | Status | Best for | Entry point |
+| --- | --- | --- | --- |
+| iOS | TestFlight beta | EPUBs, pasted text, long reading sessions | `FastRead.xcodeproj` |
+| Android | Internal testing lane | Native Compose parity and Play release hardening | `android-spike/` |
+| Chrome | Web Store companion | Reader View and RSVP over current web articles | `chrome-ext/` |
+
+## Product posture
+
+- Local-first by default: no account, no developer analytics, no reading-content upload.
+- Real release surfaces, not a mockup repo: SwiftUI, Compose, and Manifest V3 are all maintained here.
+- Public-source hygiene: release credentials and private corpus paths stay in ignored local files or environment variables.
+- Verifiable pipeline: fixtures cover HTML extraction, EPUB import, tokenization, storage migration, and playback timing.
+
 ## Product Links
 
 - Public product page: <https://www.theonlyperson.com/fastread>
 - iOS beta: <https://www.theonlyperson.com/justread/testflight>
+- Chrome Web Store: <https://chromewebstore.google.com/detail/jlphjjnghcblidffelhhiooeghjblfed>
 - Chrome extension privacy policy: <https://www.theonlyperson.com/fastread/chrome/privacy>
 - Chrome extension terms: <https://www.theonlyperson.com/fastread/chrome/terms>
 
 This repo is the source of truth for the product surfaces. The public page uses release assets from `chrome-ext/store-assets/` and `android-spike/play-assets/` so marketing copy stays tied to the shipped app, not a separate mockup.
+
+## Quick verification
+
+```bash
+swift test
+scripts/verify-chrome-ext.sh
+scripts/verify-android.sh
+```
+
+Use `scripts/verify-ios-performance.sh` before release-facing iOS work. It runs the source guardrails, Swift tests, verifier executables, Release iOS build, and simulator/UI flows when local fixtures are available.
 
 ## Run iOS
 
@@ -44,6 +84,8 @@ bun run build
 ```
 
 For local development, use `bun run dev`. For Web Store packaging, use `bun run zip` and follow `chrome-ext/CHROME_WEB_STORE.md`.
+
+![JustRead RSVP playback](chrome-ext/store-assets/screenshots/03-fastread.png)
 
 ## Reader pipeline
 
