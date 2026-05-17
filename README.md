@@ -76,7 +76,7 @@ SwiftPM suite coverage:
 | `EpubRegistryFlowTests` | registry → Document round trip |
 | `HtmlGoldenTests` | 6 frozen HTML/text fixtures, regression-locked |
 | `ReadingStoreTests` | library lifecycle, jump/scrub/play/pause, settings + article persistence |
-| `EpubE2ETests` | end-to-end on `~/proj/local-epub/exports/all/local-test-book.epub` |
+| `EpubE2ETests` | gated end-to-end run against a local EPUB provided through `FASTREAD_E2E_EPUB` or `test.epub` |
 | `UrlIngestTests` | stubbed `URLProtocol` for fetch errors |
 | `StorageMigrationTests` | v1 (text-only) → v2 (Document) round trip |
 | `ReadingArticleCodableTests` | persistence shape stable |
@@ -87,7 +87,7 @@ A separate XCUITest target lives outside the SwiftPM package and runs against th
 
 | Target | Scheme | What it checks |
 | --- | --- | --- |
-| `FastReadUITests` | `FastReadUITests` (or the bundled `FastRead` test action) | Single happy-path XCUITest: launches the app reset, picks `test.epub` from the system Files picker, asserts the reader opens on local-test-book, taps `SKIP →`, opens `CONTENTS`, jumps to a chapter, and confirms the playhead moves. |
+| `FastReadUITests` | `FastReadUITests` (or the bundled `FastRead` test action) | Single happy-path XCUITest: launches the app reset, picks `test.epub` from the system Files picker, asserts the reader opens, taps `SKIP ->`, opens `CONTENTS`, jumps to a chapter, and confirms the playhead moves. |
 
 Run the UI test directly:
 
@@ -102,7 +102,7 @@ The test seeds `test.epub` (from `FASTREAD_E2E_EPUB` or the repo-root copy) into
 
 ## Optional gated suites
 
-`EpubE2ETests` resolves its EPUB in this order: `FASTREAD_E2E_EPUB` env var → `<repoRoot>/test.epub` (gitignored convenience copy) → iCloud Drive `~/Library/Mobile Documents/com~apple~CloudDocs/books/local-test-book.epub`.
+`EpubE2ETests` resolves its EPUB in this order: `FASTREAD_E2E_EPUB` env var -> `<repoRoot>/test.epub` (gitignored convenience copy). It skips when neither exists.
 
 `EpubCorpusTests` defaults to `~/Library/Mobile Documents/com~apple~CloudDocs/books/`, override with `FASTREAD_EPUB_CORPUS_DIR`.
 

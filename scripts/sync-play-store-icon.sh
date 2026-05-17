@@ -5,9 +5,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:---check}"
 PLAY_JSON="${FASTREAD_PLAY_SERVICE_ACCOUNT_JSON:-$HOME/.config/shh/play-service-accounts/fastread-google-play-service-account.json}"
-if [[ ! -f "$PLAY_JSON" && -f "$HOME/.config/shh/play-service-accounts/shos-google-play-service-account.json" ]]; then
-  PLAY_JSON="$HOME/.config/shh/play-service-accounts/shos-google-play-service-account.json"
-fi
 PLAY_PACKAGE="${FASTREAD_PLAY_PACKAGE:-com.shhtheonlyperson.fastread}"
 PLAY_LANGUAGE="${FASTREAD_PLAY_LISTING_LANGUAGE:-en-US}"
 ICON_PATH="${FASTREAD_PLAY_ICON:-$ROOT_DIR/android-spike/play-assets/justread-icon-512.png}"
@@ -160,4 +157,3 @@ function permissionHint() {
   process.exit(1);
 });
 NODE
-

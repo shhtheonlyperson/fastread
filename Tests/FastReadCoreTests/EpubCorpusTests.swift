@@ -4,8 +4,7 @@ import XCTest
 // Walks a directory of real EPUBs and asserts every file imports cleanly.
 //
 // Gated by FASTREAD_RUN_EPUB_CORPUS=1 — keeps the default `swift test` run
-// fast and CI-safe. Default path is the local local EPUB export at
-// ~/proj/local-epub/exports/all; override with FASTREAD_EPUB_CORPUS_DIR.
+// fast and CI-safe. Override with FASTREAD_EPUB_CORPUS_DIR.
 // Cap iteration with FASTREAD_EPUB_CORPUS_LIMIT.
 //
 // For each *.epub:

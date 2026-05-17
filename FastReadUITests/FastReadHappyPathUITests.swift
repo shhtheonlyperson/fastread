@@ -30,15 +30,12 @@ final class FastReadHappyPathUITests: XCTestCase {
 
         try navigateFilesPickerAndPickEpub(app: app, epubFilename: (epubPath as NSString).lastPathComponent)
 
-        let title = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'local-test-book'")).firstMatch
-        if !title.waitForExistence(timeout: 20) {
-            attachScreenshot(name: "no-title-after-pick")
-            XCTFail("Reader title for local-test-book did not appear. Tree:\n\(app.debugDescription)")
-        }
-
         let positionRegex = NSPredicate(format: "label MATCHES %@", "^[0-9,]+ / [0-9,]+$")
         let positionLabel = app.staticTexts.matching(positionRegex).firstMatch
-        XCTAssertTrue(positionLabel.waitForExistence(timeout: 8), "Position counter not visible")
+        if !positionLabel.waitForExistence(timeout: 20) {
+            attachScreenshot(name: "no-reader-after-pick")
+            XCTFail("Reader position counter did not appear. Tree:\n\(app.debugDescription)")
+        }
         let preIndex = Self.parseLeadingInt(positionLabel.label)
 
         let skipButton = app.buttons.matching(NSPredicate(format: "label CONTAINS 'SKIP'")).firstMatch
@@ -86,8 +83,6 @@ final class FastReadHappyPathUITests: XCTestCase {
         XCTAssertTrue(updatedAfterToc.waitForExistence(timeout: 5))
         let postTocIndex = Self.parseLeadingInt(updatedAfterToc.label)
         XCTAssertNotEqual(preTocIndex, postTocIndex, "Reader position should change after TOC selection")
-
-        XCTAssertTrue(title.exists, "Reader title should remain visible after TOC dismiss")
 
         attachScreenshot(name: "reader-final")
     }

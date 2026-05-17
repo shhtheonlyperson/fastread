@@ -116,7 +116,7 @@ final class DocumentTests: XCTestCase {
                 Section(id: "cov", title: "封面", kind: .chapter, text: "封面"),
                 Section(id: "ver", title: "版權頁", kind: .chapter, text: "版權所有 翻印必究"),
                 Section(id: "tof", title: "目錄", kind: .chapter, text: "第一章 第二章"),
-                Section(id: "rec", title: "推薦序 · local-test-book是個謎", kind: .chapter, text: chapterText(120)),
+                Section(id: "rec", title: "推薦序 · 閱讀是一扇門", kind: .chapter, text: chapterText(120)),
                 Section(id: "ch1", title: "樂園", kind: .chapter, text: chapterText(2500)),
                 Section(id: "ch2", title: "失樂園", kind: .chapter, text: chapterText(2500)),
             ]

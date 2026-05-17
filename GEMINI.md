@@ -1,40 +1,17 @@
 # FastRead Assistant Notes
 
-## Release Shorthand
+Keep this repository public-safe. Do not commit credentials, private account
+emails, dashboard URLs, API key IDs, issuer IDs, certificate fingerprints,
+provisioning-profile UUIDs, private EPUB names, or machine-local corpus paths.
 
-If the user says `bump release`, treat it as:
+`bump release` means mobile release from the latest main state:
 
-- sync to the latest `origin/main` / `main` state first;
-- bump the store build number/version code as needed for the next release;
-- release the mobile app from that latest main state;
-- prioritize iOS/TestFlight, then Android internal testing if the Play service-account JSON is available;
-- verify store acceptance, not just local build success.
+- iOS/TestFlight first
+- Android internal testing second when Play credentials are available
+- verify store acceptance, not just local builds
 
-Do not ask whether this means web, desktop, docs, or package publishing. In this repo, `bump release` means mobile release.
+Read the public-safe runbooks before release work:
 
-## Android Play Release
-
-Before any Android release build/upload, run `scripts/check-android-release-credentials.sh`. The canonical JSON may intentionally be a symlink to an allowlisted shared uploader; the default allowlist includes `play-uploader@example.iam.gserviceaccount.com` and the legacy `legacy-play-uploader@example.iam.gserviceaccount.com`. The preflight verifies live Android Publisher API edit access and the Play store listing icon. When creating or re-downloading a FastRead-specific Play service-account JSON, immediately install it with `scripts/install-android-play-service-account.sh ~/Downloads/<downloaded-key>.json`; do not leave it in Downloads or a repo checkout. For off-machine backup, run the installer with `FASTREAD_PLAY_SERVICE_ACCOUNT_1PASSWORD_VAULT=<vault>` and approve the 1Password prompt. If icon sync reports commit denied, grant the service account **Edit store listing information** / `CAN_MANAGE_PUBLIC_LISTING`.
-
-## iOS TestFlight Release
-
-Before attempting any iOS/TestFlight release, read `docs/TESTFLIGHT.md`.
-
-Current release target:
-
-- App Store Connect app: `JustRead Speed Reader`
-- ASC app id: `ASC_APP_ID_PLACEHOLDER`
-- Bundle id: `com.shhtheonlyperson.fastread`
-- Team id: `QLJ9ZM278S`
-- Active ASC API key id: `ASC_KEY_ID_PLACEHOLDER`
-- Avoid revoked key id: `REVOKED_ASC_KEY_ID_PLACEHOLDER`
-
-Key pitfalls:
-
-- Do not trust `.env.local` blindly; it previously pointed at revoked key `REVOKED_ASC_KEY_ID_PLACEHOLDER`.
-- The App Store Connect record is `com.shhtheonlyperson.fastread`; do not upload `com.shh.fastread`.
-- If a distribution private key is missing locally, create an RSA 2048 CSR, then create a new `IOS_DISTRIBUTION` cert and `IOS_APP_STORE` profile through the ASC API.
-- Do not pass `PROVISIONING_PROFILE_SPECIFIER` globally to `xcodebuild archive`; scope manual signing to the app target only.
-- Do not stop at `processingState=VALID`; verify `buildBetaDetail.internalBuildState=IN_BETA_TESTING`.
-- If a build shows `MISSING_EXPORT_COMPLIANCE`, set `usesNonExemptEncryption=false` on the build and keep `ITSAppUsesNonExemptEncryption=false` in `FastReadApp/Info.plist`.
-- Internal TestFlight groups cannot be attached with the ASC `builds/{id}/relationships/betaGroups` API.
+- `docs/TESTFLIGHT.md`
+- `docs/PLAY_CONSOLE_ANDROID.md`
+- `chrome-ext/CHROME_WEB_STORE.md`

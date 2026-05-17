@@ -1,7 +1,7 @@
 import XCTest
 @testable import FastReadCore
 
-// End-to-end EPUB ingest test against a real local EPUB export. Drives the
+// End-to-end EPUB ingest test against a real local EPUB. Drives the
 // full pipeline that the iOS app uses for an EPUB pick:
 //   file bytes -> EpubImporter -> Document
 //                 -> Document.flattenText -> RSVPEngine.tokenize
@@ -14,9 +14,7 @@ final class EpubE2ETests: XCTestCase {
     // Resolution order:
     //   1. FASTREAD_E2E_EPUB (absolute or ~ expanded)
     //   2. <repoRoot>/test.epub (gitignored convenience copy)
-    //   3. ~/Library/Mobile Documents/com~apple~CloudDocs/books/local-test-book.epub
-    //      (iCloud Drive requires Files-and-Folders TCC access)
-    // Skips with a hint if none of the above is readable.
+    // Skips with a hint if no local fixture is readable.
     private static let defaultPath: String = resolveDefaultPath()
 
     private static func repoRoot(file: StaticString = #filePath) -> URL {
@@ -34,8 +32,7 @@ final class EpubE2ETests: XCTestCase {
         if FileManager.default.isReadableFile(atPath: local) {
             return local
         }
-        return (NSHomeDirectory() as NSString)
-            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/books/local-test-book.epub")
+        return local
     }
 
     private static let epubAvailable: Bool = FileManager.default.isReadableFile(atPath: defaultPath)
@@ -52,7 +49,6 @@ final class EpubE2ETests: XCTestCase {
             """
             EPUB not readable at \(Self.defaultPath).
             • Drop a copy at <repoRoot>/test.epub — gitignored, picked up automatically.
-            • Or grant Files-and-Folders access for iCloud Drive in System Settings → Privacy & Security → Files and Folders.
             • Or override the default with FASTREAD_E2E_EPUB=/absolute/path/to/book.epub.
             """
         )

@@ -65,7 +65,7 @@ metadata="$(
            data["private_key"].to_s.include?("BEGIN PRIVATE KEY")
       abort("not a Google Cloud service-account JSON key")
     end
-    allowed_shared = ENV.fetch("FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS", "legacy-play-uploader@example.iam.gserviceaccount.com,play-uploader@example.iam.gserviceaccount.com").split(",").map(&:strip)
+    allowed_shared = ENV.fetch("FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS", "").split(",").map(&:strip).reject(&:empty?)
     unless data["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1" || allowed_shared.include?(data["client_email"])
       abort("service-account email is not FastRead-specific: #{data["client_email"]}")
     end

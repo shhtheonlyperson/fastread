@@ -11,8 +11,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/android-spike"
 PREFERRED_SERVICE_ACCOUNT_PATH="$HOME/.config/shh/play-service-accounts/fastread-google-play-service-account.json"
 PREFERRED_SERVICE_ACCOUNT_MANIFEST="${PREFERRED_SERVICE_ACCOUNT_PATH%.json}.manifest"
-EXPECTED_UPLOAD_SHA1="${FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1:-FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1}"
-DEFAULT_SHARED_SERVICE_ACCOUNT_EMAILS="legacy-play-uploader@example.iam.gserviceaccount.com,play-uploader@example.iam.gserviceaccount.com"
+EXPECTED_UPLOAD_SHA1="${FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1:-}"
+DEFAULT_SHARED_SERVICE_ACCOUNT_EMAILS="${FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS:-}"
 PLAY_PACKAGE="${FASTREAD_PLAY_PACKAGE:-com.shhtheonlyperson.fastread}"
 FAILED=0
 
@@ -68,14 +68,14 @@ else
       missing = %w[type client_email private_key token_uri].select { |key| data[key].to_s.empty? }
       abort("missing required fields: #{missing.join(", ")}") unless missing.empty?
       abort("not a Google service-account JSON") unless data["type"] == "service_account" && data["client_email"].to_s.end_with?(".gserviceaccount.com") && data["private_key"].to_s.include?("BEGIN PRIVATE KEY")
-      allowed_shared = ENV.fetch("FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS", "legacy-play-uploader@example.iam.gserviceaccount.com,play-uploader@example.iam.gserviceaccount.com").split(",").map(&:strip)
+      allowed_shared = ENV.fetch("FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS", "").split(",").map(&:strip).reject(&:empty?)
       unless data["client_email"].include?("fastread") || ENV["FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT"] == "1" || allowed_shared.include?(data["client_email"])
         abort("service-account email is not FastRead-specific: #{data["client_email"]}")
       end
       puts data["client_email"]
     ' "$service_account_path"
   )"; then
-    fail "Invalid FastRead Play service-account JSON at $service_account_path. Use a fastread-publisher key, or grant an allowlisted shared account access to the FastRead Play app. Default shared accounts: $DEFAULT_SHARED_SERVICE_ACCOUNT_EMAILS"
+    fail "Invalid FastRead Play service-account JSON at $service_account_path. Use a FastRead-specific key, set FASTREAD_ALLOW_SHARED_PLAY_SERVICE_ACCOUNT=1, or set FASTREAD_ALLOWED_SHARED_PLAY_SERVICE_ACCOUNT_EMAILS."
   else
     log "Play service-account JSON found: $service_account_path ($service_account_email)"
     if [ "$service_account_path" = "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ ! -L "$PREFERRED_SERVICE_ACCOUNT_PATH" ] && [ ! -f "$PREFERRED_SERVICE_ACCOUNT_MANIFEST" ]; then
@@ -144,6 +144,9 @@ else
 fi
 
 properties_path="$ANDROID_DIR/keystore.properties"
+if [ -z "$EXPECTED_UPLOAD_SHA1" ]; then
+  fail "FASTREAD_PLAY_EXPECTED_UPLOAD_SHA1 is required for release preflight."
+fi
 if [ ! -f "$properties_path" ]; then
   fail "Missing $properties_path"
 else

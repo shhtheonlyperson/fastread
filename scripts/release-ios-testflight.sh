@@ -4,12 +4,19 @@ set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+if [[ -f .env.local ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env.local
+  set +a
+fi
+
 SCHEME="${FASTREAD_IOS_SCHEME:-FastRead}"
 PROJECT="${FASTREAD_IOS_PROJECT:-FastRead.xcodeproj}"
 CONFIGURATION="${FASTREAD_IOS_CONFIGURATION:-Release}"
-ASC_APP_ID="${FASTREAD_ASC_APP_ID:-ASC_APP_ID_PLACEHOLDER}"
-ASC_KEY_ID="${ASC_KEY_ID:-ASC_KEY_ID_PLACEHOLDER}"
-ASC_ISSUER_ID="${ASC_ISSUER_ID:-ASC_ISSUER_ID_PLACEHOLDER}"
+ASC_APP_ID="${FASTREAD_ASC_APP_ID:-}"
+ASC_KEY_ID="${ASC_KEY_ID:-}"
+ASC_ISSUER_ID="${ASC_ISSUER_ID:-}"
 ASC_KEY_PATH="${ASC_KEY_PATH:-$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8}"
 TEAM_ID="${FASTREAD_TEAM_ID:-QLJ9ZM278S}"
 BUILD_KEYCHAIN="${FASTREAD_BUILD_KEYCHAIN:-$HOME/Library/Keychains/fastread-build.keychain-db}"
@@ -38,6 +45,9 @@ ensure_clean() {
 }
 
 ensure_auth() {
+  [[ -n "$ASC_APP_ID" ]] || fail "FASTREAD_ASC_APP_ID is required."
+  [[ -n "$ASC_KEY_ID" ]] || fail "ASC_KEY_ID is required."
+  [[ -n "$ASC_ISSUER_ID" ]] || fail "ASC_ISSUER_ID is required."
   [[ -f "$ASC_KEY_PATH" ]] || fail "missing ASC API key at $ASC_KEY_PATH"
 }
 
