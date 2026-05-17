@@ -57,6 +57,11 @@ See `CHROME_WEB_STORE.md` for the full submission checklist. Listing
 copy, privacy policy markdown, and 1280×800 screenshots are pre-rendered
 in `store-assets/`.
 
+Legal pages for the listing:
+
+- Privacy Policy: https://www.theonlyperson.com/fastread/chrome/privacy
+- Terms of Use: https://www.theonlyperson.com/fastread/chrome/terms
+
 Bonus scripts:
 
 - `bun run icons` — regenerate the toolbar icons (16/48/128 PNG) from the

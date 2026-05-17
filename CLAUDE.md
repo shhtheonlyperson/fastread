@@ -72,15 +72,17 @@ Current Web Store listing:
 - Item name: `JustRead — Reader View + Speed Reading`
 - Publisher account: `shh@theonlyperson.com` (Developer fee paid here)
 - Contact email (verified): `shh@theonlyperson.com`
-- Privacy policy URL: `https://www.theonlyperson.com/privacy` (source `chrome-ext/store-assets/PRIVACY.md`)
+- Privacy policy URL: `https://www.theonlyperson.com/fastread/chrome/privacy` (source `chrome-ext/store-assets/PRIVACY.md`)
+- Terms of Use URL: `https://www.theonlyperson.com/fastread/chrome/terms` (source `chrome-ext/store-assets/TERMS.md`)
 - Category: Tools (under Productivity); Visibility: Public, all regions, free
 - Status URL: `https://chrome.google.com/webstore/devconsole/CHROME_DEVELOPER_ID_PLACEHOLDER/jlphjjnghcblidffelhhiooeghjblfed/edit/status`
 - Live URL (post-approval): `https://chromewebstore.google.com/detail/jlphjjnghcblidffelhhiooeghjblfed`
-- Submitted: 2026-05-15 (tag `chrome-ext-v1.0.0-submitted`)
+- Submitted: 2026-05-15 (tag `chrome-ext-v1.0.0-submitted`); resubmitted 2026-05-17 after fixing the Chrome Web Store privacy policy URL. Current draft status: pending review.
 
 Key pitfalls:
 
 - The Web Store dropzones for the store icon (128×128) and screenshots (1280×800) reject every programmatic upload path: `setInputFiles`, synthesized `DragEvent('drop', { dataTransfer })`, CDP-level drops. They require a real user gesture (drag from Finder, or click + native file picker). Plan to hand off these uploads to the user; automate the rest.
+- Rejection `Purple Nickel` means the privacy URL did not render a direct policy. Verify `https://www.theonlyperson.com/fastread/chrome/privacy` returns the Chrome-specific JustRead policy before appealing or resubmitting; keep the app policy and Chrome extension policy on separate TheOnlyPerson URLs.
 - Save Draft saves only the currently visible tab. Filling Privacy fields then navigating to Distribution **wipes** the unsaved Privacy values. Pattern: fill page → Save → verify with snapshot → only then navigate.
 - The submit-confirm modal's action button is "Submit For Review" (capital F, R). There is a *different* "Publish" button that uses a stored publish-time which defaults to the Unix epoch and surfaces a "Publish time has expired" error. Click "Submit For Review" only.
 - The contact email change triggers an emailed verification link that the user has to click before the submit gate lifts. Plan for the inbox round-trip.

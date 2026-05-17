@@ -24,7 +24,7 @@ JustRead turns any web article into a clean, distraction-free reading view — a
 
 • Works on the SPA-rendered web. Most reader extensions choke on Substack notes, Medium drafts, and other JavaScript-mounted content. JustRead has a fallback extractor for those — if Readability bails out, the densest text block (ProseMirror, article-shaped containers) gets picked up.
 
-• No accounts, no servers, no analytics. Everything runs in your browser. The source is public.
+• No accounts, no servers, no analytics. Everything runs in your browser.
 
 **Keyboard shortcuts (Fast Read):**
 
@@ -41,7 +41,9 @@ JustRead turns any web article into a clean, distraction-free reading view — a
 • `Alt+Shift+R` — toggle Fast Read
 • Or click the toolbar icon.
 
-**Privacy:** Zero network requests, zero telemetry, zero third-party scripts. JustRead stores your settings in `chrome.storage` and never sends page contents anywhere. Full policy at https://www.theonlyperson.com/privacy
+**Privacy:** Zero telemetry, zero third-party scripts, no accounts, and no content uploads. JustRead stores your settings in `chrome.storage` and never sends page contents to a JustRead server. Full policy: https://www.theonlyperson.com/fastread/chrome/privacy
+
+**Terms:** https://www.theonlyperson.com/fastread/chrome/terms
 
 ## Category
 

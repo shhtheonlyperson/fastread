@@ -7,9 +7,6 @@ import overlayCss from '../styles/overlay.css?inline';
 import tokensCss from '../styles/tokens.css?inline';
 
 const HOST_ID = '__justread_host__';
-const FONTS_ID = '__justread_fonts__';
-const FONTS_HREF =
-  'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap';
 
 interface MountState {
   host: HTMLElement;
@@ -35,15 +32,6 @@ history.pushState = function (...args) { const r = origPush.apply(this, args); i
 const origReplace = history.replaceState;
 history.replaceState = function (...args) { const r = origReplace.apply(this, args); invalidate(); return r; };
 
-function ensureFonts() {
-  if (document.getElementById(FONTS_ID)) return;
-  const link = document.createElement('link');
-  link.id = FONTS_ID;
-  link.rel = 'stylesheet';
-  link.href = FONTS_HREF;
-  document.head.appendChild(link);
-}
-
 function mount(mode: 'reader' | 'fastread') {
   const article = getArticle();
   if (!article) {
@@ -55,7 +43,6 @@ function mount(mode: 'reader' | 'fastread') {
     renderOverlay(state.root, article, mode);
     return;
   }
-  ensureFonts();
   const host = document.createElement('div');
   host.id = HOST_ID;
   host.style.cssText = 'all: initial; position: fixed; inset: 0; z-index: 2147483647;';

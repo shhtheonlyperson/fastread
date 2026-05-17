@@ -24,7 +24,7 @@
 
 • 支援 SPA 渲染的網頁。大部分閱讀模式擴充功能在 Substack notes、Medium 草稿等 JavaScript 動態渲染內容上會失效；簡讀對這類頁面有後備擷取策略：當 Readability 找不到內容時，會選取最密集的文字區塊（ProseMirror、文章狀的容器等）。
 
-• 無帳號、無伺服器、無分析追蹤。一切在瀏覽器內運作，原始碼公開。
+• 無帳號、無伺服器、無分析追蹤。一切在瀏覽器內運作。
 
 **速讀模式鍵盤快捷鍵：**
 
@@ -41,4 +41,6 @@
 • `Alt+Shift+R` — 切換速讀模式
 • 或點工具列圖示。
 
-**隱私：** 零網路請求、零遙測、零第三方腳本。簡讀只把使用者偏好設定存在 `chrome.storage`，從不把頁面內容傳送到任何地方。完整政策：https://www.theonlyperson.com/privacy
+**隱私：** 零遙測、零第三方腳本、無帳號，也不會把頁面內容上傳到簡讀伺服器。簡讀只把使用者偏好設定存在 `chrome.storage`。完整政策：https://www.theonlyperson.com/fastread/chrome/privacy
+
+**使用條款：** https://www.theonlyperson.com/fastread/chrome/terms

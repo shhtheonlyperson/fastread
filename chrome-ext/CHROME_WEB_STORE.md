@@ -2,17 +2,18 @@
 
 This doc is the submission checklist plus the live-listing reference.
 
-## Current listing state (as of 2026-05-15)
+## Current listing state (as of 2026-05-17)
 
 - **Item ID:** `jlphjjnghcblidffelhhiooeghjblfed`
 - **Name:** `JustRead — Reader View + Speed Reading`
 - **Publisher account:** `shh@theonlyperson.com` (Web Store Developer fee paid here)
 - **Contact email (verified):** `shh@theonlyperson.com`
-- **Privacy policy URL:** `https://www.theonlyperson.com/privacy` (source: [`store-assets/PRIVACY.md`](store-assets/PRIVACY.md))
+- **Privacy policy URL:** `https://www.theonlyperson.com/fastread/chrome/privacy` (source: [`store-assets/PRIVACY.md`](store-assets/PRIVACY.md))
+- **Terms of Use URL:** `https://www.theonlyperson.com/fastread/chrome/terms` (source: [`store-assets/TERMS.md`](store-assets/TERMS.md))
 - **Category:** Tools (under Productivity) — visibility public, all regions, free
 - **Status URL (bookmark):** [Status tab](https://chrome.google.com/webstore/devconsole/CHROME_DEVELOPER_ID_PLACEHOLDER/jlphjjnghcblidffelhhiooeghjblfed/edit/status)
 - **Live URL (post-approval):** `https://chromewebstore.google.com/detail/jlphjjnghcblidffelhhiooeghjblfed`
-- **Submitted:** 2026-05-15. Status: **Pending review**. Local tag: `chrome-ext-v1.0.0-submitted`.
+- **Submitted:** 2026-05-15. **Resubmitted:** 2026-05-17 after fixing the Web Store privacy policy URL to the Chrome-specific policy. Current status: **Pending review** (`This draft is pending review.`). Local tag: `chrome-ext-v1.0.0-submitted`.
 
 ## What to watch while in review
 
@@ -27,10 +28,11 @@ Google emails the contact address (`shh@theonlyperson.com`) on every status chan
 
 ## If the review bounces
 
-Most likely two reasons; both are addressable without changing the extension code:
+Most likely reasons; all are addressable without changing the extension code:
 
-1. **Broad host permissions need clearer justification.** Re-paste the `<all_urls>` justification verbatim from [`store-assets/listing-en.md`](store-assets/listing-en.md) into the reviewer reply form.
-2. **Single-purpose policy.** Won't happen unless we add features outside reader/RSVP later.
+1. **Privacy policy URL does not lead directly to a valid policy.** Re-check `https://www.theonlyperson.com/fastread/chrome/privacy` with `curl -L` before appealing or resubmitting. This is the 2026-05-17 `Purple Nickel` bounce; keep the listing on the Chrome-specific JustRead policy page, not the generic TheOnlyPerson owner-site route.
+2. **Broad host permissions need clearer justification.** Re-paste the `<all_urls>` justification verbatim from [`store-assets/listing-en.md`](store-assets/listing-en.md) into the reviewer reply form.
+3. **Single-purpose policy.** Won't happen unless we add features outside reader/RSVP later.
 
 If a code change is needed, bump `chrome-ext/package.json` version (e.g. `1.0.0` → `1.0.1`), `bun run zip`, drag the new zip onto the dashboard's Package tab, fix the flagged setting, and Submit again.
 
@@ -172,10 +174,17 @@ Then tick the three certification statements:
 
 ### Privacy policy URL
 
-`https://www.theonlyperson.com/privacy`
+`https://www.theonlyperson.com/fastread/chrome/privacy`
 
 > Ensure that URL is live before submitting. Source markdown to paste at
-> the destination lives at `chrome-ext/store-assets/PRIVACY.md`.
+> the destination lives at `chrome-ext/store-assets/PRIVACY.md`. It must
+> render as a direct JustRead privacy policy, not an owner-site homepage.
+
+### Terms of Use URL
+
+`https://www.theonlyperson.com/fastread/chrome/terms`
+
+> Source markdown lives at `chrome-ext/store-assets/TERMS.md`.
 
 ### Remote code
 
@@ -214,11 +223,15 @@ above is what the reviewer looks for.
 
 ## Appendix: if the review bounces
 
-The two most common reasons for a JustRead-shaped extension to bounce:
+Common reasons for a JustRead-shaped extension to bounce:
 
-1. **"Broad host permissions need clearer justification."** Re-paste the
+1. **"Privacy policy link does not lead to a valid privacy policy."** Verify
+   `https://www.theonlyperson.com/fastread/chrome/privacy` returns the
+   Chrome-specific JustRead policy; then appeal the rejected revision or
+   resubmit the draft.
+2. **"Broad host permissions need clearer justification."** Re-paste the
    `<all_urls>` justification from this doc verbatim into the reviewer
    reply.
-2. **"Single-purpose violation."** Don't add new functionality that
+3. **"Single-purpose violation."** Don't add new functionality that
    isn't reader/RSVP; the listing reads as a pure reader extension and
    reviewers expect that.
