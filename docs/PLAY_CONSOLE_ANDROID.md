@@ -11,8 +11,8 @@ Play Console is the source of truth. Update this section after each release atte
 - Min SDK: **34** (Android 14, Pixel 8 launch line)
 - Target SDK: **35**
 - Latest signed AAB: `android-spike/app/build/outputs/bundle/release/app-release.aab`
-- Latest live internal-testing release observed through the Play Developer API: `0.2.1` (versionCode 8), `completed`, uploaded May 16, 2026.
-- Current local release candidate: `0.2.1` (versionCode 8), built and uploaded to Play internal testing on May 16, 2026.
+- Latest live internal-testing release observed through the Play Developer API: `0.2.2` (versionCode 9), `completed`, uploaded May 16, 2026.
+- Current local release candidate: `0.2.2` (versionCode 9), built and uploaded to Play internal testing on May 16, 2026.
 - Upload keystore: `android-spike/upload-keystore.jks` (gitignored, never commit)
 - Keystore properties: `android-spike/keystore.properties` (gitignored)
 - Play Console currently expects upload key SHA-1:
@@ -22,6 +22,7 @@ Play Console is the source of truth. Update this section after each release atte
 - Local `android-spike/upload-keystore.jks` SHA-256:
   `FASTREAD_PLAY_EXPECTED_UPLOAD_SHA256`
 - May 16, 2026 release attempt: the original upload keystore was recovered from the old EAS project `30524a6b-d9f1-40a1-b75a-43e289b49812` (`huang47` / `fastread` / production build credentials). Its SHA-1 matches Play's current upload key, so the pending upload-key reset was canceled in Play Console. Fastlane then built and uploaded versionCode 8 to the internal track with `release_status: completed`.
+- May 16, 2026 parity release: Android `0.2.2` / versionCode 9 was built from commit `88dea9e` and uploaded through `fastlane internal`; live Play track readback returned internal release `0.2.2`, versionCode `9`, status `completed`.
 - Play store listing icon is guarded by `scripts/sync-play-store-icon.sh --check`; the current `en-US` icon matches `android-spike/play-assets/justread-icon-512.png`.
 
 ## 1. Create the app in Play Console (one time)
