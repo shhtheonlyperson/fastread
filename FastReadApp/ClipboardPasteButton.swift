@@ -58,7 +58,7 @@ struct ClipboardPasteButton: View {
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .borderBeam(
             border: JRColor.terracotta,
-            beam: [JRColor.terracotta, Color(hex: 0xDFA15D)],
+            beam: [JRColor.terracotta, JRColor.accentAmber],
             beamBlur: 12,
             cornerRadius: 6,
             isEnabled: !isLoading

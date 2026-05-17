@@ -108,7 +108,7 @@ struct EnterFocusPlayButton: View {
 
                 Image(systemName: "play.fill")
                     .font(.system(size: compact ? 22 : 26, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(JRColor.onPrimary)
                     .padding(.leading, 3)
             }
         }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,10 +88,14 @@ fun SettingsScreen(
                 onValueChange = { onWpmChange(Persistence.normalizedWPM(it.toInt())) },
                 valueRange = 300f..1500f,
                 steps = 23,
+                colors = justReadSliderColors(),
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 SectionLabel("SLOW · 300")
@@ -107,7 +112,11 @@ fun SettingsScreen(
                         fontFamily = JRFont.sans,
                     )
                 }
-                Switch(checked = punctuationPause, onCheckedChange = onPunctuationPauseChange)
+                Switch(
+                    checked = punctuationPause,
+                    onCheckedChange = onPunctuationPauseChange,
+                    colors = justReadSwitchColors(),
+                )
             }
         }
 
@@ -247,14 +256,22 @@ private fun SettingsGroup(label: String, content: @Composable ColumnScope.() -> 
 
 @Composable
 private fun SettingsRow(content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        content = content,
-    )
+    ProvideTextStyle(
+        value = TextStyle(
+            color = JRColor.ink,
+            fontSize = 15.sp,
+            fontFamily = JRFont.sans,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            content = content,
+        )
+    }
 }
 
 @Composable

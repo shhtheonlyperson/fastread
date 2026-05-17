@@ -305,8 +305,8 @@ private fun glyph(screen: Screen): String = when (screen) {
 }
 
 private fun Context.appVersionName(): String =
-    runCatching { packageManager.getPackageInfo(packageName, 0).versionName ?: "0.2.2" }
-        .getOrDefault("0.2.2")
+    runCatching { packageManager.getPackageInfo(packageName, 0).versionName ?: "0.2.3" }
+        .getOrDefault("0.2.3")
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

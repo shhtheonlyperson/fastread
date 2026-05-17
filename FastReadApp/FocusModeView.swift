@@ -99,7 +99,7 @@ struct FocusModeView: View {
                 } label: {
                     Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(JRColor.onPrimary)
                         .frame(width: 72, height: 72)
                         .background(JRColor.terracotta)
                         .clipShape(Circle())

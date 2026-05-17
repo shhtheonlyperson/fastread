@@ -123,7 +123,7 @@ struct TocDrawerView: View {
                         .font(JRFont.mono(11, weight: .bold))
                         .tracking(2)
                         .textCase(.uppercase)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(JRColor.onPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(JRColor.terracotta)

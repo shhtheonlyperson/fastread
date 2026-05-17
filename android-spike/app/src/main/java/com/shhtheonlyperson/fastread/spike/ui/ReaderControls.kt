@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.SliderColors
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,6 +25,36 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.data.LocalEpubFile
+
+@Composable
+fun justReadSliderColors(): SliderColors = SliderDefaults.colors(
+    thumbColor = JRColor.primary,
+    activeTrackColor = JRColor.primary,
+    inactiveTrackColor = JRColor.hairline,
+    activeTickColor = JRColor.onPrimary.copy(alpha = 0.72f),
+    inactiveTickColor = JRColor.mutedSoft.copy(alpha = 0.55f),
+    disabledThumbColor = JRColor.primaryDisabled,
+    disabledActiveTrackColor = JRColor.primaryDisabled,
+    disabledActiveTickColor = JRColor.mutedSoft.copy(alpha = 0.45f),
+    disabledInactiveTrackColor = JRColor.hairlineSoft,
+    disabledInactiveTickColor = JRColor.mutedSoft.copy(alpha = 0.25f),
+)
+
+@Composable
+fun justReadSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    checkedThumbColor = JRColor.onPrimary,
+    checkedTrackColor = JRColor.primary,
+    checkedBorderColor = JRColor.primary,
+    uncheckedThumbColor = JRColor.canvas,
+    uncheckedTrackColor = JRColor.surfaceCard,
+    uncheckedBorderColor = JRColor.hairline,
+    disabledCheckedThumbColor = JRColor.primaryDisabled,
+    disabledCheckedTrackColor = JRColor.hairline,
+    disabledCheckedBorderColor = JRColor.hairline,
+    disabledUncheckedThumbColor = JRColor.surfaceSoft,
+    disabledUncheckedTrackColor = JRColor.hairlineSoft,
+    disabledUncheckedBorderColor = JRColor.hairline,
+)
 
 @Composable
 fun SectionLabel(text: String, color: Color = JRColor.inkQuiet) {

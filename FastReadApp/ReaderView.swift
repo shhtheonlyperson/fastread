@@ -113,7 +113,7 @@ struct ReaderView: View {
     private var tocOverlay: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
-                Color.black.opacity(0.18)
+                JRColor.ink.opacity(0.18)
                     .ignoresSafeArea()
                     .onTapGesture {
                         closeToc()
@@ -169,7 +169,7 @@ struct ReaderView: View {
             Button(action: onBack) {
                 Text("Back to library")
                     .font(JRFont.sans(14, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(JRColor.onPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(JRColor.ink)
@@ -301,7 +301,7 @@ struct ReaderView: View {
                 store.markRead()
             }
             .font(JRFont.sans(13, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(JRColor.onPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(Capsule().fill(JRColor.terracotta))

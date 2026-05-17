@@ -142,7 +142,7 @@ struct LibraryView: View {
                             Text("Resume")
                                 .font(JRFont.sans(13, weight: .semibold))
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(JRColor.onPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(Capsule().fill(JRColor.terracotta))

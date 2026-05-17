@@ -286,6 +286,7 @@ private fun ProgressScrubber(
             value = if (tokenCount <= 1) 0f else index.toFloat() / (tokenCount - 1).toFloat(),
             onValueChange = onScrub,
             valueRange = 0f..1f,
+            colors = justReadSliderColors(),
         )
         Row {
             Text(

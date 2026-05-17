@@ -152,30 +152,30 @@ def main() -> None:
 <title>Maestro · {html.escape(flow_name)}</title>
 <style>
   body {{ font-family: -apple-system, system-ui, sans-serif; max-width: 1100px;
-          margin: 32px auto; padding: 0 24px; color: #1F1A17; background: #F5EFE2; }}
+          margin: 32px auto; padding: 0 24px; color: #141413; background: #faf9f5; }}
   h1 {{ font-family: Georgia, serif; font-weight: 500; letter-spacing: -0.5px; }}
   .summary {{ display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 24px; }}
-  .pill {{ padding: 6px 12px; border-radius: 4px; background: #FAF6EC; border: 0.5px solid rgba(31,26,23,.15); font-size: 13px; }}
-  .pill.ok {{ background: #C96442; color: white; }}
+  .pill {{ padding: 6px 12px; border-radius: 4px; background: #f5f0e8; border: 0.5px solid #e6dfd8; font-size: 13px; }}
+  .pill.ok {{ background: #cc785c; color: white; }}
   .pill.fail {{ background: #B33; color: white; }}
-  video {{ width: 100%; max-width: 640px; border: 0.5px solid rgba(31,26,23,.18); display: block; margin: 0 auto 32px; background: black; }}
+  video {{ width: 100%; max-width: 640px; border: 0.5px solid #e8e0d2; display: block; margin: 0 auto 32px; background: #181715; }}
   .shots {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 24px 0; }}
   .shot {{ margin: 0; }}
-  .shot img {{ width: 100%; border: 0.5px solid rgba(31,26,23,.15); border-radius: 4px; background: white; }}
+  .shot img {{ width: 100%; border: 0.5px solid #e6dfd8; border-radius: 4px; background: white; }}
   .shot figcaption {{ font-size: 12px; margin-bottom: 6px; line-height: 1.45; }}
-  .shot-sub {{ color: #4A3F37; font-weight: normal; }}
+  .shot-sub {{ color: #3d3d3a; font-weight: normal; }}
   ol.steps {{ list-style: none; padding: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }}
   ol.steps li {{ display: grid; grid-template-columns: 32px 28px 1fr 60px; gap: 12px;
-                 padding: 8px 12px; border-bottom: 0.5px solid rgba(31,26,23,.08); }}
+                 padding: 8px 12px; border-bottom: 0.5px solid #e6dfd8; }}
   ol.steps li.ok .step-emoji {{ color: #2A6F47; }}
   ol.steps li.fail {{ background: rgba(179,51,51,.08); }}
   ol.steps li.fail .step-emoji {{ color: #B33; }}
-  .step-num {{ color: #8A7A6A; }}
-  .step-time {{ color: #8A7A6A; text-align: right; }}
-  .step-cmd code {{ background: rgba(31,26,23,.05); padding: 1px 4px; border-radius: 3px; }}
+  .step-num {{ color: #6c6a64; }}
+  .step-time {{ color: #6c6a64; text-align: right; }}
+  .step-cmd code {{ background: #efe9de; padding: 1px 4px; border-radius: 3px; }}
   h2 {{ margin-top: 36px; font-family: Georgia, serif; font-weight: 500; }}
-  footer {{ color: #8A7A6A; font-size: 12px; margin-top: 32px; padding-top: 16px;
-            border-top: 0.5px solid rgba(31,26,23,.08); }}
+  footer {{ color: #6c6a64; font-size: 12px; margin-top: 32px; padding-top: 16px;
+            border-top: 0.5px solid #e6dfd8; }}
 </style></head>
 <body>
 <h1>Maestro · {html.escape(flow_name)}</h1>

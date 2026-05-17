@@ -1,16 +1,41 @@
 import SwiftUI
 
 enum JRColor {
-    static let paper = Color(hex: 0xF5EFE2)
-    static let paperStrong = Color(hex: 0xFAF6EC)
-    static let paperDeep = Color(hex: 0xECE4D2)
-    static let ink = Color(hex: 0x1F1A17)
-    static let inkMid = Color(hex: 0x4A3F37)
-    static let inkQuiet = Color(hex: 0x8A7A6A)
-    static let rule = Color(hex: 0x1F1A17, opacity: 0.08)
-    static let ruleStrong = Color(hex: 0x1F1A17, opacity: 0.18)
-    static let terracotta = Color(hex: 0xC96442)
-    static let focusDark = Color(hex: 0x1C1714)
+    static let primary = Color(hex: 0xCC785C)
+    static let primaryActive = Color(hex: 0xA9583E)
+    static let primaryDisabled = Color(hex: 0xE6DFD8)
+    static let ink = Color(hex: 0x141413)
+    static let body = Color(hex: 0x3D3D3A)
+    static let bodyStrong = Color(hex: 0x252523)
+    static let muted = Color(hex: 0x6C6A64)
+    static let mutedSoft = Color(hex: 0x8E8B82)
+    static let hairline = Color(hex: 0xE6DFD8)
+    static let hairlineSoft = Color(hex: 0xEBE6DF)
+    static let canvas = Color(hex: 0xFAF9F5)
+    static let surfaceSoft = Color(hex: 0xF5F0E8)
+    static let surfaceCard = Color(hex: 0xEFE9DE)
+    static let surfaceCreamStrong = Color(hex: 0xE8E0D2)
+    static let surfaceDark = Color(hex: 0x181715)
+    static let surfaceDarkElevated = Color(hex: 0x252320)
+    static let surfaceDarkSoft = Color(hex: 0x1F1E1B)
+    static let onPrimary = Color(hex: 0xFFFFFF)
+    static let onDark = Color(hex: 0xFAF9F5)
+    static let onDarkSoft = Color(hex: 0xA09D96)
+    static let accentTeal = Color(hex: 0x5DB8A6)
+    static let accentAmber = Color(hex: 0xE8A55A)
+    static let success = Color(hex: 0x5DB872)
+    static let warning = Color(hex: 0xD4A017)
+    static let error = Color(hex: 0xC64545)
+
+    static let paper = canvas
+    static let paperStrong = surfaceSoft
+    static let paperDeep = surfaceCard
+    static let inkMid = body
+    static let inkQuiet = muted
+    static let rule = hairline
+    static let ruleStrong = surfaceCreamStrong
+    static let terracotta = primary
+    static let focusDark = surfaceDark
 }
 
 enum JRFont {
@@ -92,7 +117,7 @@ struct BrandMark: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(hex: 0xF3ECE1), Color(hex: 0xE9DCC5), Color(hex: 0xD9C8AA)],
+                colors: [JRColor.canvas, JRColor.surfaceCard, JRColor.surfaceCreamStrong],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -100,7 +125,7 @@ struct BrandMark: View {
             VStack(spacing: 7) {
                 ForEach(0..<Int(size / 8 + 2), id: \.self) { _ in
                     Rectangle()
-                        .fill(Color.black.opacity(0.025))
+                        .fill(JRColor.ink.opacity(0.025))
                         .frame(height: 1)
                     Spacer(minLength: 0)
                 }
@@ -127,7 +152,7 @@ struct BrandMark: View {
         .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
+                .stroke(JRColor.ink.opacity(0.08), lineWidth: 0.5)
         )
     }
 }
@@ -230,7 +255,7 @@ extension View {
     func borderBeam(
         border: Color = .primary,
         hideFadeBorder: Bool = false,
-        beam: [Color] = [.blue, .purple],
+        beam: [Color] = [JRColor.primary, JRColor.accentAmber],
         beamBlur: CGFloat = 10,
         cornerRadius: CGFloat = 20,
         isEnabled: Bool = true
@@ -287,10 +312,10 @@ private struct BorderBeamEffect: ViewModifier {
                                 .mask {
                                     ZStack {
                                         Rectangle()
-                                            .fill(.white)
+                                            .fill(JRColor.onPrimary)
                                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                                             .inset(by: max(1, beamBlur / 3))
-                                            .fill(.white)
+                                            .fill(JRColor.onPrimary)
                                             .blur(radius: beamBlur)
                                             .blendMode(.destinationOut)
                                     }
