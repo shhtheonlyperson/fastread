@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["chrome", "vite/client"]
+    "types": ["chrome", "node", "vite/client"]
   },
   "include": ["src", "e2e", "manifest.config.ts", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

@@ -24,6 +24,7 @@
     "@crxjs/vite-plugin": "^2.0.0-beta.25",
     "@playwright/test": "^1.60.0",
     "@types/chrome": "^0.0.268",
+    "@types/node": "^24.10.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript/native-preview": "latest",
