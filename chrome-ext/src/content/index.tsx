@@ -83,17 +83,6 @@ function toggle(mode: 'reader' | 'fastread') {
   mount(mode);
 }
 
-/* Modifier-free shortcuts can't be MV3 commands. The content script handles them. */
-window.addEventListener('keydown', (e) => {
-  const tgt = e.target as HTMLElement | null;
-  if (tgt && (tgt.closest('input, textarea, [contenteditable="true"]'))) return;
-  if (state) return; // overlay handles its own keys when mounted
-  if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    e.preventDefault();
-    toggle(e.shiftKey ? 'fastread' : 'reader');
-  }
-});
-
 chrome.runtime.onMessage.addListener((msg: Msg, _sender, sendResponse) => {
   if (msg.type === 'ping') {
     sendResponse({ ok: true, readerable: canRead() } satisfies MsgResponse);
