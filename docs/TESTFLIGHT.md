@@ -23,6 +23,8 @@ ASC_KEY_ID="<App Store Connect API key id>"
 ASC_ISSUER_ID="<App Store Connect issuer id>"
 ASC_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 FASTREAD_TEAM_ID="<Apple team id>"
+FASTREAD_BUILD_KEYCHAIN="$HOME/Library/Keychains/fastread-build.keychain-db"
+FASTREAD_CODESIGN="<dedicated build keychain password>"
 ```
 
 ## Before Upload
@@ -71,6 +73,7 @@ Connect.
 | Missing ASC key | Set `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_PATH` locally. |
 | Duplicate build number | Bump `CURRENT_PROJECT_VERSION` and upload again. |
 | Wrong bundle identifier | Align the Release build settings with the ASC app record. |
+| Code signing asks through macOS UI | Set `FASTREAD_CODESIGN` locally, then let the release script unlock the dedicated keychain and grant `codesign` access. If it still asks, remove stale duplicate signing identities from other keychains. |
 | Code signing hangs | Unlock or recreate the dedicated build keychain, then remove stale duplicate signing identities. |
 | Missing export compliance | Keep `ITSAppUsesNonExemptEncryption=false` and clear the build state in ASC if needed. |
 

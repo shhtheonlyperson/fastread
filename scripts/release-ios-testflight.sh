@@ -20,7 +20,7 @@ ASC_ISSUER_ID="${ASC_ISSUER_ID:-}"
 ASC_KEY_PATH="${ASC_KEY_PATH:-$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8}"
 TEAM_ID="${FASTREAD_TEAM_ID:-QLJ9ZM278S}"
 BUILD_KEYCHAIN="${FASTREAD_BUILD_KEYCHAIN:-$HOME/Library/Keychains/fastread-build.keychain-db}"
-BUILD_KEYCHAIN_PASSWORD="${FASTREAD_BUILD_KEYCHAIN_PASSWORD:-fastread}"
+BUILD_KEYCHAIN_PASSWORD="${FASTREAD_CODESIGN:-}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 ARCHIVE="${FASTREAD_ARCHIVE_PATH:-$ROOT_DIR/build/JustRead-$STAMP.xcarchive}"
 EXPORT_DIR="${FASTREAD_EXPORT_DIR:-$ROOT_DIR/build/export-$STAMP}"
@@ -51,14 +51,37 @@ ensure_auth() {
   [[ -f "$ASC_KEY_PATH" ]] || fail "missing ASC API key at $ASC_KEY_PATH"
 }
 
+ensure_keychain_in_search_list() {
+  local existing_keychains=()
+  local keychain
+
+  while IFS= read -r keychain; do
+    keychain="${keychain#\"}"
+    keychain="${keychain%\"}"
+    [[ -n "$keychain" ]] && existing_keychains+=("$keychain")
+  done < <(security list-keychains -d user)
+
+  for keychain in "${existing_keychains[@]}"; do
+    [[ "$keychain" == "$BUILD_KEYCHAIN" ]] && return
+  done
+
+  security list-keychains -d user -s "$BUILD_KEYCHAIN" "${existing_keychains[@]}" \
+    || fail "unable to add build keychain to user keychain search list: $BUILD_KEYCHAIN"
+}
+
 unlock_keychain() {
   if [[ -f "$BUILD_KEYCHAIN" ]]; then
-    security unlock-keychain -p "$BUILD_KEYCHAIN_PASSWORD" "$BUILD_KEYCHAIN" || true
+    [[ -n "$BUILD_KEYCHAIN_PASSWORD" ]] \
+      || fail "FASTREAD_CODESIGN is required to unlock the build keychain: $BUILD_KEYCHAIN"
+    ensure_keychain_in_search_list
+    security unlock-keychain -p "$BUILD_KEYCHAIN_PASSWORD" "$BUILD_KEYCHAIN" \
+      || fail "unable to unlock build keychain. Check FASTREAD_CODESIGN."
     security set-key-partition-list \
       -S "apple-tool:,apple:,codesign:" \
       -s \
       -k "$BUILD_KEYCHAIN_PASSWORD" \
-      "$BUILD_KEYCHAIN" >/dev/null 2>&1 || true
+      "$BUILD_KEYCHAIN" >/dev/null \
+      || fail "unable to grant non-interactive codesign access. Check the build keychain password and signing identity."
   fi
 }
 
