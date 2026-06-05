@@ -23,6 +23,15 @@ public enum RSVPEngine {
         isCJK ? RSVPSpec.WPM.minimumUserCJK : RSVPSpec.WPM.minimumUserLatin
     }
 
+    /// Clamp `value` to the user-facing range and snap it to the nearest
+    /// `wpmStep`. The single home for this rule — previously copied into
+    /// ReadingStore, SettingsView, and ReaderPaceControl.
+    public static func snapWPM(_ value: Double, forCJK isCJK: Bool = false) -> Double {
+        let floor = minimumUserWPM(forCJK: isCJK)
+        let clamped = clamp(value, min: floor, max: maximumWPM)
+        return (((clamped - floor) / wpmStep).rounded() * wpmStep) + floor
+    }
+
     public struct FocusSplit: Equatable {
         public let before: String
         public let focus: String

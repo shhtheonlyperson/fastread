@@ -630,8 +630,7 @@ public final class ReadingStore: ObservableObject {
     }
 
     private static func normalizedWPM(_ value: Double) -> Double {
-        let clamped = RSVPEngine.clamp(value, min: RSVPEngine.minimumUserWPM, max: RSVPEngine.maximumWPM)
-        return (Double(((clamped - RSVPEngine.minimumUserWPM) / RSVPEngine.wpmStep).rounded()) * RSVPEngine.wpmStep) + RSVPEngine.minimumUserWPM
+        RSVPEngine.snapWPM(value)
     }
 
     private func tokens(for article: ReadingArticle) -> [String] {
@@ -687,19 +686,9 @@ public final class ReadingStore: ObservableObject {
     }
 
     private static func makeLede(from text: String, tokens: [String]) -> String {
-        let limit = containsCJK(text) ? 42 : 18
-        let selected = tokens.prefix(limit)
-        return containsCJK(text) ? selected.joined() : selected.joined(separator: " ")
-    }
-
-    private static func containsCJK(_ text: String) -> Bool {
-        text.unicodeScalars.contains { scalar in
-            (0x3040...0x30ff).contains(scalar.value) ||
-            (0x3400...0x4dbf).contains(scalar.value) ||
-            (0x4e00...0x9fff).contains(scalar.value) ||
-            (0xf900...0xfaff).contains(scalar.value) ||
-            (0xac00...0xd7af).contains(scalar.value)
-        }
+        let useJoin = RSVPEngine.containsCJK(text)
+        let selected = tokens.prefix(useJoin ? 42 : 18)
+        return useJoin ? selected.joined() : selected.joined(separator: " ")
     }
 }
 

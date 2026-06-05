@@ -190,8 +190,7 @@ struct SettingsView: View {
     }
 
     private func snappedWPM(_ value: Double) -> Double {
-        let clamped = RSVPEngine.clamp(value, min: RSVPEngine.minimumUserWPM, max: RSVPEngine.maximumWPM)
-        return (Double(((clamped - RSVPEngine.minimumUserWPM) / RSVPEngine.wpmStep).rounded()) * RSVPEngine.wpmStep) + RSVPEngine.minimumUserWPM
+        RSVPEngine.snapWPM(value)
     }
 
     private var appVersion: String {
