@@ -7,8 +7,9 @@
 //   1. mergeCrossScriptUnits     — digit + CJK measure word (5公里)
 //   2. mergePrepDigitNoun        — 在 + 101 + 大樓 → 在101大樓
 //   3. coalesceSingleCharRuns    — 3+ adjacent single-Han runs group
-//      into 2-3 char clusters; k=2 merges when next is non-multi-CJK;
-//      pronoun-in-run / k=4 + multi-char next triggers peel-forward
+//      into 2-3 char clusters; k=2 merges when next is non-multi-CJK or
+//      neither singleton is a pronoun; k=4 peel-forward only fires on a
+//      pronoun-in-run or a verb-like 4th char
 //   4. glueFunctionParticles     — 的 shorter-side, 了/著/過/之/etc.
 //      backward, 在/從/對/是 forward (only into multi-char)
 //   5. absorbStraySingletons     — leftover 1-Han chunks: backward cap
@@ -95,7 +96,19 @@ object ChunkShaper {
 
     // ---- Pass 3: single-Han run coalesce ----------------------------
 
-    private val pronouns = setOf('我', '你', '他', '她', '它', '您', '咱')
+    private val pronouns = setOf('我', '你', '他', '她', '它', '您', '咱', '妳')
+
+    // Motion / aspect verbs that commonly start a VP right after a name,
+    // signalling a k=4 run should split as `name(3) | verb-led VP(N)`.
+    // Guards the k=4 peel so it only fires when the 4th run char looks
+    // verb-like: keeps `黃|士|旗|去 + 吃飯 → 黃士旗 | 去吃飯` while leaving
+    // `阿|娜|擦|得 + 發光 → 阿娜 | 擦得 | 發光` (得 is a complement marker,
+    // not a motion verb).
+    private val peelForwardVerbs = setOf(
+        '去', '來', '回', '走', '上', '下', '進', '出',
+        '看', '說', '講', '做', '想', '聽', '讀', '寫',
+        '吃', '喝', '買', '賣', '找',
+    )
 
     private fun coalesceSingleCharRuns(tokens: List<String>): List<String> {
         val result = mutableListOf<String>()
@@ -124,10 +137,19 @@ object ChunkShaper {
                     continue
                 }
                 if (runLen == 4 && nextHasRoom) {
-                    result += tokens.subList(i, i + 3).joinToString("")
-                    result += tokens[i + 3] + tokens[j]
-                    i = j + 1
-                    continue
+                    // Name-led 4 + VP: only peel when there's a positive
+                    // signal that the run actually splits as name(3) +
+                    // verb. Without the guard this rule splits 阿娜 + 擦得
+                    // + 發光 into 阿娜擦 / 得發光 (treating 得 as a verb
+                    // when it's a complement marker).
+                    val fourthChar = tokens[i + 3].firstOrNull()
+                    val peel = runHasPronoun || (fourthChar in peelForwardVerbs)
+                    if (peel) {
+                        result += tokens.subList(i, i + 3).joinToString("")
+                        result += tokens[i + 3] + tokens[j]
+                        i = j + 1
+                        continue
+                    }
                 }
                 if (runLen == 5 && nextHasRoom && cjkCount(tokens[j]) == 1) {
                     result += tokens.subList(i, i + 3).joinToString("")
@@ -143,8 +165,17 @@ object ChunkShaper {
                 }
                 i = j
             } else if (runLen == 2) {
+                // Merge a 2-singleton run when:
+                //   • next is non-multi-CJK (so the second singleton has
+                //     nothing better to bind with), OR
+                //   • next is multi but neither singleton is a pronoun
+                //     (so `怡 + 婷 + 常常` reads as `怡婷 | 常常`).
+                // Pronoun guard keeps the S+VP rhythm: `我 | 去 + 吃飯了`
+                // doesn't collapse to `我去 | 吃飯了`.
                 val nextNotMultiCJK = j >= tokens.size || cjkCount(tokens[j]) < 2
-                if (nextNotMultiCJK) {
+                val neitherIsPronoun = tokens[i].firstOrNull() !in pronouns
+                    && tokens[i + 1].firstOrNull() !in pronouns
+                if (nextNotMultiCJK || neitherIsPronoun) {
                     result += tokens.subList(i, j).joinToString("")
                     i = j
                 } else {
@@ -264,6 +295,18 @@ object ChunkShaper {
 
     // ---- Pass 5: absorb stray singletons -----------------------------
 
+    // Hard punctuation that ends a clause / sentence. Absorbing a stray
+    // singleton backward across one of these would glue content from a
+    // new clause onto the tail of the old one (說謊。+也 → 說謊。也).
+    private val hardClauseEndings = setOf(
+        '。', '，', '！', '？', '；', '：',
+        '」', '』', '）', '》', '〉',
+        '.', ',', '!', '?', ';', ':',
+    )
+
+    private fun endsInHardPunct(chunk: String): Boolean =
+        chunk.lastOrNull() in hardClauseEndings
+
     private fun absorbStraySingletons(tokens: List<String>): List<String> {
         val result = mutableListOf<String>()
         var i = 0
@@ -274,9 +317,13 @@ object ChunkShaper {
                 i += 1
                 continue
             }
-            // Backward into multi-char prev (cap 3).
+            // Backward into multi-char prev (cap 3). Skip when the prev
+            // chunk ends in clause-ending punctuation — that boundary is a
+            // hard semantic break (說謊。也 / 遊子。一 across two sentences).
             val last = result.lastOrNull()
-            if (last != null && cjkCount(last) >= 2 && cjkCount(last) + 1 <= 3) {
+            if (last != null && cjkCount(last) >= 2 && cjkCount(last) + 1 <= 3
+                && !endsInHardPunct(last)
+            ) {
                 result[result.lastIndex] = last + cur
                 i += 1
                 continue
