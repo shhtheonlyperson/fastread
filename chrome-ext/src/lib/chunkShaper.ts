@@ -7,6 +7,7 @@
  */
 
 import { isHan, isCJKChar, isCJKPunctuation } from './tokenizer';
+import { RSVP_SPEC } from './rsvpSpec.generated';
 
 /* ---------- helpers ---------- */
 
@@ -39,52 +40,23 @@ function isDigitRun(s: string): boolean {
   return true;
 }
 
-/* ---------- constants ---------- */
+/* ---------- constants ----------
+ * Single-sourced from Tools/rsvp-spec.json via the generated RSVP_SPEC
+ * (rsvpSpec.generated.ts). Don't inline new literals — edit the spec. */
 
-const prepositionsForCompound = new Set(['在', '從', '到', '向', '於']);
+const CS = RSVP_SPEC.chunkShaper;
 
-const measureWords = new Set([
-  '個', '位', '件', '種', '名', '次', '回', '張', '把', '條', '場', '份',
-  '年', '月', '日', '時', '分', '秒', '週', '季', '點', '天',
-  '小時', '分鐘', '秒鐘',
-  '公斤', '公克', '公尺', '公里', '公分', '公升',
-  '元', '塊', '毛', '億', '萬',
-  '度',
-  '個月', '個人', '歲',
-]);
+const prepositionsForCompound = new Set<string>(CS.prepositionsForCompound);
+const measureWords = new Set<string>(CS.measureWords);
+const particlesBackward = new Set<string>(CS.particlesBackward);
+const particlesForward = new Set<string>(CS.particlesForward);
 
-const particlesBackward = new Set([
-  '了', '著', '過',
-  '之', '矣', '哉', '焉', '乎', '而',
-  '嗎', '呢', '吧', '啊', '喔', '耶', '呀', '嘛', '呵',
-]);
+const POSSESSIVE_DE = CS.possessiveDe;
+const MAX_MERGED_CJK = CS.maxMergedCJK;
 
-const particlesForward = new Set([
-  '在', '從', '對', '向', '把', '被', '給',
-  '及', '或',
-  '是', '為',
-  '也', '又', '都', '還', '才', '就', '便',
-  '很', '更', '最', '太',
-  '不', '沒', '未', '別',
-  '新', '舊',
-]);
-
-const POSSESSIVE_DE = '的';
-const MAX_MERGED_CJK = 4;
-
-const pronouns = new Set(['我', '你', '他', '她', '它', '您', '咱', '妳']);
-
-const peelForwardVerbs = new Set([
-  '去', '來', '回', '走', '上', '下', '進', '出',
-  '看', '說', '講', '做', '想', '聽', '讀', '寫',
-  '吃', '喝', '買', '賣', '找',
-]);
-
-const hardClauseEndings = new Set([
-  '。', '，', '！', '？', '；', '：',
-  '」', '』', '）', '》', '〉',
-  '.', ',', '!', '?', ';', ':',
-]);
+const pronouns = new Set<string>(CS.pronouns);
+const peelForwardVerbs = new Set<string>(CS.peelForwardVerbs);
+const hardClauseEndings = new Set<string>(CS.hardClauseEndings);
 
 function endsInHardPunct(chunk: string): boolean {
   const last = [...chunk].at(-1);

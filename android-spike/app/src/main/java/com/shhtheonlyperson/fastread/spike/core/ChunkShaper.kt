@@ -27,19 +27,13 @@ object ChunkShaper {
         return result
     }
 
-    private const val MAX_MERGED_CJK = 4
+    // Constants & rule tables are single-sourced from Tools/rsvp-spec.json via
+    // the generated RsvpSpec (RsvpSpec.generated.kt). Edit the spec, not here.
+    private const val MAX_MERGED_CJK = RsvpSpec.ChunkShaper.MAX_MERGED_CJK
 
     // ---- Pass 1: cross-script number + measure word -----------------
 
-    private val measureWords = setOf(
-        "個", "位", "件", "種", "名", "次", "回", "張", "把", "條", "場", "份",
-        "年", "月", "日", "時", "分", "秒", "週", "季", "點", "天",
-        "小時", "分鐘", "秒鐘",
-        "公斤", "公克", "公尺", "公里", "公分", "公升",
-        "元", "塊", "毛", "億", "萬",
-        "度",
-        "個月", "個人", "歲",
-    )
+    private val measureWords = RsvpSpec.ChunkShaper.measureWords
 
     private fun mergeCrossScriptUnits(tokens: List<String>): List<String> {
         val result = mutableListOf<String>()
@@ -71,7 +65,7 @@ object ChunkShaper {
 
     // ---- Pass 2: preposition + digit + Han noun ---------------------
 
-    private val prepositionsForCompound = setOf('在', '從', '到', '向', '於')
+    private val prepositionsForCompound = RsvpSpec.ChunkShaper.prepositionsForCompound
 
     private fun mergePrepDigitNoun(tokens: List<String>): List<String> {
         val result = mutableListOf<String>()
@@ -96,7 +90,7 @@ object ChunkShaper {
 
     // ---- Pass 3: single-Han run coalesce ----------------------------
 
-    private val pronouns = setOf('我', '你', '他', '她', '它', '您', '咱', '妳')
+    private val pronouns = RsvpSpec.ChunkShaper.pronouns
 
     // Motion / aspect verbs that commonly start a VP right after a name,
     // signalling a k=4 run should split as `name(3) | verb-led VP(N)`.
@@ -104,11 +98,7 @@ object ChunkShaper {
     // verb-like: keeps `黃|士|旗|去 + 吃飯 → 黃士旗 | 去吃飯` while leaving
     // `阿|娜|擦|得 + 發光 → 阿娜 | 擦得 | 發光` (得 is a complement marker,
     // not a motion verb).
-    private val peelForwardVerbs = setOf(
-        '去', '來', '回', '走', '上', '下', '進', '出',
-        '看', '說', '講', '做', '想', '聽', '讀', '寫',
-        '吃', '喝', '買', '賣', '找',
-    )
+    private val peelForwardVerbs = RsvpSpec.ChunkShaper.peelForwardVerbs
 
     private fun coalesceSingleCharRuns(tokens: List<String>): List<String> {
         val result = mutableListOf<String>()
@@ -215,23 +205,11 @@ object ChunkShaper {
 
     // ---- Pass 4: particle gluing ------------------------------------
 
-    private val particlesBackward = setOf(
-        '了', '著', '過',
-        '之', '矣', '哉', '焉', '乎', '而',
-        '嗎', '呢', '吧', '啊', '喔', '耶', '呀', '嘛', '呵',
-    )
+    private val particlesBackward = RsvpSpec.ChunkShaper.particlesBackward
 
-    private val particlesForward = setOf(
-        '在', '從', '對', '向', '把', '被', '給',
-        '及', '或',
-        '是', '為',
-        '也', '又', '都', '還', '才', '就', '便',
-        '很', '更', '最', '太',
-        '不', '沒', '未', '別',
-        '新', '舊',
-    )
+    private val particlesForward = RsvpSpec.ChunkShaper.particlesForward
 
-    private const val POSSESSIVE_DE = '的'
+    private const val POSSESSIVE_DE = RsvpSpec.ChunkShaper.POSSESSIVE_DE
 
     private fun glueFunctionParticles(tokens: List<String>): List<String> {
         val result = mutableListOf<String>()
@@ -298,11 +276,7 @@ object ChunkShaper {
     // Hard punctuation that ends a clause / sentence. Absorbing a stray
     // singleton backward across one of these would glue content from a
     // new clause onto the tail of the old one (說謊。+也 → 說謊。也).
-    private val hardClauseEndings = setOf(
-        '。', '，', '！', '？', '；', '：',
-        '」', '』', '）', '》', '〉',
-        '.', ',', '!', '?', ';', ':',
-    )
+    private val hardClauseEndings = RsvpSpec.ChunkShaper.hardClauseEndings
 
     private fun endsInHardPunct(chunk: String): Boolean =
         chunk.lastOrNull() in hardClauseEndings
@@ -358,10 +332,5 @@ object ChunkShaper {
 
     private fun cjkCount(chunk: String): Int = chunk.count(::isHanCharacter)
 
-    private fun isHanCharacter(c: Char): Boolean {
-        val v = c.code
-        return (v in 0x3400..0x4dbf)
-            || (v in 0x4e00..0x9fff)
-            || (v in 0xf900..0xfaff)
-    }
+    private fun isHanCharacter(c: Char): Boolean = RsvpSpec.hanRanges.any { c.code in it }
 }

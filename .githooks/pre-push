@@ -11,6 +11,7 @@ set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+scripts/verify-rsvp-spec.sh
 scripts/verify-ios-performance.sh
 scripts/verify-chrome-ext.sh
 scripts/verify-android.sh

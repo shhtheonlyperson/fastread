@@ -1,0 +1,84 @@
+{
+  "$comment": "Single source of truth for RSVP tokenizer + ChunkShaper constants shared by Swift (Sources/FastReadCore), the Chrome extension (chrome-ext/src/lib), and Android (android-spike). DO NOT hand-edit the generated RSVPSpec.* files — edit this and run `node Tools/gen-rsvp-spec.mjs`. The generated files are drift-gated in CI (scripts/verify-rsvp-spec.sh).",
+  "version": 1,
+  "wpm": {
+    "default": 450,
+    "minimumSafe": 100,
+    "maximum": 1500,
+    "step": 25,
+    "minimumUser": {
+      "latin": 300,
+      "cjk": 150
+    }
+  },
+  "duration": {
+    "baseMillisPerMinute": 60000,
+    "cjkMultiplier": 1.5,
+    "lengthThreshold": 9,
+    "lengthPerCharIncrement": 0.07,
+    "lengthMaxIncrement": 0.6,
+    "pauseMultiplier": 1.65
+  },
+  "ranges": {
+    "cjk": [
+      [12352, 12543],
+      [13312, 19903],
+      [19968, 40959],
+      [63744, 64255],
+      [44032, 55215]
+    ],
+    "han": [
+      [13312, 19903],
+      [19968, 40959],
+      [63744, 64255]
+    ],
+    "cjkPunctuation": [
+      [12288, 12351],
+      [65280, 65519]
+    ]
+  },
+  "punctuation": {
+    "asciiPause": [".", ",", "!", "?", ";", ":"],
+    "latinSentenceEnd": [".", "!", "?", ";", ":", ")"],
+    "latinTrailingClosers": ["\"", "'", ")", "]"]
+  },
+  "chunkShaper": {
+    "maxMergedCJK": 4,
+    "possessiveDe": "的",
+    "measureWords": [
+      "個", "位", "件", "種", "名", "次", "回", "張", "把", "條", "場", "份",
+      "年", "月", "日", "時", "分", "秒", "週", "季", "點", "天",
+      "小時", "分鐘", "秒鐘",
+      "公斤", "公克", "公尺", "公里", "公分", "公升",
+      "元", "塊", "毛", "億", "萬",
+      "度",
+      "個月", "個人", "歲"
+    ],
+    "prepositionsForCompound": ["在", "從", "到", "向", "於"],
+    "particlesBackward": [
+      "了", "著", "過",
+      "之", "矣", "哉", "焉", "乎", "而",
+      "嗎", "呢", "吧", "啊", "喔", "耶", "呀", "嘛", "呵"
+    ],
+    "particlesForward": [
+      "在", "從", "對", "向", "把", "被", "給",
+      "及", "或",
+      "是", "為",
+      "也", "又", "都", "還", "才", "就", "便",
+      "很", "更", "最", "太",
+      "不", "沒", "未", "別",
+      "新", "舊"
+    ],
+    "pronouns": ["我", "你", "他", "她", "它", "您", "咱", "妳"],
+    "peelForwardVerbs": [
+      "去", "來", "回", "走", "上", "下", "進", "出",
+      "看", "說", "講", "做", "想", "聽", "讀", "寫",
+      "吃", "喝", "買", "賣", "找"
+    ],
+    "hardClauseEndings": [
+      "。", "，", "！", "？", "；", "：",
+      "」", "』", "）", "》", "〉",
+      ".", ",", "!", "?", ";", ":"
+    ]
+  }
+}

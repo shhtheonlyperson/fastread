@@ -8,15 +8,27 @@
  */
 
 import { shape } from './chunkShaper';
+import { RSVP_SPEC } from './rsvpSpec.generated';
 
 /** Bump when the tokenizer or shaper produces a materially different
  * chunking for the same input. Persisted token state with a different
- * version is discarded and recomputed. */
-export const TOKENIZER_VERSION = 1;
+ * version is discarded and recomputed.
+ *
+ * Constants & rule tables are single-sourced from Tools/rsvp-spec.json via
+ * the generated RSVP_SPEC (rsvpSpec.generated.ts). Don't inline new literals
+ * here — add them to the spec so all three platforms stay in sync. */
+export const TOKENIZER_VERSION = RSVP_SPEC.version;
 
 const NBSP = ' ';
 
 /* ---------- character-class helpers (parity with Swift) ---------- */
+
+function inRanges(ch: string, ranges: readonly (readonly [number, number])[]): boolean {
+  const v = ch.codePointAt(0);
+  if (v === undefined) return false;
+  for (const [lo, hi] of ranges) if (v >= lo && v <= hi) return true;
+  return false;
+}
 
 const focusableRegex = /[\p{L}\p{N}]/u;
 
@@ -25,34 +37,18 @@ export function isFocusable(ch: string): boolean {
 }
 
 export function isHan(ch: string): boolean {
-  const v = ch.codePointAt(0);
-  if (v === undefined) return false;
-  return (
-    (v >= 0x3400 && v <= 0x4dbf) || // CJK Ext A
-    (v >= 0x4e00 && v <= 0x9fff) || // CJK Unified
-    (v >= 0xf900 && v <= 0xfaff)    // CJK Compat
-  );
+  return inRanges(ch, RSVP_SPEC.ranges.han);
 }
 
 export function isCJKChar(ch: string): boolean {
-  const v = ch.codePointAt(0);
-  if (v === undefined) return false;
-  return (
-    (v >= 0x3040 && v <= 0x30ff) || // Hiragana/Katakana
-    (v >= 0x3400 && v <= 0x4dbf) ||
-    (v >= 0x4e00 && v <= 0x9fff) ||
-    (v >= 0xf900 && v <= 0xfaff) ||
-    (v >= 0xac00 && v <= 0xd7af)    // Hangul
-  );
+  return inRanges(ch, RSVP_SPEC.ranges.cjk);
 }
 
 export function isCJKPunctuation(ch: string): boolean {
-  const v = ch.codePointAt(0);
-  if (v === undefined) return false;
-  return (v >= 0x3000 && v <= 0x303f) || (v >= 0xff00 && v <= 0xffef);
+  return inRanges(ch, RSVP_SPEC.ranges.cjkPunctuation);
 }
 
-const ASCII_PAUSE = new Set(['.', ',', '!', '?', ';', ':']);
+const ASCII_PAUSE = new Set<string>(RSVP_SPEC.punctuation.asciiPause);
 export function isASCIIPunctuationPause(ch: string): boolean {
   return ASCII_PAUSE.has(ch);
 }
@@ -228,8 +224,8 @@ export function splitForFocus(token: string | null | undefined): FocusSplit {
 
 /* ---------- per-token duration (matches iOS) ---------- */
 
-const TRAILING_CLOSERS = new Set(['"', "'", ')', ']']);
-const ENGLISH_PAUSE = new Set(['.', '!', '?', ';', ':', ')']);
+const TRAILING_CLOSERS = new Set<string>(RSVP_SPEC.punctuation.latinTrailingClosers);
+const ENGLISH_PAUSE = new Set<string>(RSVP_SPEC.punctuation.latinSentenceEnd);
 
 export function endsWithPunctuationPause(token: string): boolean {
   if (containsCJK(token)) {
@@ -252,21 +248,22 @@ export function endsWithPunctuationPause(token: string): boolean {
 }
 
 function safeWPM(wpm: number): number {
-  const raw = Number.isFinite(wpm) && wpm !== 0 ? wpm : 450;
-  return Math.min(1500, Math.max(100, raw));
+  const raw = Number.isFinite(wpm) && wpm !== 0 ? wpm : RSVP_SPEC.wpm.default;
+  return Math.min(RSVP_SPEC.wpm.maximum, Math.max(RSVP_SPEC.wpm.minimumSafe, raw));
 }
 
 export function durationMs(token: string, wpm: number, punctuationPause = true): number {
+  const d = RSVP_SPEC.duration;
   const safe = safeWPM(wpm);
-  const base = 60_000 / safe;
+  const base = d.baseMillisPerMinute / safe;
   const chars = [...token];
   const cjk = containsCJK(token);
   const focusableCount = chars.filter(c => isFocusable(c) || isCJKChar(c)).length;
-  const cjkMultiplier = cjk ? 1.5 : 1;
-  const lengthMultiplier = focusableCount > 9
-    ? 1 + Math.min((focusableCount - 9) * 0.07, 0.6)
+  const cjkMultiplier = cjk ? d.cjkMultiplier : 1;
+  const lengthMultiplier = focusableCount > d.lengthThreshold
+    ? 1 + Math.min((focusableCount - d.lengthThreshold) * d.lengthPerCharIncrement, d.lengthMaxIncrement)
     : 1;
-  const pauseMultiplier = punctuationPause && endsWithPunctuationPause(token) ? 1.65 : 1;
+  const pauseMultiplier = punctuationPause && endsWithPunctuationPause(token) ? d.pauseMultiplier : 1;
   return Math.round(base * cjkMultiplier * lengthMultiplier * pauseMultiplier);
 }
 

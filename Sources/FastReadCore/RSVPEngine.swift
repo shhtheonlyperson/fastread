@@ -5,12 +5,23 @@ public enum RSVPEngine {
     /// Bump when the tokenizer or shaper produces a materially different
     /// chunking for the same input. Persisted tokens whose recorded
     /// `tokenizerVersion` doesn't match are discarded and recomputed.
-    public static let version: Int = 1
-    public static let defaultWPM: Double = 450
-    public static let minimumSafeWPM: Double = 100
-    public static let minimumUserWPM: Double = 300
-    public static let maximumWPM: Double = 1_500
-    public static let wpmStep: Double = 25
+    // Constants & rule tables are single-sourced from Tools/rsvp-spec.json via
+    // the generated RSVPSpec (see RSVPSpec.generated.swift). Don't inline new
+    // literals here — add them to the spec so all three platforms stay in sync.
+    public static let version: Int = RSVPSpec.version
+    public static let defaultWPM: Double = RSVPSpec.WPM.default
+    public static let minimumSafeWPM: Double = RSVPSpec.WPM.minimumSafe
+    /// Latin-script floor for the user-facing WPM slider. CJK content uses the
+    /// lower `minimumUserWPM(forCJK:)` floor.
+    public static let minimumUserWPM: Double = RSVPSpec.WPM.minimumUserLatin
+    public static let maximumWPM: Double = RSVPSpec.WPM.maximum
+    public static let wpmStep: Double = RSVPSpec.WPM.step
+
+    /// Script-dependent floor for the WPM slider: CJK is denser per glyph and
+    /// already carries a duration multiplier, so it reads comfortably slower.
+    public static func minimumUserWPM(forCJK isCJK: Bool) -> Double {
+        isCJK ? RSVPSpec.WPM.minimumUserCJK : RSVPSpec.WPM.minimumUserLatin
+    }
 
     public struct FocusSplit: Equatable {
         public let before: String
@@ -110,15 +121,16 @@ public enum RSVPEngine {
 
     public static func duration(for token: String?, wpm: Double, punctuationPause: Bool = true) -> Int {
         let safeWPM = safeWPM(wpm)
-        let base = 60_000 / safeWPM
+        let base = RSVPSpec.Duration.baseMillisPerMinute / safeWPM
         let rawToken = token ?? ""
         let isCJK = hasCJK(rawToken)
         let focusableCount = Array(rawToken).filter { isFocusable($0) || isCJKCharacter($0) }.count
-        let cjkMultiplier = isCJK ? 1.5 : 1
-        let lengthMultiplier = focusableCount > 9
-            ? 1 + min(Double(focusableCount - 9) * 0.07, 0.6)
+        let cjkMultiplier = isCJK ? RSVPSpec.Duration.cjkMultiplier : 1
+        let threshold = RSVPSpec.Duration.lengthThreshold
+        let lengthMultiplier = focusableCount > threshold
+            ? 1 + min(Double(focusableCount - threshold) * RSVPSpec.Duration.lengthPerCharIncrement, RSVPSpec.Duration.lengthMaxIncrement)
             : 1
-        let pauseMultiplier = punctuationPause && endsWithPunctuationPause(rawToken) ? 1.65 : 1
+        let pauseMultiplier = punctuationPause && endsWithPunctuationPause(rawToken) ? RSVPSpec.Duration.pauseMultiplier : 1
 
         return Int((base * cjkMultiplier * lengthMultiplier * pauseMultiplier).rounded())
     }
@@ -316,23 +328,14 @@ public enum RSVPEngine {
 
     private static func isCJKCharacter(_ character: Character) -> Bool {
         character.unicodeScalars.contains { scalar in
-            inRange(scalar.value, 0x3040, 0x30ff) ||
-            inRange(scalar.value, 0x3400, 0x4dbf) ||
-            inRange(scalar.value, 0x4e00, 0x9fff) ||
-            inRange(scalar.value, 0xf900, 0xfaff) ||
-            inRange(scalar.value, 0xac00, 0xd7af)
+            RSVPSpec.cjkRanges.contains { $0.contains(scalar.value) }
         }
     }
 
     private static func isCJKPunctuation(_ character: Character) -> Bool {
         character.unicodeScalars.contains { scalar in
-            inRange(scalar.value, 0x3000, 0x303f) ||
-            inRange(scalar.value, 0xff00, 0xffef)
+            RSVPSpec.cjkPunctuationRanges.contains { $0.contains(scalar.value) }
         }
-    }
-
-    private static func inRange(_ value: UInt32, _ lower: UInt32, _ upper: UInt32) -> Bool {
-        value >= lower && value <= upper
     }
 
     private static func safeWPM(_ wpm: Double) -> Double {
@@ -346,8 +349,8 @@ public enum RSVPEngine {
             return isCJKPunctuation(last) || isASCIIPunctuationPause(last)
         }
 
-        let punctuation: Set<Character> = [".", "!", "?", ";", ":", ")"]
-        let trailingClosers: Set<Character> = ["\"", "'", ")", "]"]
+        let punctuation = RSVPSpec.latinSentenceEnd
+        let trailingClosers = RSVPSpec.latinTrailingClosers
         let characters = Array(token)
 
         for index in characters.indices.reversed() {
@@ -365,7 +368,7 @@ public enum RSVPEngine {
     }
 
     private static func isASCIIPunctuationPause(_ character: Character) -> Bool {
-        [".", ",", "!", "?", ";", ":"].contains(character)
+        RSVPSpec.asciiPause.contains(character)
     }
 }
 

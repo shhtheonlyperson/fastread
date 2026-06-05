@@ -14,10 +14,13 @@ object RSVPEngine {
     /// chunking for the same input. Persistence drops cached tokens whose
     /// stored `tokenizerVersion` no longer matches this value. Kept in
     /// lock-step with Sources/FastReadCore/RSVPEngine.swift.
-    const val VERSION: Int = 1
-    const val DEFAULT_WPM: Double = 450.0
-    const val MINIMUM_SAFE_WPM: Double = 100.0
-    const val MAXIMUM_WPM: Double = 1500.0
+    // Constants & rule tables are single-sourced from Tools/rsvp-spec.json via
+    // the generated RsvpSpec (see RsvpSpec.generated.kt). Don't inline new
+    // literals here — add them to the spec so all three platforms stay in sync.
+    const val VERSION: Int = RsvpSpec.VERSION
+    const val DEFAULT_WPM: Double = RsvpSpec.Wpm.DEFAULT
+    const val MINIMUM_SAFE_WPM: Double = RsvpSpec.Wpm.MINIMUM_SAFE
+    const val MAXIMUM_WPM: Double = RsvpSpec.Wpm.MAXIMUM
 
     data class FocusSplit(val before: String, val focus: String, val after: String)
 
@@ -75,15 +78,16 @@ object RSVPEngine {
 
     fun duration(token: String?, wpm: Double, punctuationPause: Boolean = true): Int {
         val safeWpm = safeWPM(wpm)
-        val base = 60_000.0 / safeWpm
+        val base = RsvpSpec.Duration.BASE_MILLIS_PER_MINUTE / safeWpm
         val raw = token ?: ""
         val isCJK = hasCJK(raw)
         val focusableCount = raw.toCharArray().count { isFocusable(it) || isCJKCharacter(it) }
-        val cjkMultiplier = if (isCJK) 1.5 else 1.0
-        val lengthMultiplier = if (focusableCount > 9)
-            1.0 + minOf((focusableCount - 9) * 0.07, 0.6)
+        val cjkMultiplier = if (isCJK) RsvpSpec.Duration.CJK_MULTIPLIER else 1.0
+        val threshold = RsvpSpec.Duration.LENGTH_THRESHOLD
+        val lengthMultiplier = if (focusableCount > threshold)
+            1.0 + minOf((focusableCount - threshold) * RsvpSpec.Duration.LENGTH_PER_CHAR_INCREMENT, RsvpSpec.Duration.LENGTH_MAX_INCREMENT)
         else 1.0
-        val pauseMultiplier = if (punctuationPause && endsWithPunctuationPause(raw)) 1.65 else 1.0
+        val pauseMultiplier = if (punctuationPause && endsWithPunctuationPause(raw)) RsvpSpec.Duration.PAUSE_MULTIPLIER else 1.0
         return (base * cjkMultiplier * lengthMultiplier * pauseMultiplier).toInt()
     }
 
@@ -256,26 +260,16 @@ object RSVPEngine {
 
     private fun hasCJK(s: String): Boolean = s.any(::isCJKCharacter)
 
-    private fun isCJKCharacter(c: Char): Boolean {
-        val v = c.code
-        return v in 0x3040..0x30ff ||
-            v in 0x3400..0x4dbf ||
-            v in 0x4e00..0x9fff ||
-            v in 0xf900..0xfaff ||
-            v in 0xac00..0xd7af
-    }
+    private fun isCJKCharacter(c: Char): Boolean = RsvpSpec.cjkRanges.any { c.code in it }
 
-    private fun isCJKPunctuation(c: Char): Boolean {
-        val v = c.code
-        return v in 0x3000..0x303f || v in 0xff00..0xffef
-    }
+    private fun isCJKPunctuation(c: Char): Boolean = RsvpSpec.cjkPunctuationRanges.any { c.code in it }
 
     private fun isFocusable(c: Char): Boolean {
         if (c.isLetter() || c.isDigit()) return true
         return false
     }
 
-    private fun isASCIIPunctuationPause(c: Char): Boolean = c in setOf('.', ',', '!', '?', ';', ':')
+    private fun isASCIIPunctuationPause(c: Char): Boolean = c in RsvpSpec.asciiPause
 
     private fun safeWPM(wpm: Double): Double {
         val raw = if (wpm.isFinite() && wpm != 0.0) wpm else DEFAULT_WPM
@@ -288,8 +282,8 @@ object RSVPEngine {
             val last = token.last()
             return isCJKPunctuation(last) || isASCIIPunctuationPause(last)
         }
-        val punctuation = setOf('.', '!', '?', ';', ':', ')')
-        val trailingClosers = setOf('"', '\'', ')', ']')
+        val punctuation = RsvpSpec.latinSentenceEnd
+        val trailingClosers = RsvpSpec.latinTrailingClosers
         for (i in token.indices.reversed()) {
             if (punctuation.contains(token[i])) {
                 val tail = token.substring(i + 1)

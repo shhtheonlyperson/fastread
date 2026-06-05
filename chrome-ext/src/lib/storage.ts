@@ -4,9 +4,15 @@ export type ChunkSize = 1 | 2 | 3;
 export type OrpAccent = 'coral' | 'merlot' | 'teal' | 'amber';
 export type LocalePref = 'en' | 'zh_TW';
 
-export const WPM_MIN = 150;
-export const WPM_MAX = 1500;
-export const WPM_STEP = 25;
+import { RSVP_SPEC } from './rsvpSpec.generated';
+
+// Single-sourced from Tools/rsvp-spec.json. WPM_MIN uses the CJK floor (the
+// extension's historical slider minimum); the higher Latin floor lives in
+// RSVP_SPEC.wpm.minimumUser.latin. TODO: make the slider floor language-aware
+// like the spec models (see Tools/rsvp-spec.json minimumUser).
+export const WPM_MIN = RSVP_SPEC.wpm.minimumUser.cjk;
+export const WPM_MAX = RSVP_SPEC.wpm.maximum;
+export const WPM_STEP = RSVP_SPEC.wpm.step;
 
 export interface Settings {
   theme: Theme;

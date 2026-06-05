@@ -49,9 +49,7 @@ enum ChunkShaper {
     /// (mergeCrossScriptUnits already handled e.g. 100|公斤) — the rule
     /// is "prep + number + ≥2-char noun", which leaves 在2025年 as
     /// `在 | 2025年` so the prep flashes alone like the corpus prefers.
-    private static let prepositionsForCompound: Set<Character> = [
-        "在", "從", "到", "向", "於",
-    ]
+    private static let prepositionsForCompound = RSVPSpec.ChunkShaper.prepositionsForCompound
 
     private static func mergePrepDigitNoun(_ tokens: [String]) -> [String] {
         var result: [String] = []
@@ -80,15 +78,7 @@ enum ChunkShaper {
     /// digit run. Kept short on purpose — false positives here are
     /// worse than missed glues, because anything wrongly merged shows
     /// up as a too-long chunk and we'll see it in the corpus.
-    private static let measureWords: Set<String> = [
-        "個", "位", "件", "種", "名", "次", "回", "張", "把", "條", "場", "份",
-        "年", "月", "日", "時", "分", "秒", "週", "季", "點", "天",
-        "小時", "分鐘", "秒鐘",
-        "公斤", "公克", "公尺", "公里", "公分", "公升",
-        "元", "塊", "毛", "億", "萬",
-        "度",
-        "個月", "個人", "歲",
-    ]
+    private static let measureWords = RSVPSpec.ChunkShaper.measureWords
 
     private static func mergeCrossScriptUnits(_ tokens: [String]) -> [String] {
         var result: [String] = []
@@ -124,11 +114,7 @@ enum ChunkShaper {
     /// 而 lives here because in 四言 verse it's most often the second
     /// half of a beat (學而 | 時習之); modern uses ('從容而堅定') also
     /// read naturally trailing.
-    private static let particlesBackward: Set<Character> = [
-        "了", "著", "過",                                 // aspect
-        "之", "矣", "哉", "焉", "乎", "而",                 // classical
-        "嗎", "呢", "吧", "啊", "喔", "耶", "呀", "嘛", "呵",  // sentence-final
-    ]
+    private static let particlesBackward = RSVPSpec.ChunkShaper.particlesBackward
 
     /// Particles whose semantic anchor is on the next token: structural
     /// 的, conjunctions, prepositions, copula 是, and the common
@@ -137,15 +123,7 @@ enum ChunkShaper {
     /// ICU has already split into singletons, and forward-gluing them
     /// would steal the first character of the next NP (我|跟|王|小明
     /// → 跟王 |…). Run coalescing handles them instead.
-    private static let particlesForward: Set<Character> = [
-        "在", "從", "對", "向", "把", "被", "給",    // prepositions
-        "及", "或",                                  // conjunctions
-        "是", "為",                                  // copula
-        "也", "又", "都", "還", "才", "就", "便",    // adverbs
-        "很", "更", "最", "太",                      // degree
-        "不", "沒", "未", "別",                      // negation
-        "新", "舊",                                   // common content modifiers
-    ]
+    private static let particlesForward = RSVPSpec.ChunkShaper.particlesForward
 
     /// 的 is a special case: it joins the *shorter* side of the noun
     /// phrase it sits between. Gold examples from the corpus:
@@ -156,9 +134,9 @@ enum ChunkShaper {
     ///   • 好(1) 的 沒問題(3)         → 好的 | 沒問題 (backward)
     /// Tie → forward (only one row in the corpus is a tie and either
     /// direction reads OK).
-    private static let possessiveDe: Character = "的"
+    private static let possessiveDe = RSVPSpec.ChunkShaper.possessiveDe
 
-    private static let maxMergedCJK = 4
+    private static let maxMergedCJK = RSVPSpec.ChunkShaper.maxMergedCJK
 
     private static func glueFunctionParticles(_ tokens: [String]) -> [String] {
         var result: [String] = []
@@ -249,9 +227,7 @@ enum ChunkShaper {
     /// Pronouns most likely to lead a run of singletons that the user
     /// wants split as `pronoun-V | rest` rather than `pronoun-V-V`.
     /// e.g., 你來看一下 → 你來 | 看一下 (gold) instead of 你來看 | 一下.
-    private static let pronouns: Set<Character> = [
-        "我", "你", "他", "她", "它", "您", "咱", "妳",
-    ]
+    private static let pronouns = RSVPSpec.ChunkShaper.pronouns
 
     /// Motion / aspect verbs that commonly start a VP right after a name,
     /// signalling a k=4 run should split as `name(3) | verb-led VP(N)`.
@@ -259,22 +235,14 @@ enum ChunkShaper {
     /// run char looks verb-like — keeps `黃|士|旗|去 + 吃飯 → 黃士旗 |
     /// 去吃飯` while leaving `阿|娜|擦|得 + 發光 → 阿娜 | 擦得 | 發光`
     /// (得 isn't a motion verb, the run is name + verb + complement).
-    private static let peelForwardVerbs: Set<Character> = [
-        "去", "來", "回", "走", "上", "下", "進", "出",
-        "看", "說", "講", "做", "想", "聽", "讀", "寫",
-        "吃", "喝", "買", "賣", "找",
-    ]
+    private static let peelForwardVerbs = RSVPSpec.ChunkShaper.peelForwardVerbs
 
     /// Hard punctuation that ends a clause / sentence — absorbing a
     /// stray singleton backward across one of these glues content from
     /// a new clause onto the tail of the old one (e.g., 說謊。+也 →
     /// 說謊。也). Block backward-absorb when the previous chunk ends
     /// with any of these.
-    private static let hardClauseEndings: Set<Character> = [
-        "。", "，", "！", "？", "；", "：",
-        "」", "』", "）", "》", "〉",
-        ".", ",", "!", "?", ";", ":",
-    ]
+    private static let hardClauseEndings = RSVPSpec.ChunkShaper.hardClauseEndings
 
     private static func coalesceSingleCharRuns(_ tokens: [String]) -> [String] {
         var result: [String] = []
@@ -464,10 +432,7 @@ enum ChunkShaper {
 
     private static func isHanCharacter(_ c: Character) -> Bool {
         c.unicodeScalars.contains { scalar in
-            let v = scalar.value
-            return (0x3400...0x4dbf).contains(v) ||  // CJK Ext A
-                   (0x4e00...0x9fff).contains(v) ||  // CJK
-                   (0xf900...0xfaff).contains(v)     // CJK Compatibility
+            RSVPSpec.hanRanges.contains { $0.contains(scalar.value) }
         }
     }
 }
