@@ -233,6 +233,7 @@ private fun JustReadApp(autoSweepSeconds: Int? = null) {
 
             Screen.Settings -> SettingsScreen(
                 wpm = store.wpm,
+                minimumWpm = store.currentMinimumWpm,
                 punctuationPause = store.punctuationPause,
                 focusIndicator = store.focusIndicator,
                 dictionary = store.dictionary,

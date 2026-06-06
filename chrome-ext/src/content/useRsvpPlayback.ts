@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RsvpEngine, type RsvpToken } from '../lib/rsvp';
-import { setSettings, WPM_MAX, WPM_MIN, WPM_STEP } from '../lib/storage';
+import { containsCJK } from '../lib/tokenizer';
+import { RSVP_SPEC } from '../lib/rsvpSpec.generated';
+import { setSettings, WPM_MAX, WPM_STEP } from '../lib/storage';
 
 interface Args {
   tokens: RsvpToken[];
@@ -33,6 +35,13 @@ export function useRsvpPlayback({ tokens, wpm, textContent, onExitToReader }: Ar
   const [playing, setPlaying] = useState(false);
   const engineRef = useRef<RsvpEngine | null>(null);
 
+  // CJK is denser per glyph and carries a duration multiplier, so it reads
+  // comfortably slower — its WPM floor drops below the Latin one.
+  const minWpm = useMemo(
+    () => (containsCJK(textContent) ? RSVP_SPEC.wpm.minimumUser.cjk : RSVP_SPEC.wpm.minimumUser.latin),
+    [textContent],
+  );
+
   useEffect(() => {
     const engine = new RsvpEngine({
       wpm,
@@ -63,7 +72,7 @@ export function useRsvpPlayback({ tokens, wpm, textContent, onExitToReader }: Ar
   };
 
   const adjustWpm = (delta: number) => {
-    const next = Math.min(WPM_MAX, Math.max(WPM_MIN, wpmRef.current + delta));
+    const next = Math.min(WPM_MAX, Math.max(minWpm, wpmRef.current + delta));
     setSettings({ wpm: next });
     wpmRef.current = next; // optimistic — keeps batched presses coherent.
   };

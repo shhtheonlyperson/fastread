@@ -65,7 +65,7 @@ struct SettingsView: View {
                             store.previewWPM(next)
                         }
                     ),
-                    in: RSVPEngine.minimumUserWPM...RSVPEngine.maximumWPM,
+                    in: store.currentMinimumWPM...RSVPEngine.maximumWPM,
                     onEditingChanged: { isEditing in
                         if !isEditing {
                             store.setWPM(paceDraft ?? store.wpm)
@@ -76,7 +76,7 @@ struct SettingsView: View {
                 .tint(JRColor.terracotta)
 
                 HStack {
-                    Text("Slow · 300")
+                    Text("Slow · \(Int(store.currentMinimumWPM))")
                     Spacer()
                     Text("Fast · 900")
                     Spacer()
@@ -190,7 +190,7 @@ struct SettingsView: View {
     }
 
     private func snappedWPM(_ value: Double) -> Double {
-        RSVPEngine.snapWPM(value)
+        store.snapWPM(value)
     }
 
     private var appVersion: String {

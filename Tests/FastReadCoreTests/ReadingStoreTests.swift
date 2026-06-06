@@ -194,6 +194,31 @@ final class ReadingStoreTests: XCTestCase {
         XCTAssertEqual(store.wpm, 475)
     }
 
+    func testWPMFloorIsLanguageAware() {
+        let store = makeStore()
+
+        // Latin article: floor is 300, so a slower request clamps up.
+        store.addDraftArticle(text: "This is a plain english article body long enough to read.", title: "English")
+        XCTAssertEqual(store.currentMinimumWPM, 300)
+        store.setWPM(150)
+        XCTAssertEqual(store.wpm, 300)
+
+        // CJK article: denser per glyph, so the floor drops to 150.
+        store.addDraftArticle(text: "這是一篇中文文章內容足夠長可以閱讀測試。", title: "中文")
+        XCTAssertEqual(store.currentMinimumWPM, 150)
+        store.setWPM(150)
+        XCTAssertEqual(store.wpm, 150)
+
+        // Switching back to the Latin article re-clamps the stored wpm up to
+        // its floor — never silently leaves it below the slider minimum.
+        guard let englishID = store.articles.first(where: { $0.title == "English" })?.id else {
+            return XCTFail("expected the English article to still be in the library")
+        }
+        store.openArticle(englishID, resume: true)
+        XCTAssertEqual(store.currentMinimumWPM, 300)
+        XCTAssertEqual(store.wpm, 300)
+    }
+
     func testSettingsRoundTripThroughUserDefaults() {
         do {
             let store = makeStore()

@@ -36,11 +36,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shhtheonlyperson.fastread.spike.data.FocusIndicatorStyle
-import com.shhtheonlyperson.fastread.spike.data.Persistence
 
 @Composable
 fun SettingsScreen(
     wpm: Int,
+    minimumWpm: Int,
     punctuationPause: Boolean,
     focusIndicator: FocusIndicatorStyle,
     dictionary: List<String>,
@@ -84,10 +84,10 @@ fun SettingsScreen(
                 )
             }
             Slider(
-                value = wpm.toFloat(),
-                onValueChange = { onWpmChange(Persistence.normalizedWPM(it.toInt())) },
-                valueRange = 300f..1500f,
-                steps = 23,
+                value = wpm.toFloat().coerceIn(minimumWpm.toFloat(), 1500f),
+                onValueChange = { onWpmChange(it.toInt()) },
+                valueRange = minimumWpm.toFloat()..1500f,
+                steps = ((1500 - minimumWpm) / 50 - 1).coerceAtLeast(0),
                 colors = justReadSliderColors(),
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
@@ -98,7 +98,7 @@ fun SettingsScreen(
                     .padding(bottom = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                SectionLabel("SLOW · 300")
+                SectionLabel("SLOW · $minimumWpm")
                 SectionLabel("FAST · 900")
                 SectionLabel("SPRINT · 1500")
             }

@@ -57,6 +57,27 @@ public final class ReadingStore: ObservableObject {
         return articles.firstIndex { $0.id == selectedArticleID } ?? (articles.isEmpty ? nil : 0)
     }
 
+    /// Whether the current article reads as CJK, sampled cheaply from the
+    /// short lede (falling back to title) so it can be read on every slider
+    /// tick without flattening the whole document.
+    private var currentArticleIsCJK: Bool {
+        guard let currentArticle else { return false }
+        let sample = currentArticle.lede.isEmpty ? currentArticle.title : currentArticle.lede
+        return RSVPEngine.containsCJK(sample)
+    }
+
+    /// Lowest WPM the slider allows for the current article. CJK is denser per
+    /// glyph and carries a duration multiplier, so it reads comfortably slower
+    /// (see RSVPSpec.WPM.minimumUser).
+    public var currentMinimumWPM: Double {
+        RSVPEngine.minimumUserWPM(forCJK: currentArticleIsCJK)
+    }
+
+    /// Clamp + snap a WPM value to the current article's script-aware range.
+    public func snapWPM(_ value: Double) -> Double {
+        RSVPEngine.snapWPM(value, forCJK: currentArticleIsCJK)
+    }
+
     public var recentSources: [RecentSource] {
         var seen = Set<String>()
         return articles
@@ -84,12 +105,15 @@ public final class ReadingStore: ObservableObject {
         self.articles = loadedArticles
         self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle)
         self.stats = StatsEngine.load(from: defaults.data(forKey: StorageKey.stats))
-        self.wpm = Self.normalizedWPM(settings.wpm)
+        // Provisional; re-snapped below once the selected article (and so its
+        // script-aware floor) is resolved.
+        self.wpm = settings.wpm
         self.punctuationPause = settings.punctuationPause
         self.focusIndicator = settings.focusIndicator
         self.userDictionary = Self.loadUserDictionary(from: defaults)
 
         ensureSelectedArticle()
+        self.wpm = snapWPM(settings.wpm)
         StatsEngine.rollStatsIfNeeded(into: &stats, wpm: wpm)
     }
 
@@ -113,6 +137,11 @@ public final class ReadingStore: ObservableObject {
                 }
             }
         }
+
+        // The new article's script may raise the floor (e.g. switching from a
+        // CJK article read at 150 to a Latin one). Re-snap so the stored wpm
+        // never sits below the slider's minimum; snapping only ever raises it.
+        updateWPM(wpm, persist: true)
     }
 
     public func setWPM(_ value: Double) {
@@ -364,7 +393,7 @@ public final class ReadingStore: ObservableObject {
     }
 
     private func updateWPM(_ value: Double, persist: Bool) {
-        let next = Self.normalizedWPM(value)
+        let next = snapWPM(value)
         guard next != wpm else {
             if persist { persistSettings() }
             return
@@ -526,10 +555,6 @@ public final class ReadingStore: ObservableObject {
     private static func estimatedMinutes(for words: Int, wpm: Double) -> Int {
         guard words > 0 else { return 0 }
         return max(1, Int(ceil(RSVPEngine.estimateMinutes(wordCount: words, wpm: wpm))))
-    }
-
-    private static func normalizedWPM(_ value: Double) -> Double {
-        RSVPEngine.snapWPM(value)
     }
 
     private func tokens(for article: ReadingArticle) -> [String] {

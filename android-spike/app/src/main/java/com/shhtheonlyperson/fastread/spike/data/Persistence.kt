@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.shhtheonlyperson.fastread.spike.core.RSVPEngine
+import com.shhtheonlyperson.fastread.spike.core.RsvpSpec
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
@@ -43,6 +44,18 @@ class Persistence(context: Context) {
             ?.let { id -> articles.firstOrNull { it.id == id } }
             ?: articles.firstOrNull()
 
+    /** Sampled cheaply from the short lede (falling back to title) so it's safe
+     *  to read on every slider tick without flattening the whole document. */
+    private val currentArticleIsCjk: Boolean
+        get() = currentArticle?.let { RSVPEngine.containsCJK(it.lede.ifBlank { it.title }) } ?: false
+
+    /** Lowest WPM the slider allows for the current article: CJK reads slower
+     *  per glyph, so its floor drops below the Latin one (see RsvpSpec). */
+    val currentMinimumWpm: Int
+        get() = (if (currentArticleIsCjk) RsvpSpec.Wpm.MINIMUM_USER_CJK else RsvpSpec.Wpm.MINIMUM_USER_LATIN).toInt()
+
+    private fun snapWpm(value: Int): Int = normalizedWPM(value, currentMinimumWpm)
+
     val recentSources: List<RecentSource>
         get() {
             val seen = mutableSetOf<String>()
@@ -61,6 +74,9 @@ class Persistence(context: Context) {
 
     init {
         ensureSelectedArticle()
+        // Re-snap now that the selected article (and so its script-aware floor)
+        // is resolved.
+        wpm = snapWpm(loadWPM())
         rollStatsIfNeeded()
         persistSettings()
     }
@@ -77,10 +93,13 @@ class Persistence(context: Context) {
                 progress = if (resume || article.isFinished) article.progress else 0.0,
             )
         }
+        // The new article's script may raise the floor; re-snap so the stored
+        // wpm never sits below the slider minimum (snapping only raises it).
+        setWPM(wpm)
     }
 
     fun setWPM(value: Int) {
-        val next = normalizedWPM(value)
+        val next = snapWpm(value)
         if (next == wpm) return
         wpm = next
         persistSettings()
@@ -480,10 +499,10 @@ class Persistence(context: Context) {
             const val tokenSeparator = '\u0001'
         }
 
-        fun normalizedWPM(value: Int): Int {
-            val clamped = value.coerceIn(300, RSVPEngine.MAXIMUM_WPM.toInt())
-            return ((((clamped - 300) / 50.0).roundToInt() * 50) + 300)
-                .coerceIn(300, RSVPEngine.MAXIMUM_WPM.toInt())
+        fun normalizedWPM(value: Int, floor: Int = RsvpSpec.Wpm.MINIMUM_USER_LATIN.toInt()): Int {
+            val max = RSVPEngine.MAXIMUM_WPM.toInt()
+            val clamped = value.coerceIn(floor, max)
+            return ((((clamped - floor) / 50.0).roundToInt() * 50) + floor).coerceIn(floor, max)
         }
 
         private fun nowMillis(): Long = System.currentTimeMillis()
