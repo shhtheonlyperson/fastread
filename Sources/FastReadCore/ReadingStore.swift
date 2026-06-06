@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import OSLog
 
 @MainActor
 public final class ReadingStore: ObservableObject {
@@ -19,12 +18,9 @@ public final class ReadingStore: ObservableObject {
     @Published public var sourceStatus = ""
 
     private var playbackTask: Task<Void, Never>?
-    /// In-memory fallback for articles whose persisted `tokens` slot is
-    /// nil (legacy upgrade, or after a user-dictionary change). Lookups
-    /// hit `article.tokens` first; this dict only matters until the next
-    /// mutation re-persists tokens on the article record.
-    private var tokenCache: [String: [String]] = [:]
-    private var documentMetadataCache: [String: DocumentMetadataCacheEntry] = [:]
+    /// Tokenization + section-boundary memo. Owns the per-article caches and
+    /// the version-gated fast path (see ArticleContentCache).
+    private let contentCache = ArticleContentCache()
     private let defaults: UserDefaults
 
     public var currentArticle: ReadingArticle? {
@@ -87,14 +83,14 @@ public final class ReadingStore: ObservableObject {
         let loadedArticles = Self.loadArticles(from: defaults)
         self.articles = loadedArticles
         self.selectedArticleID = defaults.string(forKey: StorageKey.selectedArticle)
-        self.stats = Self.loadStats(from: defaults)
+        self.stats = StatsEngine.load(from: defaults.data(forKey: StorageKey.stats))
         self.wpm = Self.normalizedWPM(settings.wpm)
         self.punctuationPause = settings.punctuationPause
         self.focusIndicator = settings.focusIndicator
         self.userDictionary = Self.loadUserDictionary(from: defaults)
 
         ensureSelectedArticle()
-        rollStatsIfNeeded()
+        StatsEngine.rollStatsIfNeeded(into: &stats, wpm: wpm)
     }
 
     deinit {
@@ -150,8 +146,7 @@ public final class ReadingStore: ObservableObject {
         // and section offsets must be recomputed on next access. Strip
         // the persisted per-article tokens too so the version-gated fast
         // path falls through to a fresh tokenize on next access.
-        tokenCache.removeAll(keepingCapacity: true)
-        documentMetadataCache.removeAll(keepingCapacity: true)
+        contentCache.invalidateAll()
         var changed = false
         for index in articles.indices {
             if articles[index].tokens != nil || articles[index].tokenizerVersion != nil {
@@ -321,7 +316,7 @@ public final class ReadingStore: ObservableObject {
             tokens: tokens,
             tokenizerVersion: RSVPEngine.version
         )
-        tokenCache[article.id] = tokens
+        contentCache.store(tokens: tokens, for: article.id)
         articles.insert(article, at: 0)
         selectedArticleID = article.id
         persistSelectedArticleID()
@@ -337,8 +332,7 @@ public final class ReadingStore: ObservableObject {
         }
 
         articles.remove(at: deletedIndex)
-        tokenCache.removeValue(forKey: id)
-        documentMetadataCache.removeValue(forKey: id)
+        contentCache.remove(id)
 
         if deletedSelectedArticle {
             selectedArticleID = articles.indices.contains(deletedIndex)
@@ -437,57 +431,13 @@ public final class ReadingStore: ObservableObject {
 
     private func recordReadWords(_ count: Int) {
         guard count > 0 else { return }
-        startActivityIfNeeded()
-        stats.today.words += count
-        stats.today.minutes = Self.estimatedMinutes(for: stats.today.words, wpm: wpm)
-        if let todayIndex = stats.week.firstIndex(where: { $0.date == Self.dayKey(for: Date()) }) {
-            stats.week[todayIndex].words += count
-        }
-        stats.avgWPM = Int(wpm.rounded())
-        stats.bestWPM = max(stats.bestWPM, Int(wpm.rounded()))
+        StatsEngine.recordReadWords(count, into: &stats, wpm: wpm)
         persistStats()
     }
 
     private func recordFinishedArticle() {
-        startActivityIfNeeded()
-        stats.today.articles += 1
-        stats.today.minutes = Self.estimatedMinutes(for: stats.today.words, wpm: wpm)
-        stats.totalArticles += 1
-        stats.avgWPM = Int(wpm.rounded())
-        stats.bestWPM = max(stats.bestWPM, Int(wpm.rounded()))
+        StatsEngine.recordFinishedArticle(into: &stats, wpm: wpm)
         persistStats()
-    }
-
-    private func startActivityIfNeeded(now: Date = Date()) {
-        rollStatsIfNeeded(now: now)
-        let todayKey = Self.dayKey(for: now)
-        let alreadyActiveToday = stats.lastActiveDay == todayKey && (stats.today.words > 0 || stats.today.articles > 0)
-        guard !alreadyActiveToday else { return }
-
-        if let lastActiveDay = stats.lastActiveDay,
-           let lastActiveDate = Self.date(fromDayKey: lastActiveDay),
-           Calendar.current.isDate(lastActiveDate, inSameDayAs: Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now) {
-            stats.streak += 1
-        } else {
-            stats.streak = 1
-        }
-        stats.lastActiveDay = todayKey
-    }
-
-    private func rollStatsIfNeeded(now: Date = Date()) {
-        let todayKey = Self.dayKey(for: now)
-        let datedWeek = stats.week.filter { $0.date != nil }
-        let wordsByDay = Dictionary(uniqueKeysWithValues: datedWeek.map { ($0.date ?? $0.day, $0.words) })
-        stats.week = Self.weekTemplate(endingAt: now).map { day in
-            DayWords(date: day.date, day: day.day, words: wordsByDay[day.date ?? day.day] ?? 0)
-        }
-
-        if stats.lastActiveDay != todayKey {
-            stats.today = TodayStats(words: wordsByDay[todayKey] ?? 0, minutes: 0, articles: 0)
-        } else if let todayWords = stats.week.first(where: { $0.date == todayKey })?.words {
-            stats.today.words = todayWords
-        }
-        stats.today.minutes = Self.estimatedMinutes(for: stats.today.words, wpm: wpm)
     }
 
     private func persistSettings() {
@@ -556,57 +506,6 @@ public final class ReadingStore: ObservableObject {
         return articles
     }
 
-    private static func loadStats(from defaults: UserDefaults) -> ReadingStats {
-        guard
-            let data = defaults.data(forKey: StorageKey.stats),
-            let stats = try? JSONDecoder().decode(ReadingStats.self, from: data)
-        else {
-            return emptyStats()
-        }
-
-        guard stats.week.allSatisfy({ $0.date != nil }) else {
-            return emptyStats()
-        }
-        return stats
-    }
-
-    private static func emptyStats(for date: Date = Date()) -> ReadingStats {
-        ReadingStats(
-            today: TodayStats(words: 0, minutes: 0, articles: 0),
-            week: weekTemplate(endingAt: date),
-            streak: 0,
-            avgWPM: 0,
-            bestWPM: 0,
-            totalArticles: 0,
-            lastActiveDay: nil
-        )
-    }
-
-    private static func weekTemplate(endingAt date: Date) -> [DayWords] {
-        let calendar = Calendar.current
-        return (0..<7).compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: offset - 6, to: date) else { return nil }
-            return DayWords(date: dayKey(for: day), day: weekdayLabel(for: day), words: 0)
-        }
-    }
-
-    private static func dayKey(for date: Date) -> String {
-        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
-    }
-
-    private static func date(fromDayKey key: String) -> Date? {
-        let parts = key.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3 else { return nil }
-        return Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
-    }
-
-    private static func weekdayLabel(for date: Date) -> String {
-        let weekday = Calendar.current.component(.weekday, from: date)
-        let symbols = Calendar.current.shortWeekdaySymbols
-        return symbols.indices.contains(weekday - 1) ? symbols[weekday - 1] : ""
-    }
-
     private static func displayDate(for date: Date) -> String {
         date.formatted(.dateTime.month(.abbreviated).day().year())
     }
@@ -634,55 +533,16 @@ public final class ReadingStore: ObservableObject {
     }
 
     private func tokens(for article: ReadingArticle) -> [String] {
-        // Fast path: the article carries its tokens from import / last
-        // mutation and the recorded version still matches the engine.
-        if let persisted = article.tokens,
-           let recorded = article.tokenizerVersion,
-           recorded == RSVPEngine.version {
-            return persisted
-        }
-        // Memo path: read-only callers (list rows, lede previews) hit
-        // here on a legacy upgrade or right after an invalidate.
-        // `updateSelectedArticle` re-persists tokens on the next mutation.
-        if let cached = tokenCache[article.id] {
-            return cached
-        }
-        let tokens = PerformanceTrace.measure("Tokenize Article") {
-            RSVPEngine.tokenize(article.text, userDictionary: userDictionary)
-        }
-        tokenCache[article.id] = tokens
-        return tokens
+        contentCache.tokens(for: article, userDictionary: userDictionary)
     }
 
     @discardableResult
     private func ensureTokens(for article: inout ReadingArticle) -> [String] {
-        if let persisted = article.tokens,
-           let recorded = article.tokenizerVersion,
-           recorded == RSVPEngine.version {
-            return persisted
-        }
-        let fresh = PerformanceTrace.measure("Tokenize Article") {
-            RSVPEngine.tokenize(article.text, userDictionary: userDictionary)
-        }
-        article.tokens = fresh
-        article.tokenizerVersion = RSVPEngine.version
-        tokenCache[article.id] = fresh
-        return fresh
+        contentCache.ensureTokens(for: &article, userDictionary: userDictionary)
     }
 
-    private func documentMetadata(for article: ReadingArticle) -> DocumentMetadataCacheEntry {
-        if let cached = documentMetadataCache[article.id] {
-            return cached
-        }
-        let metadata = PerformanceTrace.measure("Build Document Metadata") {
-            let boundaries = Document.sectionBoundaries(article.document, userDictionary: userDictionary)
-            return DocumentMetadataCacheEntry(
-                boundaries: boundaries,
-                frontMatter: Document.detectFrontMatter(article.document, boundaries: boundaries)
-            )
-        }
-        documentMetadataCache[article.id] = metadata
-        return metadata
+    private func documentMetadata(for article: ReadingArticle) -> ArticleContentCache.DocumentMetadataEntry {
+        contentCache.documentMetadata(for: article, userDictionary: userDictionary)
     }
 
     private static func makeLede(from text: String, tokens: [String]) -> String {
@@ -706,28 +566,10 @@ public struct RecentSource: Identifiable, Equatable, Sendable {
     public var id: String { (url ?? label).lowercased() }
 }
 
-private enum PerformanceTrace {
-    private static let log = OSLog(subsystem: "com.shh.fastread", category: .pointsOfInterest)
-
-    static func measure<T>(_ name: StaticString, _ operation: () throws -> T) rethrows -> T {
-        let id = OSSignpostID(log: log)
-        os_signpost(.begin, log: log, name: name, signpostID: id)
-        defer {
-            os_signpost(.end, log: log, name: name, signpostID: id)
-        }
-        return try operation()
-    }
-}
-
 private struct SettingsPayload: Codable {
     public var wpm: Double
     public var punctuationPause: Bool
     public var focusIndicator: FocusIndicatorStyle
-}
-
-private struct DocumentMetadataCacheEntry {
-    public var boundaries: [Document.SectionBoundary]
-    public var frontMatter: Document.FrontMatterDetection
 }
 
 private enum StorageKey {
