@@ -27,6 +27,10 @@ enum RSVPSpec {
     static let hanRanges: [ClosedRange<UInt32>] = [0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF]
     static let cjkPunctuationRanges: [ClosedRange<UInt32>] = [0x3000...0x303F, 0xFF00...0xFFEF]
 
+    @inline(__always) static func isCJKScalar(_ v: UInt32) -> Bool { (v >= 0x3040 && v <= 0x30FF) || (v >= 0x3400 && v <= 0x4DBF) || (v >= 0x4E00 && v <= 0x9FFF) || (v >= 0xF900 && v <= 0xFAFF) || (v >= 0xAC00 && v <= 0xD7AF) }
+    @inline(__always) static func isHanScalar(_ v: UInt32) -> Bool { (v >= 0x3400 && v <= 0x4DBF) || (v >= 0x4E00 && v <= 0x9FFF) || (v >= 0xF900 && v <= 0xFAFF) }
+    @inline(__always) static func isCJKPunctuationScalar(_ v: UInt32) -> Bool { (v >= 0x3000 && v <= 0x303F) || (v >= 0xFF00 && v <= 0xFFEF) }
+
     static let asciiPause: Set<Character> = [".", ",", "!", "?", ";", ":"]
     static let latinSentenceEnd: Set<Character> = [".", "!", "?", ";", ":", ")"]
     static let latinTrailingClosers: Set<Character> = ["\"", "'", ")", "]"]

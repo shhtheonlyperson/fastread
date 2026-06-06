@@ -431,8 +431,6 @@ enum ChunkShaper {
     // RSVPEngine's private helpers).
 
     private static func isHanCharacter(_ c: Character) -> Bool {
-        c.unicodeScalars.contains { scalar in
-            RSVPSpec.hanRanges.contains { $0.contains(scalar.value) }
-        }
+        c.unicodeScalars.contains { RSVPSpec.isHanScalar($0.value) }
     }
 }

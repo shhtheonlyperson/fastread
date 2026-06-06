@@ -336,15 +336,11 @@ public enum RSVPEngine {
     }
 
     private static func isCJKCharacter(_ character: Character) -> Bool {
-        character.unicodeScalars.contains { scalar in
-            RSVPSpec.cjkRanges.contains { $0.contains(scalar.value) }
-        }
+        character.unicodeScalars.contains { RSVPSpec.isCJKScalar($0.value) }
     }
 
     private static func isCJKPunctuation(_ character: Character) -> Bool {
-        character.unicodeScalars.contains { scalar in
-            RSVPSpec.cjkPunctuationRanges.contains { $0.contains(scalar.value) }
-        }
+        character.unicodeScalars.contains { RSVPSpec.isCJKPunctuationScalar($0.value) }
     }
 
     private static func safeWPM(_ wpm: Double) -> Double {

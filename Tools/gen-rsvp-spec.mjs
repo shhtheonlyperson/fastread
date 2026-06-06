@@ -29,6 +29,11 @@ function swiftChar(s) {
 }
 const swiftCharSet = (arr) => `[${arr.map(swiftChar).join(', ')}]`;
 const swiftRanges = (arr) => `[${arr.map(([a, b]) => `${hex(a)}...${hex(b)}`).join(', ')}]`;
+// Inline OR-expression over a scalar value `v` — compiles to the same branch
+// chain the hand-written helpers used, so the per-character hot path (CJK/Han
+// detection over whole documents) stays fast despite being single-sourced.
+const swiftScalarPredicate = (arr) =>
+  arr.map(([a, b]) => `(v >= ${hex(a)} && v <= ${hex(b)})`).join(' || ');
 
 function emitSwift() {
   const c = spec.chunkShaper;
@@ -56,6 +61,9 @@ function emitSwift() {
     `    static let cjkRanges: [ClosedRange<UInt32>] = ${swiftRanges(spec.ranges.cjk)}\n` +
     `    static let hanRanges: [ClosedRange<UInt32>] = ${swiftRanges(spec.ranges.han)}\n` +
     `    static let cjkPunctuationRanges: [ClosedRange<UInt32>] = ${swiftRanges(spec.ranges.cjkPunctuation)}\n\n` +
+    `    @inline(__always) static func isCJKScalar(_ v: UInt32) -> Bool { ${swiftScalarPredicate(spec.ranges.cjk)} }\n` +
+    `    @inline(__always) static func isHanScalar(_ v: UInt32) -> Bool { ${swiftScalarPredicate(spec.ranges.han)} }\n` +
+    `    @inline(__always) static func isCJKPunctuationScalar(_ v: UInt32) -> Bool { ${swiftScalarPredicate(spec.ranges.cjkPunctuation)} }\n\n` +
     `    static let asciiPause: Set<Character> = ${swiftCharSet(spec.punctuation.asciiPause)}\n` +
     `    static let latinSentenceEnd: Set<Character> = ${swiftCharSet(spec.punctuation.latinSentenceEnd)}\n` +
     `    static let latinTrailingClosers: Set<Character> = ${swiftCharSet(spec.punctuation.latinTrailingClosers)}\n\n` +
